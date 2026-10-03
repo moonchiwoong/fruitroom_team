@@ -1,0 +1,7 @@
+export type Lot={id:string;name:string;variety:string;harvest_date:string;intake_date:string;location:string;sensor_id:string;quantity:number;storage:string;mcp:string;packaging:string;firmness:number|null;brix:number|null;weight:number|null;acidity:number|null;notes:string;created_at:string;environment_count?:number;observation_count?:number;photo_count?:number};
+export type EnvRow={timestamp:string;sensor_id:string;temperature:number;humidity:number};
+export type Observation={id:string;lot_id:string;date:string;firmness:number|null;brix:number|null;weight:number|null;defects:string;sample_count:number;notes:string};
+export type Photo={id:string;date:string;name:string;notes:string};
+export type Stats={count:number;meanTemperature:number|null;sdTemperature:number|null;meanHumidity:number|null;sdHumidity:number|null;minTemperature:number|null;maxTemperature:number|null;gapCount:number;missingSlots:number;expectedIntervalMinutes:number|null;outOfRangeHours:number;coverageHours:number;futureExcluded:number;lastRecorded:string|null;stale:boolean;rows:EnvRow[]};
+export type Prediction={mode:'demo_only'|'unavailable';reason?:string;asOf:string;horizonDays:number;firmness:number|null;weightLoss:number|null;assumedTemperature:number;assumedHumidity:number;errorRange:null;modelVersion:string;sampleOnly:true;limitations:string[]};
+export const today=()=>new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});

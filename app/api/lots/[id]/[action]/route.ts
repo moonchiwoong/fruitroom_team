@@ -1,0 +1,4 @@
+import {getAnalysis,uploadEnvironment,addObservation,uploadPhoto,makePrediction,json,errorResponse} from '@/lib/lot-server';
+type Context={params:Promise<{id:string;action:string}>};
+export async function GET(req:Request,ctx:Context){try{const {id,action}=await ctx.params;if(action==='analysis'||action==='environment-summary')return json(await getAnalysis(id,req));return json({error:'요청 경로가 없습니다.'},404);}catch(e){return errorResponse(e);}}
+export async function POST(req:Request,ctx:Context){try{const {id,action}=await ctx.params;if(action==='environment')return await uploadEnvironment(id,req);if(action==='observations')return await addObservation(id,req);if(action==='photos')return await uploadPhoto(id,req);if(action==='predictions')return await makePrediction(id,req);return json({error:'요청 경로가 없습니다.'},404);}catch(e){return errorResponse(e);}}
