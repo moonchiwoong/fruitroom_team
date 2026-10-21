@@ -1,18 +1,29 @@
 'use client';
-import {useMemo, useState} from 'react';
-import {ArrowDown, ArrowUp, Minus, CloudRain, Download, Info, MapPin, RotateCcw, Sprout, Thermometer, TriangleAlert, Warehouse} from 'lucide-react';
+import {useCallback, useEffect, useMemo, useState} from 'react';
+import {ArrowDown, ArrowUp, Minus, Bookmark, BookmarkCheck, FolderOpen, Loader2, Save, Trash2, UserRound, CloudRain, Download, Info, MapPin, RotateCcw, Sprout, Thermometer, TriangleAlert, Warehouse} from 'lucide-react';
 import {
   contributions, defaultInputs, inputInfo, inputKeys, MAX_STORAGE_DAYS, metricInfo, metricKeys, predictAll, predictMetric,
   regionIds, regions, regionSummary, reliability, samples, storageFormula, storageIds, storageInfo, storageMetricInfo, storageValue,
   type Initial, type InputKey, type Inputs, type MetricKey, type RegionId, type StorageMetric,
 } from '@/lib/initial-quality';
+import {useTeamSession} from '@/components/team-auth';
+import {deletePrediction, listPredictions, savePrediction, type SavedPrediction} from '@/lib/my-predictions';
 
 const fmt = (v: number, d: number) => (Number.isFinite(v) ? v.toLocaleString('ko-KR', {minimumFractionDigits: d, maximumFractionDigits: d}) : '—');
 const inputIcon: Record<InputKey, typeof CloudRain> = {rain9: CloudRain, lc56: Sprout, lc78: Sprout, min4: Thermometer};
 
 export default function InitialQuality() {
-  const [region, setRegion] = useState<RegionId>('cheongsong');
-  const [text, setText] = useState<Record<InputKey, string>>(() => toText(defaultInputs('cheongsong')));
+  const session = useTeamSession();
+  const home = session?.profile.region || 'cheongsong';
+  // 내 기본값(산지·기상값)이 있으면 그 값으로 시작합니다.
+  const startInputs = (r: RegionId) => r === session?.profile.region && session?.profile.default_inputs ? session.profile.default_inputs : defaultInputs(r);
+  const [region, setRegion] = useState<RegionId>(home);
+  const [text, setText] = useState<Record<InputKey, string>>(() => toText(startInputs(home)));
+  const [saved, setSaved] = useState<SavedPrediction[] | null>(null), [savedError, setSavedError] = useState('');
+  const [title, setTitle] = useState(''), [busy, setBusy] = useState(''), [flash, setFlash] = useState('');
+  const refreshSaved = useCallback(() => { listPredictions().then(r => { setSaved(r); setSavedError(''); }).catch(e => { setSaved([]); setSavedError((e as Error).message); }); }, []);
+  useEffect(() => { if (session) refreshSaved(); }, [session?.userId, refreshSaved]);
+  useEffect(() => { if (!flash) return; const t = setTimeout(() => setFlash(''), 3500); return () => clearTimeout(t); }, [flash]);
   const [metric, setMetric] = useState<MetricKey>('firmness');
   const summary = regionSummary(region);
 
@@ -21,7 +32,22 @@ export default function InitialQuality() {
   const outside = valid ? inputKeys.filter(k => inputs[k] < summary.inputRange[k].min || inputs[k] > summary.inputRange[k].max) : [];
   const result = valid ? predictAll(region, inputs) : null;
 
-  function chooseRegion(r: RegionId) { setRegion(r); setText(toText(defaultInputs(r))); }
+  function chooseRegion(r: RegionId) { setRegion(r); setText(toText(startInputs(r))); }
+  async function saveRecord() {
+    if (!result) return; setBusy('save');
+    try { const rec = await savePrediction({region, title: title.trim() || `${regions[region].name} · ${new Date().toLocaleDateString('ko-KR')}`, inputs, result}); setSaved(s => [rec, ...(s ?? [])]); setTitle(''); setFlash('예측 기록에 저장했어요.'); }
+    catch (e) { setFlash((e as Error).message); } finally { setBusy(''); }
+  }
+  async function saveDefaults() {
+    if (!session || !valid) return; setBusy('default');
+    const err = await session.saveProfile({region, default_inputs: inputs}); setBusy(''); setFlash(err ?? '이 산지와 기상값을 내 기본값으로 저장했어요.');
+  }
+  function openRecord(r: SavedPrediction) { setRegion(r.region); setText(toText(r.inputs)); window.scrollTo({top: 0, behavior: 'smooth'}); setFlash(`‘${r.title}’ 기록을 불러왔어요.`); }
+  async function removeRecord(r: SavedPrediction) {
+    if (!window.confirm(`‘${r.title}’ 기록을 삭제할까요?`)) return;
+    try { await deletePrediction(r.id); setSaved(s => (s ?? []).filter(x => x.id !== r.id)); } catch (e) { setFlash((e as Error).message); }
+  }
+  const isMyDefault = !!session?.profile.default_inputs && session.profile.region === region && inputKeys.every(k => session.profile.default_inputs![k] === inputs[k]);
   function loadYear(y: string) {
     const row = summary.yearMeans.find(m => String(m.year) === y);
     if (row) setText(toText(Object.fromEntries(inputKeys.map(k => [k, Math.round(row.inputs[k] * 10) / 10])) as Inputs));
@@ -54,6 +80,7 @@ export default function InitialQuality() {
             </select>
           </label>
           <button className="btn btn-ghost" onClick={() => setText(toText(defaultInputs(region)))}><RotateCcw size={15} />전체 평균값</button>
+          {session?.profile.default_inputs && session.profile.region === region && <button className="btn btn-ghost" onClick={() => setText(toText(session.profile.default_inputs!))}><UserRound size={15} />내 기본값</button>}
         </div>
         <div className="iq-inputs">
           {inputKeys.map(k => {
@@ -96,7 +123,18 @@ export default function InitialQuality() {
             </button>;
           })}
         </div>}
-        {result && <button className="btn btn-outline iq-download" onClick={() => downloadCsv(region, inputs, result)}><Download size={15} />예측 결과 CSV 저장</button>}
+        {result && session && <div className="iq-save">
+          <div className="iq-save-row">
+            <input value={title} onChange={e => setTitle(e.target.value)} maxLength={80} placeholder={`기록 이름 (예: ${regions[region].name} 우리 과원 ${new Date().getFullYear()})`} aria-label="예측 기록 이름" />
+            <button className="btn btn-primary" onClick={saveRecord} disabled={busy === 'save'}>{busy === 'save' ? <Loader2 className="spin" size={15} /> : <Save size={15} />}기록 저장</button>
+          </div>
+          <div className="iq-save-row">
+            <button className="btn btn-outline" onClick={saveDefaults} disabled={busy === 'default' || isMyDefault}>{isMyDefault ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}{isMyDefault ? '내 기본값과 같아요' : '이 값을 내 기본값으로'}</button>
+            <button className="btn btn-outline" onClick={() => downloadCsv(region, inputs, result)}><Download size={15} />CSV 저장</button>
+          </div>
+          {flash && <p className="iq-flash" role="status">{flash}</p>}
+        </div>}
+        {result && !session && <button className="btn btn-outline iq-download" onClick={() => downloadCsv(region, inputs, result)}><Download size={15} />예측 결과 CSV 저장</button>}
       </section>
     </div>
 
@@ -113,6 +151,22 @@ export default function InitialQuality() {
     </div>}
 
     {result && <Storage predicted={{firmness: result.firmness, brix: result.brix, acidity: result.acidity}} />}
+
+    {session && <section className="iq-card" id="my-predictions">
+      <div className="iq-card-head"><div><h3><FolderOpen size={18} />내 예측 기록</h3><p>저장한 예측은 나만 볼 수 있어요. 불러오면 그때의 산지와 기상값으로 다시 계산합니다.</p></div></div>
+      {saved === null ? <div className="loading-strip"><Loader2 className="spin" size={16} />불러오는 중…</div>
+        : savedError ? <div className="iq-alert">{savedError}</div>
+        : !saved.length ? <p className="iq-empty">아직 저장한 예측이 없어요. 위에서 ‘기록 저장’을 눌러 보세요.</p>
+        : <div className="iq-table-wrap"><table className="iq-table iq-saved">
+          <thead><tr><th>기록</th><th>산지</th>{metricKeys.map(m => <th key={m}>{metricInfo[m].label} <small>{metricInfo[m].unit}</small></th>)}<th>저장일</th><th /></tr></thead>
+          <tbody>{saved.map(r => <tr key={r.id}>
+            <td className="iq-saved-title">{r.title}</td><td>{regions[r.region]?.name ?? r.region}</td>
+            {metricKeys.map(m => <td key={m}>{fmt(r.result[m], metricInfo[m].digits)}</td>)}
+            <td>{new Date(r.created_at).toLocaleDateString('ko-KR')}</td>
+            <td className="iq-saved-actions"><button className="btn btn-ghost" onClick={() => openRecord(r)}>불러오기</button><button className="btn btn-ghost iq-del" onClick={() => removeRecord(r)} aria-label={`${r.title} 삭제`}><Trash2 size={15} /></button></td>
+          </tr>)}</tbody>
+        </table></div>}
+    </section>}
 
     <section className="iq-card iq-method">
       <div className="iq-card-head"><div><h3><Info size={17} />예측 방법과 한계</h3></div></div>

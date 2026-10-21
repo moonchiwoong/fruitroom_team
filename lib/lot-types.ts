@@ -1,4 +1,4 @@
-export type Lot={id:string;name:string;variety:string;harvest_date:string;intake_date:string;location:string;sensor_id:string;quantity:number;storage:string;mcp:string;packaging:string;firmness:number|null;brix:number|null;weight:number|null;acidity:number|null;notes:string;created_at:string;environment_count?:number;observation_count?:number;photo_count?:number};
+export type Lot={id:string;name:string;variety:string;harvest_date:string;intake_date:string;location:string;sensor_id:string;quantity:number;storage:string;mcp:string;packaging:string;firmness:number|null;brix:number|null;weight:number|null;acidity:number|null;notes:string;created_at:string;environment_count?:number;observation_count?:number;photo_count?:number;team_shared?:boolean;owner_id?:string|null};
 export type EnvRow={timestamp:string;sensor_id:string;temperature:number;humidity:number};
 export type Observation={id:string;lot_id:string;date:string;firmness:number|null;brix:number|null;weight:number|null;defects:string;sample_count:number;notes:string};
 export type Photo={id:string;date:string;name:string;notes:string};
