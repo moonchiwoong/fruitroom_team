@@ -434,3 +434,18 @@ footer.site-footer{display:block;padding:0;font-size:inherit;line-height:inherit
 @media(max-width:760px){.l-join{padding-top:30vh}}
 .l-auth .l-agree input[type=checkbox]{width:17px;height:17px}
 .l-scroll{background:#fbfbf9d9;backdrop-filter:blur(6px);padding:8px 14px;border-radius:999px;margin-bottom:8px}
+
+/* 노트북·확대 상태(901~1300px)에서도 PC용 상단 메뉴 유지 — 메뉴는 900px 이하에서만 접힘 */
+@media(max-width:1300px){.nav-link svg{display:none}.nav-link{padding:8px 9px;font-size:14px}}
+@media(min-width:901px){
+ .menu-toggle{display:none}
+ .site-nav{display:flex;position:static;flex-direction:row;align-items:center;gap:0;padding:0;background:none;overflow:visible}
+ .nav-mobile-foot{display:none}
+ .user-chip{display:flex}
+}
+@media(min-width:901px) and (max-width:1100px){
+ .site-header-inner{gap:8px;padding:0 16px}
+ .nav-link{padding:7px 7px;font-size:13.5px}
+ .brand-text small{display:none}.brand-text{font-size:17px}
+ .user-chip{padding-left:6px}.site-utils .nav-util{padding:7px 9px}
+}
