@@ -433,3 +433,4 @@ footer.site-footer{display:block;padding:0;font-size:inherit;line-height:inherit
 .l-join{padding-top:16vh}
 @media(max-width:760px){.l-join{padding-top:30vh}}
 .l-auth .l-agree input[type=checkbox]{width:17px;height:17px}
+.l-scroll{background:#fbfbf9d9;backdrop-filter:blur(6px);padding:8px 14px;border-radius:999px;margin-bottom:8px}
