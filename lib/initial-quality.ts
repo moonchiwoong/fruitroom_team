@@ -118,9 +118,9 @@ export function defaultInputs(region: RegionId): Inputs {
 
 /** 설명력(R²)을 사용자가 읽기 쉬운 단계로 바꿉니다. */
 export function reliability(r2: number) {
-  if (r2 >= 0.6) return {level: 'high' as const, label: '설명력 높음'};
-  if (r2 >= 0.4) return {level: 'mid' as const, label: '설명력 보통'};
-  return {level: 'low' as const, label: '참고용'};
+  if (r2 >= 0.6) return {level: 'high' as const, label: '학습 적합도 높음'};
+  if (r2 >= 0.4) return {level: 'mid' as const, label: '학습 적합도 보통'};
+  return {level: 'low' as const, label: '학습 적합도 낮음'};
 }
 
 /** 각 변수가 데이터 평균 대비 예측값을 얼마나 올리거나 내렸는지 */
@@ -142,7 +142,7 @@ export const MAX_STORAGE_DAYS = 300;
 export type StorageMetric = 'loss' | 'firmness' | 'brix' | 'acidity';
 export const storageMetricInfo: Record<StorageMetric, {label: string; unit: string; digits: number; note: string}> = {
   loss: {label: '감모율', unit: '%', digits: 2, note: '저장 시작 시 0%에서 출발'},
-  firmness: {label: '경도', unit: 'N/mm', digits: 1, note: '초기 경도에서 감소'},
+  firmness: {label: '경도', unit: 'N', digits: 1, note: '초기 경도에서 감소 (원자료 단위 N)'},
   brix: {label: '당도', unit: '°Brix', digits: 1, note: '100·200일 구간선형'},
   acidity: {label: '산도', unit: '%', digits: 3, note: '지수감소 / 100일 후 유지'},
 };

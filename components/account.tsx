@@ -37,7 +37,7 @@ export default function Account({onOpenPredict}: {onOpenPredict: () => void}) {
             <option value="">선택 안 함</option>
             {regionIds.map(r => <option key={r} value={r}>{regions[r].name} ({regions[r].area})</option>)}
           </select>
-          <small>초기 품질 예측을 열면 이 산지로 시작합니다.</small>
+          <small>모델 정보의 기상 기반 계산(상세 기능)이 이 산지로 시작합니다.</small>
         </label>
         <button className="btn btn-primary" disabled={busy}>{busy ? <Loader2 className="spin" size={16} /> : <Save size={16} />}저장</button>
         {msg && <p className={msg.ok ? 'account-ok' : 'auth-error'} role="status">{msg.ok && <Check size={15} />}{msg.text}</p>}
@@ -46,17 +46,17 @@ export default function Account({onOpenPredict}: {onOpenPredict: () => void}) {
 
     <div className="account-side">
       <section className="iq-card">
-        <h3 className="account-h"><MapPin size={17} />내 기본 기상값</h3>
+        <h3 className="account-h"><MapPin size={17} />내 기본 기상값 <small>기상 기반 계산용</small></h3>
         {d ? <>
           <p className="account-sub">{session.profile.region ? regions[session.profile.region as RegionId].name : '산지 미지정'} 기준</p>
           <dl className="account-dl">{inputKeys.map(k => <div key={k}><dt>{inputInfo[k].label}</dt><dd>{d[k]} {inputInfo[k].unit}</dd></div>)}</dl>
           <button className="btn btn-ghost" onClick={clearDefaults}><X size={15} />기본값 지우기</button>
-        </> : <p className="account-sub">아직 없어요. 초기 품질 예측에서 ‘이 값을 내 기본값으로’를 누르면 저장됩니다.</p>}
+        </> : <p className="account-sub">아직 없어요. 모델 정보 › 기상 기반 계산에서 ‘이 값을 내 기본값으로’를 누르면 저장됩니다.</p>}
       </section>
       <section className="iq-card">
-        <h3 className="account-h"><Save size={17} />저장한 예측</h3>
+        <h3 className="account-h"><Save size={17} />저장한 기상 기반 계산</h3>
         <p className="account-big">{count ?? '–'}<small>건</small></p>
-        <button className="btn btn-outline" onClick={onOpenPredict}>예측 기록 보기</button>
+        <button className="btn btn-outline" onClick={onOpenPredict}>모델 정보에서 보기</button>
       </section>
       <section className="iq-card">
         <h3 className="account-h">{session.isTeam ? <Users size={17} /> : <ShieldCheck size={17} />}데이터 공유 범위</h3>

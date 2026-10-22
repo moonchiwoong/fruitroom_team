@@ -3,8 +3,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "과실연구소 | 사과 초기 품질 예측·저장 관리",
-  description: "산지 기상 조건으로 사과의 초기 품질을 예측하고, 저장 물량의 환경·품질·사진 기록을 관리합니다.",
+  applicationName: "애플트랙",
+  title: "애플트랙 — 사과 품질 예측·저장 관리",
+  description: "애플트랙 by FarmBridge — 초기 품질부터 저장 중 변화까지. 초기 품질을 입력하고, 저장 기간에 따른 변화를 예측해 실제 측정값과 비교하세요.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

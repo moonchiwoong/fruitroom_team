@@ -1,5 +1,5 @@
 import type {Lot,EnvRow,Stats,Observation,Prediction} from './lot-types';
-export class InputError extends Error{}
+export class InputError extends Error{rows?:string[];constructor(message:string,rows?:string[]){super(message);this.rows=rows;}}
 export function numberOrNull(v:unknown,min:number,max:number,label:string){if(v===null||v===undefined||v==='')return null;if(typeof v!=='string'&&typeof v!=='number')throw new InputError(`${label}는 숫자로 입력해 주세요.`);const n=Number(v);if(!Number.isFinite(n)||n<min||n>max)throw new InputError(`${label}: ${min}~${max} 범위로 입력해 주세요.`);return n;}
 export function validDate(v:unknown,label='날짜'){if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v)||!Number.isFinite(Date.parse(v+'T00:00:00Z'))||new Date(v+'T00:00:00Z').toISOString().slice(0,10)!==v)throw new InputError(`${label}를 확인해 주세요.`);return v;}
 export function endOfKoreanDay(day:string){validDate(day);return new Date(day+'T23:59:59.999+09:00').toISOString();}
@@ -16,9 +16,9 @@ export function parseCsv(text:string,sensorId:string){
   const get=(key:string)=>rows[r][headers.indexOf(key)]??'';
   if(get('sensor_id')!==sensorId){mismatched++;continue;}
   let t=get('timestamp').replace(' ','T');if(!/(Z|[+-]\d\d:\d\d)$/.test(t))t+='+09:00';const ms=Date.parse(t);
-  try{validDate(t.slice(0,10),'측정일시');if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/.test(t))throw new InputError('ISO 날짜 형식이 필요합니다.');if(!Number.isFinite(ms)||!get('temperature')||!get('humidity'))throw new InputError('날짜 또는 값 누락');const temperature=numberOrNull(get('temperature'),-15,50,'온도')!,humidity=numberOrNull(get('humidity'),0,100,'습도')!;const timestamp=new Date(ms).toISOString();if(seen.has(timestamp)){duplicates++;continue;}seen.add(timestamp);parsed.push({timestamp,sensor_id:sensorId,temperature,humidity});}catch{issues.push(`${r+1}행: 날짜·온도·습도를 확인해 주세요.`);}
+  try{validDate(t.slice(0,10),'측정일시');if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/.test(t))throw new InputError('ISO 날짜 형식이 필요합니다.');if(!Number.isFinite(ms)||!get('temperature')||!get('humidity'))throw new InputError('날짜 또는 값 누락');const temperature=numberOrNull(get('temperature'),-15,50,'온도')!,humidity=numberOrNull(get('humidity'),0,100,'습도')!;const timestamp=new Date(ms).toISOString();if(seen.has(timestamp)){duplicates++;continue;}seen.add(timestamp);parsed.push({timestamp,sensor_id:sensorId,temperature,humidity});}catch(e){issues.push(`${r+1}행: ${e instanceof InputError?e.message:'날짜·온도·습도를 확인해 주세요.'} (${rows[r].join(', ').slice(0,80)})`);}
  }
- if(issues.length)throw new InputError(`${issues.slice(0,4).join(' ')} 오류 ${issues.length}건으로 전체 업로드를 취소했습니다.`);
+ if(issues.length)throw new InputError(`오류 ${issues.length}개 행 때문에 전체 업로드를 취소했습니다. 아래 행을 고친 뒤 다시 올려 주세요.`,issues.slice(0,100));
  if(!parsed.length)throw new InputError(`센서 ${sensorId}와 일치하는 유효한 기록이 없습니다.`);
  return {rows:parsed.sort((a,b)=>a.timestamp.localeCompare(b.timestamp)),mismatched,duplicates};
 }

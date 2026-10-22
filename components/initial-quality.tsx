@@ -3,8 +3,8 @@ import {useCallback, useEffect, useMemo, useState} from 'react';
 import {ArrowDown, ArrowUp, Minus, Bookmark, BookmarkCheck, FolderOpen, Loader2, Save, Trash2, UserRound, CloudRain, Download, Info, MapPin, RotateCcw, Sprout, Thermometer, TriangleAlert, Warehouse} from 'lucide-react';
 import {
   contributions, defaultInputs, inputInfo, inputKeys, MAX_STORAGE_DAYS, metricInfo, metricKeys, predictAll, predictMetric,
-  regionIds, regions, regionSummary, reliability, samples, storageFormula, storageIds, storageInfo, storageMetricInfo, storageValue,
-  type Initial, type InputKey, type Inputs, type MetricKey, type RegionId, type StorageMetric,
+  regionIds, regions, regionSummary, reliability, samples,
+  type InputKey, type Inputs, type MetricKey, type RegionId,
 } from '@/lib/initial-quality';
 import {useTeamSession} from '@/components/team-auth';
 import {deletePrediction, listPredictions, savePrediction, type SavedPrediction} from '@/lib/my-predictions';
@@ -21,6 +21,7 @@ export default function InitialQuality() {
   const [text, setText] = useState<Record<InputKey, string>>(() => toText(startInputs(home)));
   const [saved, setSaved] = useState<SavedPrediction[] | null>(null), [savedError, setSavedError] = useState('');
   const [title, setTitle] = useState(''), [busy, setBusy] = useState(''), [flash, setFlash] = useState('');
+  const [weatherKind, setWeatherKind] = useState<'관측 기상값' | '가정값'>('가정값'), [showScatter, setShowScatter] = useState(false);
   const refreshSaved = useCallback(() => { listPredictions().then(r => { setSaved(r); setSavedError(''); }).catch(e => { setSaved([]); setSavedError((e as Error).message); }); }, []);
   useEffect(() => { if (session) refreshSaved(); }, [session?.userId, refreshSaved]);
   useEffect(() => { if (!flash) return; const t = setTimeout(() => setFlash(''), 3500); return () => clearTimeout(t); }, [flash]);
@@ -63,7 +64,7 @@ export default function InitialQuality() {
             <span className="iq-region-name"><MapPin size={16} />{regions[r].name} 사과</span>
             <span className="iq-region-area">{regions[r].area}</span>
             <span className="iq-region-meta">학습 {s.count}건 · {s.years[0]}–{s.years.at(-1)}년</span>
-            <span className="iq-region-best">가장 잘 맞는 항목 <b>{metricInfo[best].label} R² {regions[r].equations[best].r2.toFixed(2)}</b></span>
+            <span className="iq-region-best">학습 R²가 가장 높은 항목 <b>{metricInfo[best].label} {regions[r].equations[best].r2.toFixed(2)}</b></span>
           </button>;
         })}
       </div>
@@ -72,6 +73,8 @@ export default function InitialQuality() {
     <div className="iq-columns">
       <section className="iq-step iq-card">
         <StepTitle n={2} title="기상 조건 입력" desc={`${regions[region].name} 학습 데이터 평균으로 채워 두었습니다.`} />
+        <div className="iq-kind"><span>입력한 기상값의 종류</span><div className="seg">{(['관측 기상값', '가정값'] as const).map(k => <button key={k} className={weatherKind === k ? 'active' : ''} aria-pressed={weatherKind === k} onClick={() => setWeatherKind(k)}>{k}</button>)}</div>
+          <small>학습 평균·연도 평균은 해당 연도의 실제 관측값이 아니므로 ‘가정값’입니다.</small></div>
         <div className="iq-presets">
           <label>연도 평균 불러오기
             <select value="" onChange={e => loadYear(e.target.value)} aria-label="연도 평균 불러오기">
@@ -107,7 +110,7 @@ export default function InitialQuality() {
       </section>
 
       <section className="iq-step iq-card iq-result-card">
-        <StepTitle n={3} title="예측 초기 품질" desc="수확 직후 품질의 회귀식 예측값입니다." />
+        <StepTitle n={3} title="회귀식 계산값" desc={`수확 직후 품질의 회귀식 계산값 · 입력 기상값: ${weatherKind}`} />
         {!valid && <div className="iq-alert"><TriangleAlert size={16} />모든 기상 값을 숫자로 입력해 주세요.</div>}
         {outside.length > 0 && <div className="iq-alert"><TriangleAlert size={16} /><span><b>{outside.map(k => inputInfo[k].label).join(', ')}</b> 값이 학습 데이터 범위를 벗어났습니다. 범위 밖 예측은 오차가 커질 수 있어요.</span></div>}
         {result && <div className="iq-results">
@@ -116,7 +119,7 @@ export default function InitialQuality() {
             return <button key={m} className={'iq-result' + (metric === m ? ' active' : '')} onClick={() => setMetric(m)} aria-pressed={metric === m}>
               <span className="iq-result-label">{info.label}<em className={'rel rel-' + rel.level}>{rel.label}</em></span>
               <strong>{fmt(result[m], info.digits)}<small>{info.unit}</small></strong>
-              <span className="iq-result-err">± {fmt(summary.rmse[m], info.digits)} (평균 오차) · R² {eq.r2.toFixed(2)}</span>
+              <span className="iq-result-err">학습 RMSE: {fmt(summary.rmse[m], info.digits)} {info.unit} · 학습 R² {eq.r2.toFixed(2)}</span>
               {Math.abs(diff) < summary.rmse[m] * 0.1
                 ? <span className="iq-result-diff same"><Minus size={13} />산지 평균({fmt(summary.actualMean[m], info.digits)})과 비슷</span>
                 : <span className={'iq-result-diff ' + (diff >= 0 ? 'up' : 'down')}>{diff >= 0 ? <ArrowUp size={13} /> : <ArrowDown size={13} />}산지 평균 {fmt(summary.actualMean[m], info.digits)}보다 {fmt(Math.abs(diff), info.digits)} {diff >= 0 ? '높음' : '낮음'}</span>}
@@ -130,15 +133,16 @@ export default function InitialQuality() {
           </div>
           <div className="iq-save-row">
             <button className="btn btn-outline" onClick={saveDefaults} disabled={busy === 'default' || isMyDefault}>{isMyDefault ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}{isMyDefault ? '내 기본값과 같아요' : '이 값을 내 기본값으로'}</button>
-            <button className="btn btn-outline" onClick={() => downloadCsv(region, inputs, result)}><Download size={15} />CSV 저장</button>
+            <button className="btn btn-outline" onClick={() => downloadCsv(region, inputs, result, weatherKind)}><Download size={15} />CSV 저장</button>
           </div>
           {flash && <p className="iq-flash" role="status">{flash}</p>}
         </div>}
-        {result && !session && <button className="btn btn-outline iq-download" onClick={() => downloadCsv(region, inputs, result)}><Download size={15} />예측 결과 CSV 저장</button>}
+        {result && !session && <button className="btn btn-outline iq-download" onClick={() => downloadCsv(region, inputs, result, weatherKind)}><Download size={15} />예측 결과 CSV 저장</button>}
       </section>
     </div>
 
-    {result && <div className="iq-columns iq-analysis">
+    {result && <button className="btn btn-outline iq-scatter-btn" aria-expanded={showScatter} onClick={() => setShowScatter(v => !v)}>{showScatter ? '기상요인 산포도 접기' : '기상요인 산포도 자세히 보기'}</button>}
+    {result && showScatter && <div className="iq-columns iq-analysis">
       <section className="iq-card">
         <div className="iq-card-head"><div><h3>{metricInfo[metric].label}에 영향을 준 기상 요인</h3><p>산지 평균 기상과 비교했을 때 각 요인이 예측값을 얼마나 올리거나 내렸는지 보여줍니다.</p></div></div>
         <MetricTabs value={metric} onChange={setMetric} />
@@ -150,7 +154,6 @@ export default function InitialQuality() {
       </section>
     </div>}
 
-    {result && <Storage predicted={{firmness: result.firmness, brix: result.brix, acidity: result.acidity}} />}
 
     {session && <section className="iq-card" id="my-predictions">
       <div className="iq-card-head"><div><h3><FolderOpen size={18} />내 예측 기록</h3><p>저장한 예측은 나만 볼 수 있어요. 불러오면 그때의 산지와 기상값으로 다시 계산합니다.</p></div></div>
@@ -169,12 +172,12 @@ export default function InitialQuality() {
     </section>}
 
     <section className="iq-card iq-method">
-      <div className="iq-card-head"><div><h3><Info size={17} />예측 방법과 한계</h3></div></div>
+      <div className="iq-card-head"><div><h3><Info size={17} />계산 방법과 한계</h3></div></div>
       <ul>
-        <li>산지별 학습 데이터 200건(2018~2025년)에 다중선형회귀를 적합한 식입니다. 입력 기상 값 4개로 수확 직후 품질 5개 항목을 계산합니다.</li>
-        <li>R²는 실측값의 변동을 식이 설명하는 비율입니다. 0.6 이상은 ‘설명력 높음’, 0.4 미만은 ‘참고용’으로 표시합니다.</li>
-        <li>± 값은 학습 데이터에서 실측과 예측의 평균 차이(RMSE)입니다. 개별 과원의 관리 방식·수세·수확 시기는 식에 들어 있지 않습니다.</li>
-        <li>저장 중 품질 변화는 예측된 초기값(또는 직접 입력한 실측값)에서 출발하는 저장 방식별 동적 예측식입니다.</li>
+        <li>산지별 학습 자료 {summary.count}건({summary.years[0]}~{summary.years.at(-1)}년)에 다중선형회귀를 적합한 식입니다. 기상 값 4개로 수확 직후 품질 5개 항목을 계산합니다.</li>
+        <li><b>학습 R²·학습 RMSE</b>는 식을 만든 같은 자료에서 잰 적합도입니다. <b>별도 평가 성능: 평가 자료가 없어 표시하지 않습니다.</b> 개별 과실의 예측구간이나 신뢰구간이 아닙니다.</li>
+        <li>학습 범위를 벗어난 입력은 외삽이라 경고를 보여 드립니다. 개별 과원의 관리 방식·수세·수확 시기는 식에 들어 있지 않습니다.</li>
+        <li>여기의 경도는 <b>N/mm(강성)</b>입니다. 실측 입력과 저장 모델의 경도(N, 힘)와 다른 지표라 저장 중 변화 계산의 초기값으로 연결하지 않습니다.</li>
       </ul>
       <details>
         <summary>{regions[region].name} 회귀식 계수 보기</summary>
@@ -231,86 +234,15 @@ function Scatter({region, metric, predicted}: {region: RegionId; metric: MetricK
   </svg>;
 }
 
-function Storage({predicted}: {predicted: Initial}) {
-  const [source, setSource] = useState<'pred' | 'manual'>('pred');
-  const [manual, setManual] = useState({firmness: '', brix: '', acidity: ''});
-  const [day, setDay] = useState(120);
-  const init: Initial = source === 'pred' ? predicted : {
-    firmness: parseFloat(manual.firmness) || predicted.firmness,
-    brix: parseFloat(manual.brix) || predicted.brix,
-    acidity: parseFloat(manual.acidity) || predicted.acidity,
-  };
-  const metrics: StorageMetric[] = ['firmness', 'brix', 'acidity', 'loss'];
-  return <section className="iq-step iq-card iq-storage">
-    <StepTitle n={4} title="저장 중 품질 변화" desc="초기 품질에서 출발해 저장 방식별로 시간에 따라 어떻게 변하는지 봅니다." />
-    <div className="iq-storage-controls">
-      <div className="seg" role="tablist" aria-label="초기값 선택">
-        <button role="tab" aria-selected={source === 'pred'} className={source === 'pred' ? 'active' : ''} onClick={() => setSource('pred')}>예측 초기값 사용</button>
-        <button role="tab" aria-selected={source === 'manual'} className={source === 'manual' ? 'active' : ''} onClick={() => setSource('manual')}>실측 초기값 입력</button>
-      </div>
-      {source === 'manual' && <div className="iq-manual">
-        {(['firmness', 'brix', 'acidity'] as const).map(k => <label key={k}>{metricInfo[k].label}
-          <span className="iq-number"><input type="number" inputMode="decimal" step="any" placeholder={fmt(predicted[k], metricInfo[k].digits)} value={manual[k]} onChange={e => setManual(m => ({...m, [k]: e.target.value}))} /><span>{metricInfo[k].unit}</span></span>
-        </label>)}
-      </div>}
-      <label className="iq-day">
-        <span>저장 기간 <b>{day}일</b></span>
-        <input type="range" min={0} max={MAX_STORAGE_DAYS} step={1} value={day} onChange={e => setDay(+e.target.value)} aria-label="저장 기간(일)" />
-        <span className="iq-day-scale"><span>0일</span><span>100일</span><span>200일</span><span>{MAX_STORAGE_DAYS}일</span></span>
-      </label>
-    </div>
-
-    <div className="iq-table-wrap"><table className="iq-table iq-day-table">
-      <thead><tr><th>저장 {day}일 차</th>{metrics.map(m => <th key={m}>{storageMetricInfo[m].label} <small>{storageMetricInfo[m].unit}</small></th>)}</tr></thead>
-      <tbody>
-        <tr className="muted"><td>저장 시작 (0일)</td>{metrics.map(m => <td key={m}>{fmt(storageValue('cold', m, 0, init), storageMetricInfo[m].digits)}</td>)}</tr>
-        {storageIds.map(s => <tr key={s}><td><i className="swatch" style={{background: storageInfo[s].color}} />{storageInfo[s].label}</td>
-          {metrics.map(m => {const v = storageValue(s, m, day, init), v0 = storageValue(s, m, 0, init); return <td key={m}>{fmt(v, storageMetricInfo[m].digits)}<span className="delta">{v - v0 >= 0 ? '+' : '−'}{fmt(Math.abs(v - v0), storageMetricInfo[m].digits)}</span></td>;})}
-        </tr>)}
-      </tbody>
-    </table></div>
-
-    <div className="iq-mini-grid">
-      {metrics.map(m => <div key={m} className="iq-mini">
-        <div className="iq-mini-head"><h4>{storageMetricInfo[m].label} <small>{storageMetricInfo[m].unit}</small></h4><span>{storageMetricInfo[m].note}</span></div>
-        <LineChart metric={m} init={init} day={day} />
-      </div>)}
-    </div>
-    <div className="iq-legend">{storageIds.map(s => <span key={s}><i style={{background: storageInfo[s].color}} />{storageInfo[s].label}</span>)}</div>
-    <details className="iq-formulas">
-      <summary><Warehouse size={15} />저장 방식별 동적 예측식</summary>
-      <div className="iq-table-wrap"><table className="iq-table">
-        <thead><tr><th>항목</th>{storageIds.map(s => <th key={s}>{storageInfo[s].label}</th>)}</tr></thead>
-        <tbody>{metrics.map(m => <tr key={m}><td>{storageMetricInfo[m].label}</td>{storageIds.map(s => <td key={s}><code>{storageFormula[m][s]}</code></td>)}</tr>)}</tbody>
-      </table></div>
-      <p>t는 저장 일수, y₀·S₀는 초기값입니다. 원자료의 저장 경도식은 N 단위로 제공되어 초기 경도와 단위 해석을 확인할 필요가 있습니다.</p>
-    </details>
-  </section>;
-}
-
-function LineChart({metric, init, day}: {metric: StorageMetric; init: Initial; day: number}) {
-  const W = 320, H = 170, L = 44, R = 10, T = 10, B = 26, days = Array.from({length: 61}, (_, i) => i * 5);
-  const series = storageIds.map(s => ({s, v: days.map(t => storageValue(s, metric, t, init))}));
-  const all = series.flatMap(x => x.v); let lo = Math.min(...all), hi = Math.max(...all);
-  if (hi - lo < 1e-9) {hi += 1; lo -= 1;} const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
-  const x = (t: number) => L + t / MAX_STORAGE_DAYS * (W - L - R), y = (v: number) => T + (hi - v) / (hi - lo) * (H - T - B);
-  const d = storageMetricInfo[metric].digits;
-  return <svg viewBox={`0 0 ${W} ${H}`} className="iq-chart" role="img" aria-label={`${storageMetricInfo[metric].label} 저장 기간별 변화`}>
-    {[lo + (hi - lo) * 0.1, (lo + hi) / 2, hi - (hi - lo) * 0.1].map((t, i) => <g key={i}><line x1={L} x2={W - R} y1={y(t)} y2={y(t)} className="grid" /><text x={L - 6} y={y(t) + 4} textAnchor="end" className="tick">{fmt(t, Math.min(d, 2))}</text></g>)}
-    {[0, 100, 200, 300].map(t => <text key={t} x={x(t)} y={H - 8} textAnchor="middle" className="tick">{t}일</text>)}
-    {series.map(({s, v}) => <path key={s} d={v.map((val, i) => `${i ? 'L' : 'M'}${x(days[i]).toFixed(1)},${y(val).toFixed(1)}`).join('')} fill="none" stroke={storageInfo[s].color} strokeWidth="2.2" strokeLinejoin="round" />)}
-    <line x1={x(day)} x2={x(day)} y1={T} y2={H - B} className="marker" />
-    {storageIds.map(s => <circle key={s} cx={x(day)} cy={y(storageValue(s, metric, day, init))} r="3.6" fill={storageInfo[s].color} stroke="var(--surface)" strokeWidth="1.5" />)}
-  </svg>;
-}
-
-function downloadCsv(region: RegionId, inputs: Inputs, result: Record<MetricKey, number>) {
+function downloadCsv(region: RegionId, inputs: Inputs, result: Record<MetricKey, number>, weatherKind: string) {
   const s = regionSummary(region);
   const lines = [
-    ['구분', '항목', '값', '단위', 'R2', '평균오차(RMSE)'],
+    ['구분', '항목', '값', '단위', '학습 R2', '학습 RMSE'],
     ['산지', regions[region].name, '', '', '', ''],
+    ['입력 기상값 종류', weatherKind, '', '', '', ''],
+    ['별도 평가 성능', '평가 자료 없음', '', '', '', ''],
     ...inputKeys.map(k => ['입력', `${inputInfo[k].label}(${inputInfo[k].code})`, String(inputs[k]), inputInfo[k].unit, '', '']),
-    ...metricKeys.map(m => ['예측', metricInfo[m].label, result[m].toFixed(4), metricInfo[m].unit, regions[region].equations[m].r2.toFixed(4), s.rmse[m].toFixed(4)]),
+    ...metricKeys.map(m => ['회귀식 계산값', metricInfo[m].label, result[m].toFixed(4), metricInfo[m].unit, regions[region].equations[m].r2.toFixed(4), s.rmse[m].toFixed(4)]),
   ];
   const csv = lines.map(r => r.map(c => /[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c).join(',')).join('\n');
   const url = URL.createObjectURL(new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8'}));
