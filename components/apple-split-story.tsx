@@ -3,6 +3,7 @@ import {useEffect, useMemo, useRef, type ReactNode} from 'react';
 import * as THREE from 'three';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {buildApple} from './apple-model';
+import {mulberry32} from '@/lib/apple-skin-painter';
 import {addDays, computeSeries, fmtNum, todayKST} from '@/lib/tracker';
 
 /**
@@ -73,6 +74,13 @@ export default function AppleSplitStory({intro, onFail}: {intro: ReactNode; onFa
 
     // ── 사과 두 쪽: 같은 모양의 사과 두 개를 x=0 면에서 반대로 잘라 붙여 둡니다 ──
     const root = new THREE.Group(); scene.add(root);
+    // 단면 그림은 한 번만 그려 두 쪽이 함께 씁니다 (같은 면을 양쪽에서 보는 것이므로 거울상)
+    const base = buildApple({seed: 11, leaf: false}), profZ = base.cutProfile(192); base.dispose();
+    const pbox = new THREE.Box2().setFromPoints(profZ), pc = pbox.getCenter(new THREE.Vector2()), S = Math.max(pbox.max.x - pbox.min.x, pbox.max.y - pbox.min.y) * 1.02;
+    const painted = paintFlesh(profZ, pc, S);
+    const tex = new THREE.CanvasTexture(painted.color); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    const bump = new THREE.CanvasTexture(painted.bump); bump.anisotropy = 8;
+    const capMat = new THREE.MeshPhysicalMaterial({map: tex, bumpMap: bump, bumpScale: 0.35, color: 0xeee4d2, roughness: 0.55, metalness: 0, clearcoat: 0.18, clearcoatRoughness: 0.4, sheen: 0.08, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xfff4d6), envMapIntensity: 0.35});
     const halves = [0, 1].map(i => {
       const sign = i === 0 ? -1 : 1;                                   // 0: 왼쪽(x<0을 남김), 1: 오른쪽(x>0을 남김)
       const half = new THREE.Group(); root.add(half);
@@ -80,15 +88,12 @@ export default function AppleSplitStory({intro, onFail}: {intro: ReactNode; onFa
       const local = new THREE.Plane(new THREE.Vector3(sign, 0, 0), 0), world = new THREE.Plane();
       model.group.traverse(o => { const m = (o as THREE.Mesh).material as THREE.Material | undefined; if (m) m.clippingPlanes = [world]; });
       // 단면: 같은 윤곽으로 만든 판에 과육 그림을 입힙니다
-      const prof = model.cutProfile(192).map(v => new THREE.Vector2(i === 0 ? -v.x : v.x, v.y));
+      const prof = profZ.map(v => new THREE.Vector2(i === 0 ? -v.x : v.x, v.y));
       const capGeo = new THREE.ShapeGeometry(new THREE.Shape(prof), 1);
-      const box = new THREE.Box2().setFromPoints(prof), c = box.getCenter(new THREE.Vector2()), S = Math.max(box.max.x - box.min.x, box.max.y - box.min.y) * 1.02;
       const uv = capGeo.attributes.uv, cp = capGeo.attributes.position;
-      for (let k = 0; k < uv.count; k++) uv.setXY(k, (cp.getX(k) - c.x) / S + 0.5, (cp.getY(k) - c.y) / S + 0.5);
-      const tex = new THREE.CanvasTexture(paintFlesh(prof, c, S)); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-      const capMat = new THREE.MeshStandardMaterial({map: tex, roughness: 0.62, metalness: 0, envMapIntensity: 0.35});
+      for (let k = 0; k < uv.count; k++) uv.setXY(k, ((i === 0 ? -cp.getX(k) : cp.getX(k)) - pc.x) / S + 0.5, (cp.getY(k) - pc.y) / S + 0.5);
       const cap = new THREE.Mesh(capGeo, capMat); cap.rotation.y = i === 0 ? Math.PI / 2 : -Math.PI / 2; half.add(cap);
-      return {half, model, local, world, sign, cap, tex, capMat, capGeo};
+      return {half, model, local, world, sign, cap, capGeo};
     });
     const anchorLocal = METRICS.map(m => new THREE.Vector3(halves[m.half].sign * -0.002, m.anchor[1], m.anchor[0]));
 
@@ -175,7 +180,7 @@ export default function AppleSplitStory({intro, onFail}: {intro: ReactNode; onFa
 
     return () => {
       stop(); io.disconnect(); ro.disconnect();
-      halves.forEach(h => { h.model.dispose(); h.tex.dispose(); h.capMat.dispose(); h.capGeo.dispose(); });
+      halves.forEach(h => { h.model.dispose(); h.capGeo.dispose(); }); tex.dispose(); bump.dispose(); capMat.dispose();
       env.dispose(); renderer.dispose(); renderer.domElement.remove();
     };
   }, [chart, onFail]);
@@ -224,40 +229,138 @@ export default function AppleSplitStory({intro, onFail}: {intro: ReactNode; onFa
   </section>;
 }
 
-/** 세로로 자른 사과 단면: 크림색 과육, 붉은 껍질 테두리, 관다발 선, 씨방과 씨 두 개, 꼭지·꽃받침 쪽 심 */
+/**
+ * 세로(꼭지-꽃받침)로 자른 사과 단면을 그립니다.
+ * 크림색 과육과 세포 결, 껍질 바로 아래의 붉은 기, 씨방을 둘러싼 관다발 선,
+ * 양피지 같은 씨방 막과 윤기 있는 씨, 꼭지 쪽 심과 꽃받침 관까지. 결 무늬는 요철(bump)로도 씁니다.
+ */
 function paintFlesh(prof: THREE.Vector2[], c: THREE.Vector2, S: number) {
-  const N = 1024, cv = document.createElement('canvas'); cv.width = cv.height = N;
-  const g = cv.getContext('2d')!;
-  const px = (x: number) => ((x - c.x) / S + 0.5) * N, py = (y: number) => (1 - ((y - c.y) / S + 0.5)) * N;
-  const outline = (k = 1, cy = 0) => { g.beginPath(); prof.forEach((v, i) => { const X = px(v.x * k), Y = py(cy + (v.y - cy) * k); if (i) g.lineTo(X, Y); else g.moveTo(X, Y); }); g.closePath(); };
-  const cx = px(0), u = N / S;                                              // 사과 좌표 1 = u 픽셀
-  // 바탕(가장자리 밖도 과육색으로 채워 경계 번짐 방지)
-  g.fillStyle = '#f4e6bd'; g.fillRect(0, 0, N, N);
-  const grad = g.createRadialGradient(cx, py(0.05), u * 0.1, cx, py(0.05), u * 0.95);
-  grad.addColorStop(0, '#fbf3d9'); grad.addColorStop(0.65, '#f8ecc8'); grad.addColorStop(1, '#efdcaa');
-  outline(); g.fillStyle = grad; g.fill();
-  // 껍질 바로 안쪽의 옅은 붉은 기
-  g.save(); outline(); g.clip(); g.lineWidth = u * 0.07; g.strokeStyle = 'rgba(214,92,82,0.22)'; outline(); g.stroke(); g.restore();
-  // 관다발: 씨방을 둘러싼 점선 고리
-  g.save(); g.setLineDash([u * 0.018, u * 0.02]); g.lineWidth = u * 0.008; g.strokeStyle = 'rgba(178,150,86,0.55)'; outline(0.56, 0.06); g.stroke(); g.restore();
-  // 꼭지·꽃받침으로 이어지는 심
-  g.strokeStyle = 'rgba(190,160,98,0.6)'; g.lineWidth = u * 0.016; g.lineCap = 'round';
-  g.beginPath(); g.moveTo(cx, py(0.33)); g.bezierCurveTo(cx + u * 0.01, py(0.45), cx - u * 0.01, py(0.55), cx, py(0.62)); g.stroke();
-  g.beginPath(); g.moveTo(cx, py(-0.18)); g.bezierCurveTo(cx - u * 0.01, py(-0.35), cx + u * 0.01, py(-0.55), cx, py(-0.74)); g.stroke();
-  // 씨방(하트 모양) + 씨 두 개
-  const core = (s: number) => { g.beginPath(); g.moveTo(cx, py(0.34 * s + 0.04)); g.bezierCurveTo(cx + u * 0.3 * s, py(0.3 * s + 0.04), cx + u * 0.24 * s, py(-0.22 * s + 0.04), cx, py(-0.26 * s + 0.04)); g.bezierCurveTo(cx - u * 0.24 * s, py(-0.22 * s + 0.04), cx - u * 0.3 * s, py(0.3 * s + 0.04), cx, py(0.34 * s + 0.04)); g.closePath(); };
-  core(1); g.fillStyle = '#efe0b0'; g.fill(); g.lineWidth = u * 0.01; g.strokeStyle = 'rgba(170,140,80,0.7)'; g.stroke();
-  core(0.62); g.fillStyle = '#e9d6a0'; g.fill();
-  [-1, 1].forEach(sd => {
-    g.save(); g.translate(cx + sd * u * 0.07, py(0.05)); g.rotate(sd * 0.18);
-    const sw = u * 0.055, sh = u * 0.15;
-    g.beginPath(); g.moveTo(0, -sh / 2); g.bezierCurveTo(sw, -sh * 0.1, sw * 0.8, sh / 2, 0, sh / 2); g.bezierCurveTo(-sw * 0.8, sh / 2, -sw, -sh * 0.1, 0, -sh / 2); g.closePath();
-    const sg = g.createLinearGradient(-sw, 0, sw, 0); sg.addColorStop(0, '#3a2213'); sg.addColorStop(0.5, '#6b4122'); sg.addColorStop(1, '#3a2213');
-    g.fillStyle = sg; g.fill(); g.fillStyle = 'rgba(255,255,255,0.25)'; g.beginPath(); g.ellipse(-sw * 0.25, -sh * 0.05, sw * 0.12, sh * 0.25, 0, 0, Math.PI * 2); g.fill();
-    g.restore();
+  const N = typeof window !== 'undefined' && window.innerWidth < 820 ? 1024 : 1536, rand = mulberry32(5);
+  const mk = () => { const cv = document.createElement('canvas'); cv.width = cv.height = N; return [cv, cv.getContext('2d')!] as const; };
+  const [cv, g] = mk(), [bv, b] = mk();
+  const u = N / S, px = (x: number) => ((x - c.x) / S + 0.5) * N, py = (y: number) => (1 - ((y - c.y) / S + 0.5)) * N;
+  const cx = px(0), coreY = 0.06;
+  const outline = (ctx: CanvasRenderingContext2D, k = 1, cy = 0, wob = 0) => {
+    ctx.beginPath(); prof.forEach((v, i) => { const a = i / prof.length * Math.PI * 2, w = 1 + wob * Math.sin(a * 7 + 1.3) + wob * 0.6 * Math.sin(a * 13 + 0.4);
+      const X = px(v.x * k * w), Y = py(cy + (v.y - cy) * k * w); if (i) ctx.lineTo(X, Y); else ctx.moveTo(X, Y); }); ctx.closePath();
+  };
+  // 부드러운 값 잡음 (과육의 얼룩진 밝기 차이)
+  const G = 64, grid = Array.from({length: G * G}, () => rand());
+  const vn = (x: number, y: number) => { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, s1 = xf * xf * (3 - 2 * xf), s2 = yf * yf * (3 - 2 * yf);
+    const at = (i: number, j: number) => grid[((j % G + G) % G) * G + ((i % G + G) % G)];
+    return lerp(lerp(at(xi, yi), at(xi + 1, yi), s1), lerp(at(xi, yi + 1), at(xi + 1, yi + 1), s1), s2); };
+  const fbm = (x: number, y: number) => vn(x, y) * 0.55 + vn(x * 2.1, y * 2.1) * 0.3 + vn(x * 4.3, y * 4.3) * 0.15;
+
+  // ── 1. 과육 바탕: 가운데는 밝은 크림색, 껍질 쪽으로 갈수록 노란 기 ──
+  g.fillStyle = '#f2e3b6'; g.fillRect(0, 0, N, N); b.fillStyle = '#808080'; b.fillRect(0, 0, N, N);
+  const grad = g.createRadialGradient(cx, py(coreY), u * 0.12, cx, py(coreY), u * 1.0);
+  grad.addColorStop(0, '#f9efcf'); grad.addColorStop(0.45, '#f6e8bf'); grad.addColorStop(0.8, '#f1dfaa'); grad.addColorStop(1, '#e7d092');
+  outline(g); g.fillStyle = grad; g.fill();
+
+  // ── 2. 과육 결: 작은 캔버스에 얼룩을, 작은 타일에 알갱이를 만들어 늘려 덮습니다 (계산을 가볍게) ──
+  const M = 320, [nv, nx] = (() => { const cv2 = document.createElement('canvas'); cv2.width = cv2.height = M; return [cv2, cv2.getContext('2d')!] as const; })();
+  const nimg = nx.createImageData(M, M);
+  for (let y = 0; y < M; y++) for (let x = 0; x < M; x++) { const k = (y * M + x) * 4, v = 128 + (fbm(x / M * 9, y / M * 9) - 0.5) * 120; nimg.data[k] = nimg.data[k + 1] = nimg.data[k + 2] = v; nimg.data[k + 3] = 255; }
+  nx.putImageData(nimg, 0, 0);
+  const T = 256, [tv, tx] = (() => { const cv2 = document.createElement('canvas'); cv2.width = cv2.height = T; return [cv2, cv2.getContext('2d')!] as const; })();
+  const timg = tx.createImageData(T, T);
+  for (let k = 0; k < T * T * 4; k += 4) { const v = 128 + (rand() - 0.5) * 110; timg.data[k] = timg.data[k + 1] = timg.data[k + 2] = v; timg.data[k + 3] = 255; }
+  tx.putImageData(timg, 0, 0);
+  const grainPat = (ctx: CanvasRenderingContext2D) => { const pt = ctx.createPattern(tv, 'repeat')!; pt.setTransform(new DOMMatrix().scale(N / 1536 * 1.2)); return pt; };
+  g.save(); outline(g); g.clip();
+  g.globalCompositeOperation = 'overlay'; g.globalAlpha = 0.4; g.drawImage(nv, 0, 0, N, N);
+  g.globalAlpha = 0.16; g.fillStyle = grainPat(g); g.fillRect(0, 0, N, N); g.restore();
+  b.drawImage(nv, 0, 0, N, N); b.globalAlpha = 0.45; b.fillStyle = grainPat(b); b.fillRect(0, 0, N, N); b.globalAlpha = 1;
+  // 세포가 모인 작은 반짝임(즙이 많은 과육의 결)
+  g.save(); outline(g); g.clip();
+  for (let i = 0, n = Math.round(2600 * (N / 1536) ** 2); i < n; i++) {
+    const x = rand() * N, y = rand() * N, r = u * (0.004 + rand() * 0.007);
+    g.fillStyle = rand() < 0.5 ? 'rgba(255,253,240,0.35)' : 'rgba(225,205,150,0.18)';
+    g.beginPath(); g.ellipse(x, y, r, r * (0.6 + rand() * 0.5), rand() * Math.PI, 0, Math.PI * 2); g.fill();
+    b.fillStyle = `rgba(${rand() < 0.5 ? 200 : 70},${rand() < 0.5 ? 200 : 70},${rand() < 0.5 ? 200 : 70},0.25)`; b.beginPath(); b.arc(x, y, r, 0, Math.PI * 2); b.fill();
+  }
+
+  // ── 3. 껍질 바로 아래 붉은 기: 고르지 않게 번진 안토시아닌 ──
+  for (let pass = 0; pass < 3; pass++) {
+    const wdt = [0.09, 0.05, 0.022][pass], al = [0.1, 0.18, 0.3][pass];
+    for (let i = 0; i < prof.length; i++) {
+      const a = prof[i], bb = prof[(i + 1) % prof.length], t = i / prof.length;
+      const amt = al * (0.45 + 0.9 * vn(t * 18 + pass * 3, pass * 5.1));                  // 위치마다 진하기가 다름
+      g.strokeStyle = `rgba(196,58,52,${amt.toFixed(3)})`; g.lineWidth = u * wdt * (0.7 + 0.6 * vn(t * 11, 7 + pass)); g.lineCap = 'round';
+      g.beginPath(); g.moveTo(px(a.x), py(a.y)); g.lineTo(px(bb.x), py(bb.y)); g.stroke();
+    }
+  }
+  // 껍질 바로 안쪽 얇은 노란 녹색 층
+  g.lineWidth = u * 0.014; g.strokeStyle = 'rgba(214,196,120,0.35)'; outline(g, 0.975); g.stroke();
+  g.restore();
+
+  // ── 4. 씨방 둘레 관다발: 꼭지에서 꽃받침까지 하트 모양으로 이어지는 점선 + 세로 줄기 ──
+  const heart = (ctx: CanvasRenderingContext2D, s: number, wob = 0) => {
+    const pts: [number, number][] = [];
+    for (let k = 0; k <= 90; k++) {
+      const a = k / 90 * Math.PI * 2, r = 1 + wob * Math.sin(a * 5 + 0.7);
+      const xx = Math.sin(a) * (0.3 + 0.06 * Math.cos(a)) * s * r, yy = (Math.cos(a) * 0.36 + 0.05 * Math.cos(2 * a)) * s * r;
+      pts.push([cx + xx * u, py(coreY + yy)]);
+    }
+    ctx.beginPath(); pts.forEach(([X, Y], k) => k ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y)); ctx.closePath();
+  };
+  g.save(); heart(g, 1.55, 0.03); g.fillStyle = 'rgba(226,212,150,0.3)'; g.fill(); g.restore();         // 씨방 주변 살짝 투명한 과육
+  for (let k = 0; k < 2; k++) {
+    g.save(); g.setLineDash([u * (0.01 + rand() * 0.01), u * 0.016]); g.lineDashOffset = rand() * 50;
+    g.lineWidth = u * (0.009 - k * 0.003); g.strokeStyle = k ? 'rgba(140,150,70,0.45)' : 'rgba(160,146,76,0.7)';
+    heart(g, 1.55 + k * 0.05, 0.03); g.stroke(); g.restore();
+  }
+  b.save(); b.lineWidth = u * 0.008; b.strokeStyle = 'rgba(60,60,60,0.5)'; heart(b, 1.55, 0.03); b.stroke(); b.restore();
+  // 세로 관다발 몇 가닥 (희미하게)
+  g.lineCap = 'round';
+  [-0.36, -0.2, 0.2, 0.36].forEach((off, k) => {
+    g.strokeStyle = 'rgba(170,156,88,0.3)'; g.lineWidth = u * 0.006;
+    g.beginPath(); g.moveTo(cx + off * 0.2 * u, py(0.58)); g.bezierCurveTo(cx + off * 1.3 * u, py(0.38), cx + off * 1.45 * u, py(-0.3 - k * 0.02), cx + off * 0.25 * u, py(-0.66)); g.stroke();
   });
-  // 껍질 테두리
-  outline(); g.lineWidth = u * 0.026; g.strokeStyle = '#9f1f26'; g.stroke();
-  outline(); g.lineWidth = u * 0.008; g.strokeStyle = '#c2453f'; g.stroke();
-  return cv;
+
+  // ── 5. 꼭지 쪽 심(섬유) + 꽃받침 관 ──
+  const fiber = (y0: number, y1: number, w: number, col: string) => {
+    for (let k = 0; k < 5; k++) { g.strokeStyle = col; g.lineWidth = u * w * (0.5 + rand() * 0.6);
+      g.beginPath(); g.moveTo(cx + (rand() - 0.5) * u * 0.02, py(y0)); g.bezierCurveTo(cx + (rand() - 0.5) * u * 0.03, py(lerp(y0, y1, 0.35)), cx + (rand() - 0.5) * u * 0.03, py(lerp(y0, y1, 0.7)), cx + (rand() - 0.5) * u * 0.015, py(y1)); g.stroke(); }
+  };
+  fiber(0.3, 0.63, 0.007, 'rgba(196,172,104,0.45)');
+  // 꽃받침 관: 아래쪽 오목한 자리에서 씨방까지 좁아지는 깔때기, 안쪽은 갈색
+  g.beginPath(); g.moveTo(cx - u * 0.05, py(-0.76)); g.bezierCurveTo(cx - u * 0.016, py(-0.64), cx - u * 0.02, py(-0.48), cx, py(-0.22));
+  g.bezierCurveTo(cx + u * 0.02, py(-0.48), cx + u * 0.016, py(-0.64), cx + u * 0.05, py(-0.76)); g.closePath();
+  const tube = g.createLinearGradient(0, py(-0.3), 0, py(-0.76)); tube.addColorStop(0, 'rgba(214,192,130,0.25)'); tube.addColorStop(0.55, 'rgba(176,140,84,0.45)'); tube.addColorStop(1, 'rgba(120,84,46,0.75)');
+  g.fillStyle = tube; g.fill();
+  for (let k = 0; k < 7; k++) { g.strokeStyle = 'rgba(90,58,30,0.6)'; g.lineWidth = u * 0.004; const xx = cx + (k - 3) * u * 0.012;
+    g.beginPath(); g.moveTo(xx, py(-0.74)); g.lineTo(xx + (rand() - 0.5) * u * 0.02, py(-0.6 - rand() * 0.06)); g.stroke(); }  // 수술 흔적
+
+  // ── 6. 씨방: 가운데 심을 사이에 두고 양쪽에 배 모양의 방, 양피지 같은 막, 안에 씨 하나씩 ──
+  g.fillStyle = 'rgba(226,210,160,0.55)'; g.beginPath(); g.ellipse(cx, py(coreY), u * 0.026, u * 0.25, 0, 0, Math.PI * 2); g.fill();   // 가운데 심
+  [-1, 1].forEach(sd => {
+    const lx = cx + sd * u * 0.11, ly = py(coreY + 0.01), tilt = sd * 0.2, lw = u * 0.085, lh = u * 0.2;
+    const boat = (ctx: CanvasRenderingContext2D, k: number) => { ctx.beginPath(); ctx.moveTo(0, -lh * k);
+      ctx.bezierCurveTo(lw * 1.25 * k, -lh * 0.55 * k, lw * 1.05 * k, lh * 0.75 * k, 0, lh * k);
+      ctx.bezierCurveTo(-lw * 1.05 * k, lh * 0.75 * k, -lw * 1.25 * k, -lh * 0.55 * k, 0, -lh * k); ctx.closePath(); };
+    for (const ctx of [g, b]) { ctx.save(); ctx.translate(lx, ly); ctx.rotate(tilt); }
+    // 막 바깥 테두리(연골질) — 옅은 황갈색, 살짝 반짝임
+    boat(g, 1.18); g.fillStyle = '#eadcae'; g.fill(); g.lineWidth = u * 0.006; g.strokeStyle = 'rgba(176,150,90,0.75)'; g.stroke();
+    boat(g, 1.0); const lg = g.createLinearGradient(-lw, 0, lw, 0); lg.addColorStop(0, '#d9c58f'); lg.addColorStop(0.5, '#efe3bb'); lg.addColorStop(1, '#cdb57a');
+    g.fillStyle = lg; g.fill(); g.lineWidth = u * 0.004; g.strokeStyle = 'rgba(150,120,70,0.8)'; g.stroke();
+    boat(b, 1.0); b.fillStyle = '#3a3a3a'; b.fill();                                                    // 방은 움푹하게
+    g.strokeStyle = 'rgba(255,252,236,0.7)'; g.lineWidth = u * 0.004; g.beginPath(); g.moveTo(-lw * 0.5, -lh * 0.55); g.quadraticCurveTo(-lw * 0.85, 0, -lw * 0.45, lh * 0.6); g.stroke();  // 막의 윤기
+    // 씨: 끝이 뾰족한 물방울, 짙은 갈색에 반사광
+    const sw = u * 0.062, sh = u * 0.155, sy = lh * 0.1;
+    const seed = (ctx: CanvasRenderingContext2D) => { ctx.beginPath(); ctx.moveTo(0, sy - sh * 0.55); ctx.bezierCurveTo(sw * 0.95, sy - sh * 0.1, sw * 0.85, sy + sh * 0.5, 0, sy + sh * 0.5); ctx.bezierCurveTo(-sw * 0.85, sy + sh * 0.5, -sw * 0.95, sy - sh * 0.1, 0, sy - sh * 0.55); ctx.closePath(); };
+    g.save(); g.shadowColor = 'rgba(70,40,10,0.35)'; g.shadowBlur = u * 0.012; seed(g);
+    const sg = g.createRadialGradient(-sw * 0.25, sy - sh * 0.05, sw * 0.1, 0, sy, sh * 0.6); sg.addColorStop(0, '#8a5530'); sg.addColorStop(0.5, '#5a321a'); sg.addColorStop(1, '#2c170b');
+    g.fillStyle = sg; g.fill(); g.restore();
+    g.fillStyle = 'rgba(255,240,220,0.45)'; g.beginPath(); g.ellipse(-sw * 0.3, sy - sh * 0.08, sw * 0.12, sh * 0.2, -0.15, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.7)'; g.beginPath(); g.ellipse(-sw * 0.33, sy - sh * 0.15, sw * 0.04, sh * 0.06, -0.15, 0, Math.PI * 2); g.fill();
+    seed(b); b.fillStyle = '#e0e0e0'; b.fill();                                                          // 씨는 볼록하게
+    g.restore(); b.restore();
+  });
+
+  // ── 7. 껍질: 짙은 빨강 테두리와 바깥쪽 얇은 밝은 선 ──
+  outline(g); g.lineWidth = u * 0.03; g.strokeStyle = '#8c1820'; g.stroke();
+  outline(g); g.lineWidth = u * 0.012; g.strokeStyle = '#b8302f'; g.stroke();
+  outline(b); b.lineWidth = u * 0.03; b.strokeStyle = '#b0b0b0'; b.stroke();
+  return {color: cv, bump: bv};
 }
