@@ -1,0 +1,48 @@
+/* Navigation and home: restrained FarmBridge green, responsive work area. */
+.site{background:#f7f8f5;--shadow:none;--brand:#24543e;--brand-2:#34734e}
+.site-header2{box-shadow:none;border-bottom:1px solid #dce5dd;background:#fff}
+.site-header-inner{max-width:1440px;margin:auto}
+.site-main{min-height:65vh}
+.page-body{max-width:1440px;margin:auto}
+.page-hero{max-width:1440px;margin:auto;padding-top:28px}
+.page-hero h1{font-size:30px;letter-spacing:-1.1px}
+.page-hero p{max-width:720px;font-size:15px}
+.page-kicker{letter-spacing:1.2px}
+.nav-link.active{box-shadow:inset 0 -3px #24543e;border-radius:6px 6px 0 0;background:#edf4ec}
+.account-menu-label{font-size:14px;white-space:nowrap}
+.user-chip{border-left:1px solid #dce5dd;padding-left:14px}
+.refreshed-home{max-width:1384px;margin:auto;padding:0 28px 48px}
+.refresh-hero{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(280px,.75fr);gap:64px;padding:62px 0 48px;align-items:center}
+.refresh-hero h1{font-size:clamp(32px,3.6vw,52px);line-height:1.22;letter-spacing:-2px;font-weight:750}
+.refresh-hero h1 em{font-style:normal;color:#376448}
+.refresh-hero p{font-size:18px;max-width:540px;line-height:1.75}
+.refresh-hero .page-kicker{font-size:11px;letter-spacing:2px;color:#657965}
+.home-calc-note{display:block;font-size:12px;color:#69786b;line-height:1.6;margin-top:18px}
+.home-start-guide{border:1px solid #dfe7d9;border-radius:18px;background:#eff3e8;padding:28px 30px;align-self:stretch;display:flex;flex-direction:column;justify-content:center}
+.start-guide-title{display:flex;align-items:center;gap:14px;color:#426349;font-size:14px;line-height:1.55;padding-bottom:22px;border-bottom:1px solid #d6dfcf}
+.start-guide-title strong{font-size:20px;color:#234e37;font-weight:650}
+.home-start-guide ol{list-style:none;margin:22px 0 0;padding:0;display:grid;gap:20px}
+.home-start-guide li{display:flex;gap:18px;align-items:baseline}
+.home-start-guide li>span{font-size:12px;color:#75916d;font-weight:700;font-variant-numeric:tabular-nums}
+.home-start-guide b{font-size:15px;color:#304e37}
+.home-start-guide li p{font-size:12px;color:#697a60;margin:4px 0 0;line-height:1.5}
+.recent-lots.home-section{padding:26px 0 0;border-top:1px solid #dfe5dc}
+.recent-lots .home-section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:14px}
+.recent-lots h2{font-size:23px;letter-spacing:-.8px;margin-top:5px}
+.recent-lot-list{display:grid;gap:0;background:#fff;border:1px solid #dde5dd;border-radius:14px;overflow:hidden}
+.recent-lot{display:flex;align-items:center;gap:18px;text-align:left;padding:23px 26px;background:#fff;color:#234731;border:0;border-bottom:1px solid #e7ece6}
+.recent-lot:last-child{border-bottom:0}.recent-lot:hover{background:#f3f7ef}
+.recent-lot-icon{display:grid;place-items:center;flex:none;width:46px;height:46px;background:#eff4e8;color:#5c7953;border-radius:12px}
+.recent-lot-copy{min-width:0;display:flex;flex-direction:column;gap:5px}.recent-lot-copy b{font-size:17px;overflow-wrap:anywhere}.recent-lot-copy>span{font-size:13px;color:#687569}.recent-lot-copy small{font-size:12px;color:#76816f}
+.recent-lot-action{margin-left:auto;display:flex;align-items:center;gap:9px;font-size:13px;white-space:nowrap}
+.home-empty{display:flex;align-items:center;gap:20px;padding:30px;border:1px dashed #cdd9ca;border-radius:12px;background:#fbfcf9;color:#61745d}.home-empty b{color:#354f39}.home-empty p{font-size:14px;margin-top:6px}.home-empty .btn{margin-left:auto;flex:none}
+.site-footer .site-footer-inner{max-width:1384px;margin:auto}.site-footer nav{display:flex;flex-wrap:wrap;gap:16px}
+.btn,.nav-link{min-height:44px}.btn:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,textarea:focus-visible{outline:3px solid #44815b;outline-offset:3px}
+@media(min-width:1000px){.site-nav{display:flex;position:static;padding:0;flex-direction:row;overflow:visible;gap:10px;background:transparent}.menu-toggle{display:none}.nav-mobile-foot{display:none}.user-chip{display:flex}.site-header-inner{height:72px}.nav-link{padding:12px 16px;font-size:15px}}
+@media(max-width:999px){.refreshed-home{padding:0 22px 32px}.refresh-hero{gap:28px;padding:36px 0}.home-start-guide{padding:24px}.home-hero-text .hero-actions{gap:10px}.hero-actions .btn{font-size:14px}.site-nav{z-index:50}.user-chip{display:none}}
+@media(max-width:680px){.refreshed-home{padding:0 16px 32px}.refresh-hero{grid-template-columns:1fr;gap:28px;padding:30px 0}.refresh-hero h1{font-size:35px;letter-spacing:-1.6px}.refresh-hero p{font-size:16px}.home-start-guide{padding:22px}.start-guide-title{padding-bottom:16px}.home-start-guide ol{gap:15px;margin-top:16px}.recent-lots .home-section-head{align-items:flex-end}.recent-lots h2{font-size:20px}.recent-lot{padding:20px 16px;gap:12px;flex-wrap:wrap}.recent-lot-copy{flex:1}.recent-lot-action{width:100%;justify-content:flex-end;font-size:12px;margin-top:3px}.home-empty{flex-wrap:wrap;padding:22px;gap:14px}.home-empty>div{flex:1;min-width:180px}.home-empty .btn{margin:0;width:100%}.site-footer .site-footer-inner{flex-direction:column}.site-footer nav{gap:12px}.page-hero h1{font-size:25px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+
+.landing-nav .brand2{background:none;border:0;text-align:left}.landing-main-menu{margin-left:auto;margin-right:20px}.landing-main-menu [aria-current=page]{color:#28563f;background:#eaf2e6}.landing-nav-inner{max-width:1360px}.l-hero h1 em{background:none;color:#24543e}.landing-main-menu .landing-link{font-size:14px}@media(max-width:700px){.landing-nav-inner{height:105px;flex-wrap:wrap;padding:10px 16px}.landing-main-menu{order:3;width:100%;justify-content:center;margin:6px 0 0;border-top:1px solid #e2e8df;padding-top:4px}.landing-nav .brand-text{font-size:16px}.landing-nav .btn{display:none}.l-hero{padding-top:140px}.landing-main-menu .landing-link{flex:1;text-align:center;padding:5px 8px}}
+
+@media(max-width:680px){.site .page-hero-track{padding:18px 16px 0}.site .page-hero-track .page-kicker{font-size:10px;margin-bottom:5px}.site .page-hero-track h1{font-size:23px}.site .page-hero-track p{font-size:12px;line-height:1.55;margin-top:6px}.site .page-body{padding-top:18px}}

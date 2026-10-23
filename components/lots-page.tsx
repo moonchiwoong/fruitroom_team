@@ -1,6 +1,6 @@
 'use client';
-import {useEffect, useState} from 'react';
-import {Activity, AlertTriangle, Apple, Camera, Check, ClipboardList, Download, Info, LineChart, Loader2, Lock, MapPin, Upload, Users} from 'lucide-react';
+import {useEffect, useMemo, useRef, useState} from 'react';
+import {Activity, AlertTriangle, Apple, ArrowLeft, Camera, Check, ClipboardList, Download, Info, LineChart, Loader2, Lock, MapPin, MessageCircle, Search, Upload, Users} from 'lucide-react';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
 import {ObservationForm, requestJson} from '@/components/lot-forms';
 import {EnvironmentChart} from '@/components/lot-charts';
@@ -8,28 +8,36 @@ import {KindBadge} from '@/components/tracker-parts';
 import {reviewLot} from '@/lib/lot-analysis';
 import {preparePhoto} from '@/lib/prepare-photo';
 import {today, type Lot, type Observation, type Photo, type Stats} from '@/lib/lot-types';
-import {daysBetween, fmtDate} from '@/lib/tracker';
+import {daysBetween, fmtDate, fmtNum} from '@/lib/tracker';
 
 type Analysis = {lot: Lot; asOf: string; stats: Stats; observations: Observation[]; photos: Photo[]};
-type Sub = 'overview' | 'records' | 'environment' | 'photos';
-const fmt = (n: number | null | undefined, d = 1) => n === null || n === undefined ? null : n.toFixed(d);
+type Sub = 'records' | 'environment' | 'photos';
+const fmt = (n: number | null | undefined, d = 1) => n === null || n === undefined ? null : fmtNum(n, d);
 const V = ({v, d = 1, unit}: {v: number | null | undefined; d?: number; unit?: string}) => { const t = fmt(v, d); return t === null ? <span className="kind k-missing">미측정</span> : <>{t}{unit && <small> {unit}</small>}</>; };
 
-export default function LotsPage({lots, loadError, reload, openTracker, focusId}: {lots: Lot[]; loadError: string; reload: () => Promise<Lot[]>; openTracker: (mode: 'real' | 'example', lotId?: string) => void; focusId?: string | null}) {
+export default function LotsPage({lots, loadError, reload, openTracker, focusId, onAskAI}: {lots: Lot[]; loadError: string; reload: () => Promise<Lot[]>; openTracker: (mode: 'real' | 'example', lotId?: string) => void; focusId?: string | null; onAskAI?: (lotId: string) => void}) {
   const [id, setId] = useState<string>(focusId ?? lots[0]?.id ?? '');
-  const [sub, setSub] = useState<Sub>('overview');
-  const [data, setData] = useState<Analysis | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState(''), [version, setVersion] = useState(0);
+  const [sub, setSub] = useState<Sub>('records');
+  const [query, setQuery] = useState(''), [mobileDetail, setMobileDetail] = useState(!!focusId);
+  const detailRef = useRef<HTMLElement>(null);
+  const filteredLots = useMemo(() => { const q = query.trim().toLocaleLowerCase('ko-KR'); return lots.filter(l => !q || [l.name, l.variety, l.location ?? ''].some(v => v.toLocaleLowerCase('ko-KR').includes(q))); }, [lots, query]);
+  const [loadedData, setData] = useState<Analysis | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState(''), [version, setVersion] = useState(0);
   const [notice, setNotice] = useState(''), [busy, setBusy] = useState(''), [rowErrors, setRowErrors] = useState<string[]>([]);
-  useEffect(() => { if (focusId) setId(focusId); }, [focusId]);
+  useEffect(() => { if (focusId) { setId(focusId); setMobileDetail(true); } }, [focusId]);
   useEffect(() => { if (!lots.some(l => l.id === id)) setId(lots[0]?.id ?? ''); }, [lots, id]);
   const selected = lots.find(l => l.id === id);
+  const data = loadedData?.lot.id === selected?.id ? loadedData : null;
+  useEffect(() => { setNotice(''); setRowErrors([]); setSub('records'); }, [id]);
   useEffect(() => {
-    setData(null); setError(''); if (!selected) return;
+    setData(null); setError(''); if (!selected) { setLoading(false); return; }
     const ctl = new AbortController(); setLoading(true);
-    requestJson<Analysis>(`/api/lots/${selected.id}/analysis?asOf=${today()}`, {signal: ctl.signal}).then(setData).catch(e => { if (e.name !== 'AbortError') setError(e.message); }).finally(() => { if (!ctl.signal.aborted) setLoading(false); });
+    requestJson<Analysis>(`/api/lots/${selected.id}/analysis?asOf=${today()}`, {signal: ctl.signal}).then(result => { if (!ctl.signal.aborted) setData(result); }).catch(e => { if (!ctl.signal.aborted && e.name !== 'AbortError') setError(e.message); }).finally(() => { if (!ctl.signal.aborted) setLoading(false); });
     return () => ctl.abort();
   }, [selected?.id, version]); // eslint-disable-line react-hooks/exhaustive-deps
   const refresh = () => { setVersion(v => v + 1); void reload(); };
+  const selectLot = (lotId: string) => { setId(lotId); setMobileDetail(true); setSub('records'); requestAnimationFrame(() => { const mobile = window.matchMedia('(max-width: 760px)').matches; detailRef.current?.focus({preventScroll: !mobile}); if (mobile) detailRef.current?.scrollIntoView({block: 'start'}); }); };
+  function changeSub(next: Sub) { setSub(next); }
+  function tabKeys(e: React.KeyboardEvent<HTMLButtonElement>) { const order: Sub[] = ['records', 'environment', 'photos']; const index = order.indexOf(sub); const next = e.key === 'ArrowRight' ? order[(index + 1) % 3] : e.key === 'ArrowLeft' ? order[(index + 2) % 3] : e.key === 'Home' ? order[0] : e.key === 'End' ? order[2] : null; if (next) { e.preventDefault(); changeSub(next); document.getElementById('lot-tab-' + next)?.focus(); } }
 
   async function upload(e: React.FormEvent<HTMLFormElement>, kind: 'environment' | 'photos') {
     e.preventDefault(); if (!selected) return; const form = e.currentTarget; setBusy(kind); setError(''); setRowErrors([]); setNotice('');
@@ -51,80 +59,90 @@ export default function LotsPage({lots, loadError, reload, openTracker, focusId}
   if (!lots.length) return <section className="empty-panel">
     <ClipboardList size={34} /><h2>{loadError ? '물량을 불러오지 못했습니다.' : '아직 등록한 물량이 없어요.'}</h2>
     <p>{loadError || '초기 품질을 입력하면 물량 기록이 만들어지고, 후속 측정·온습도 이력·사진을 여기서 관리합니다.'}</p>
-    <div className="qt-inline-btns"><button className="btn btn-primary" onClick={() => openTracker('real', 'new')}>실측값 입력</button><button className="btn btn-outline" onClick={() => openTracker('example')}>예시로 체험</button></div>
+    <div className="qt-inline-btns"><button className="btn btn-primary" onClick={() => openTracker('real', 'new')}>실측값 입력</button><button className="btn btn-outline" onClick={() => openTracker('example')}>예시로 체험</button>{loadError && <button className="btn btn-outline" onClick={() => void reload()}>다시 불러오기</button>}</div>
   </section>;
 
   const review = data ? reviewLot(data.lot, data.stats, data.observations) : null;
-  const lot = data?.lot ?? selected!;
+  const lot = data?.lot ?? selected ?? lots[0];
   const start = lot.storage_start_date || lot.intake_date;
   const latest = (k: 'firmness' | 'brix' | 'acidity') => [...(data?.observations ?? [])].reverse().find(o => o[k] !== null && o[k] !== undefined);
-  const totals = lots.reduce((n, l) => n + (l.quantity ?? 0), 0);
 
-  return <div className="lots">
+  return <div className={"lots lots-refresh" + (mobileDetail ? " has-detail" : "")}>
     <div className="lot-toolbar">
-      <div className="lot-count"><strong>{lots.length}</strong>개 물량{totals > 0 && <span>입고 중량 입력분 합계 {totals.toLocaleString()} kg</span>}</div>
+      <div className="lot-count"><strong>{lots.length}</strong>개 물량<span>접근 가능한 내 물량과 공유 물량</span></div>
       <div className="toolbar-controls"><button className="btn btn-primary" onClick={() => openTracker('real', 'new')}>실측값 입력</button></div>
     </div>
+    {loadError && <div className="error-box" role="alert">목록을 새로 불러오지 못했습니다. {loadError}<button onClick={() => void reload()}>목록 다시 불러오기</button></div>}
     {notice && <div className="success-notice" role="status"><Check size={16} />{notice}<button onClick={() => setNotice('')} aria-label="알림 닫기">×</button></div>}
     {error && <div className="error-box" role="alert">{error}{rowErrors.length > 0 && <ul className="row-errors">{rowErrors.map(r => <li key={r}>{r}</li>)}</ul>}<button onClick={refresh}>다시 불러오기</button></div>}
 
-    <div className="lot-cards">{lots.map(l => <button key={l.id} onClick={() => { setId(l.id); setSub('overview'); }} className={'lot-card ' + (selected?.id === l.id ? 'chosen' : '')} aria-pressed={selected?.id === l.id}>
-      <div><span className="lot-card-icon"><Apple size={20} /></span><span className={'share-badge' + (l.team_shared ? ' team' : '')}>{l.team_shared ? <><Users size={12} />팀 공유</> : <><Lock size={12} />나만 보기</>}</span></div>
-      <h2>{l.name}</h2><p><MapPin size={13} />{l.location || '저장고 위치 미입력'}</p>
-      <div className="lot-card-bottom"><span>{l.variety}{l.quantity ? ` · ${l.quantity.toLocaleString()} kg` : ''}</span><span>저장 {Math.max(0, daysBetween(l.storage_start_date || l.intake_date, today()))}일차{selected?.id === l.id && <Check size={14} />}</span></div>
-    </button>)}</div>
+    <div className="lots-workspace">
+    <aside className="lots-list-panel" aria-label="물량 목록">
+      <label className="lot-search"><Search size={17} aria-hidden="true" /><span className="sr-only">물량 이름·품종·저장고 검색</span><input id="lot-search-input" type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="물량 이름·품종·저장고" /></label>
+      <p className="lot-search-count" role="status">{query.trim() ? `${filteredLots.length}개 검색 결과` : '품질을 확인할 물량을 선택하세요.'}</p>
+      <div className="lot-cards">{filteredLots.map(l => <button key={l.id} id={'lot-choice-' + l.id} disabled={!!busy} onClick={() => selectLot(l.id)} className={'lot-card ' + (selected?.id === l.id ? 'chosen' : '')} aria-pressed={selected?.id === l.id}>
+        <div><span className="lot-card-icon"><Apple size={19} /></span><span className={'share-badge' + (l.team_shared ? ' team' : '')}>{l.team_shared ? <><Users size={12} />팀 공유</> : <><Lock size={12} />나만 보기</>}</span></div>
+        <h2>{l.name}</h2><p><MapPin size={13} />{l.location || '저장고 위치 미입력'}</p>
+        <div className="lot-card-bottom"><span>{l.variety}</span><span>저장 {Math.max(0, daysBetween(l.storage_start_date || l.intake_date, today()))}일차</span></div>
+        <p className="lot-record-status">{l.observation_count ? `후속 측정 ${l.observation_count}건` : '후속 측정 기록 없음'}{selected?.id === l.id && <span><Check size={14} />선택됨</span>}</p>
+      </button>)}</div>
+      {!filteredLots.length && <div className="lot-search-empty"><Search size={25} /><h3>검색 결과가 없어요.</h3><p>물량 이름, 품종 또는 저장고 위치로 다시 찾아보세요.</p><button className="btn btn-outline" onClick={() => setQuery('')}>검색 지우기</button></div>}
+    </aside>
 
-    {selected && <section className="lot-detail">
+    {selected && <section className="lot-detail" ref={detailRef} tabIndex={-1} aria-label="선택 물량 상세">
+      <button className="lot-back btn btn-outline" disabled={!!busy} onClick={() => { setMobileDetail(false); requestAnimationFrame(() => (document.getElementById('lot-choice-' + id) ?? document.getElementById('lot-search-input'))?.focus()); }}><ArrowLeft size={16} />물량 목록으로</button>
       <div className="lot-detail-head">
-        <div><span className="section-label">물량 상세</span><h2>{lot.name}</h2><p className="subtle">{lot.variety} · 저장 시작 {fmtDate(start)}{!lot.storage_start_date && ' (입고일과 같음)'} · {lot.storage}{lot.mcp === '처리' ? ' + 1-MCP 처리' : lot.mcp === '미확인' ? ' · 1-MCP 미확인' : ''}</p></div>
-        <div className="qt-inline-btns"><button className="btn btn-primary" onClick={() => openTracker('real', lot.id)}><LineChart size={16} />품질 변화 보기</button><ObservationForm lot={lot} onSaved={() => { setNotice('측정 기록을 저장했습니다.'); refresh(); }} disabled={false} /></div>
+        <div><span className="section-label">물량 상세 · {lot.team_shared ? '팀 공유' : '나만 보기'}</span><h2>{lot.name}</h2><p className="subtle">{lot.variety} · 저장 시작 {fmtDate(start)}{!lot.storage_start_date && ' (입고일과 같음)'} · {lot.storage}{lot.mcp === '처리' ? ' + 1-MCP 처리' : lot.mcp === '미확인' ? ' · 1-MCP 미확인' : ''}</p></div>
+        <div className="qt-inline-btns"><button className="btn btn-primary" onClick={() => openTracker('real', lot.id)}><LineChart size={16} />품질 변화 보기</button><ObservationForm lot={lot} onSaved={() => { setNotice('측정 기록을 저장했습니다.'); refresh(); }} disabled={!data || loading || !!busy} />{onAskAI && <button className="btn btn-outline" disabled={!data || loading || !!error} data-ai-return onClick={() => onAskAI(lot.id)}><MessageCircle size={16} />이 물량 상태 요약</button>}</div>
       </div>
-      <div className="seg lot-subtabs" role="tablist">
-        {([['overview', '개요'], ['records', '측정 기록'], ['environment', '온습도 이력'], ['photos', '사진']] as [Sub, string][]).map(([k, t]) => <button key={k} role="tab" aria-selected={sub === k} className={sub === k ? 'active' : ''} onClick={() => setSub(k)}>{t}</button>)}
+      <div className="seg lot-subtabs" role="tablist" aria-label="물량 기록 종류">
+        {([['records', '품질 기록'], ['environment', '온습도 이력'], ['photos', '사진']] as [Sub, string][]).map(([k, t]) => <button key={k} id={'lot-tab-' + k} role="tab" aria-controls="lot-record-panel" aria-selected={sub === k} tabIndex={sub === k ? 0 : -1} className={sub === k ? 'active' : ''} onKeyDown={tabKeys} onClick={() => changeSub(k)}>{t}</button>)}
       </div>
       {loading && <div className="loading-strip"><Loader2 size={17} className="spin" />기록을 불러오는 중입니다.</div>}
 
-      {sub === 'overview' && data && <div className="lot-ov">
-        <section className="lot-ov-card">
-          <h3>기본 정보</h3>
+      <div id="lot-record-panel" role="tabpanel" aria-labelledby={'lot-tab-' + sub} className="lot-record-panel">
+      {sub === 'records' && data && <div className="lot-ov">
+        <details className="lot-ov-card lot-basic-info">
+          <summary>물량·저장 조건 상세</summary>
           <dl className="lot-dl">
             <div><dt>수확일</dt><dd>{lot.harvest_date ? fmtDate(lot.harvest_date) : '미입력'}</dd></div>
             <div><dt>입고일</dt><dd>{fmtDate(lot.intake_date)}</dd></div>
             <div><dt>저장 시작일</dt><dd>{fmtDate(start)}{!lot.storage_start_date && <small> 입고일과 같음</small>}</dd></div>
             <div><dt>저장 환경 / 1-MCP</dt><dd>{lot.storage} / {lot.mcp}</dd></div>
             <div><dt>포장 / 저장고 위치</dt><dd>{lot.packaging || '미입력'} / {lot.location || '미입력'}</dd></div>
+            <div><dt>입고 중량</dt><dd>{lot.quantity != null ? `${lot.quantity.toLocaleString()} kg` : '미입력'}</dd></div>
             <div><dt>센서 번호</dt><dd>{lot.sensor_id || '미입력'}</dd></div>
             {lot.details?.mcp && (lot.details.mcp.treated_on || lot.details.mcp.product) && <div><dt>1-MCP 처리</dt><dd>{[lot.details.mcp.treated_on && fmtDate(lot.details.mcp.treated_on), lot.details.mcp.product, lot.details.mcp.concentration, lot.details.mcp.hours != null && `${lot.details.mcp.hours}h`, lot.details.mcp.temp != null && `${lot.details.mcp.temp}°C`].filter(Boolean).join(' · ')}</dd></div>}
             {lot.details?.ca && (lot.details.ca.from || lot.details.ca.o2 != null) && <div><dt>CA 환경</dt><dd>{[lot.details.ca.from && `${fmtDate(lot.details.ca.from)}~${lot.details.ca.to ? fmtDate(lot.details.ca.to) : ''}`, lot.details.ca.o2 != null && `O₂ ${lot.details.ca.o2}%`, lot.details.ca.co2 != null && `CO₂ ${lot.details.ca.co2}%`].filter(Boolean).join(' · ')}</dd></div>}
           </dl>
-        </section>
+        </details>
         <section className="lot-ov-card">
           <h3>초기 측정과 최근 측정</h3>
-          <div className="qt-table-wrap"><table className="qt-table">
+          <div className="qt-table-wrap lot-latest-table"><table className="qt-table">
             <thead><tr><th>지표</th><th>초기 <small>{lot.initial_measured_on ? fmtDate(lot.initial_measured_on) : '측정일 미입력'}{lot.initial_sample_count ? ` · ${lot.initial_sample_count}개` : ''}</small></th><th>최근</th></tr></thead>
             <tbody>{([['firmness', '경도', 'N', 1], ['brix', '당도', '°Brix', 1], ['acidity', '산도', '%', 3]] as const).map(([k, label, unit, d]) => { const o = latest(k); return <tr key={k}>
               <td>{label}</td><td><V v={lot[k]} d={d} unit={unit} />{lot[k] != null && <> <KindBadge kind="실측" /></>}</td>
-              <td>{o ? <><V v={o[k] as number} d={d} unit={unit} /> <small>{fmtDate(o.date)} · 표본 {o.sample_count}개</small></> : <span className="kind k-missing">미측정</span>}</td></tr>; })}</tbody>
+              <td>{o ? <><V v={o[k] as number} d={d} unit={unit} /> <small>{fmtDate(o.date)} · 표본 {o.sample_count}개</small></> : <span className="kind k-missing">후속 측정 없음</span>}</td></tr>; })}</tbody>
           </table></div>
         </section>
-        <section className="lot-ov-card review">
-          <h3>점검 메모 <small>규칙 기반 · 안전 판정 아님</small></h3>
+        <details className="lot-ov-card review">
+          <summary>기록 점검 메모 <small>규칙 기반 · 안전 판정 아님</small></summary>
           <p className="lot-review-label">{review?.label}</p>
           <ul>{review?.reasons.map(r => <li key={r}><AlertTriangle size={13} />{r}</li>)}</ul>
           <p className="qt-help">보관 가능일·출하일은 제공하지 않습니다.</p>
-        </section>
+        </details>
       </div>}
 
       {sub === 'records' && data && <section className="lot-ov-card">
         <h3>측정 기록 <small>빈칸은 ‘미측정’ · 파괴 측정 표본은 매번 다른 과실</small></h3>
-        <div className="qt-table-wrap"><table className="qt-table">
+        <div className="qt-table-wrap lot-history-table"><table className="qt-table">
           <thead><tr><th>측정일</th><th>구분</th><th>경과일</th><th>표본 수</th><th>경도 N</th><th>당도 °Brix</th><th>산도 %</th><th>평균 중량 g</th><th>추적 표본 중량 g</th><th>외관</th><th>측정 조건</th><th>메모</th></tr></thead>
           <tbody>
-            <tr className="row-initial"><td>{lot.initial_measured_on ? fmtDate(lot.initial_measured_on) : <small>측정일 미입력</small>}</td><td>초기</td><td>{lot.initial_measured_on ? `${daysBetween(start, lot.initial_measured_on)}일차` : '—'}</td><td>{lot.initial_sample_count ?? '—'}</td>
-              <td><V v={lot.firmness} /></td><td><V v={lot.brix} /></td><td><V v={lot.acidity} d={3} /></td><td><V v={lot.weight} /></td><td><V v={lot.details?.tracked?.initial_weight} /></td><td>—</td>
-              <td><small>{measureText(lot.details?.measure)}</small></td><td><small>{lot.notes || '—'}</small></td></tr>
-            {data.observations.map(o => <tr key={o.id}><td>{fmtDate(o.date)}</td><td>후속</td><td>{daysBetween(start, o.date)}일차</td><td>{o.sample_count}</td>
-              <td><V v={o.firmness} /></td><td><V v={o.brix} /></td><td><V v={o.acidity} d={3} /></td><td><V v={o.weight} /></td><td><V v={o.tracked_weight} /></td><td>{o.defects}</td><td><small>{measureText(o.details?.measure)}</small></td><td><small>{o.notes || '—'}</small></td></tr>)}
+            <tr className="row-initial"><td data-label="측정일">{lot.initial_measured_on ? fmtDate(lot.initial_measured_on) : <small>측정일 미입력</small>}</td><td data-label="구분">초기</td><td data-label="저장 경과일">{lot.initial_measured_on ? `${daysBetween(start, lot.initial_measured_on)}일차` : '—'}</td><td data-label="표본 수">{lot.initial_sample_count ?? '—'}</td>
+              <td data-label="경도 N"><V v={lot.firmness} /></td><td data-label="당도 °Brix"><V v={lot.brix} /></td><td data-label="산도 %"><V v={lot.acidity} d={3} /></td><td data-label="평균 중량 g"><V v={lot.weight} /></td><td data-label="추적 표본 중량 g"><V v={lot.details?.tracked?.initial_weight} /></td><td data-label="외관">—</td>
+              <td data-label="측정 조건"><small>{measureText(lot.details?.measure)}</small></td><td data-label="메모"><small>{lot.notes || '—'}</small></td></tr>
+            {data.observations.map(o => <tr key={o.id}><td data-label="측정일">{fmtDate(o.date)}</td><td data-label="구분">후속</td><td data-label="저장 경과일">{daysBetween(start, o.date)}일차</td><td data-label="표본 수">{o.sample_count}</td>
+              <td data-label="경도 N"><V v={o.firmness} /></td><td data-label="당도 °Brix"><V v={o.brix} /></td><td data-label="산도 %"><V v={o.acidity} d={3} /></td><td data-label="평균 중량 g"><V v={o.weight} /></td><td data-label="추적 표본 중량 g"><V v={o.tracked_weight} /></td><td data-label="외관">{o.defects}</td><td data-label="측정 조건"><small>{measureText(o.details?.measure)}</small></td><td data-label="메모"><small>{o.notes || '—'}</small></td></tr>)}
           </tbody>
         </table></div>
         {!data.observations.length && <p className="qt-help">아직 후속 측정이 없습니다. 위의 ‘후속 측정 추가’로 기록하세요.</p>}
@@ -169,10 +187,12 @@ export default function LotsPage({lots, loadError, reload, openTracker, focusId}
           </form>
           <p className="upload-format">JPG·PNG·WebP · 입력 최대 12MB · 긴 변 최대 1,600px의 JPEG 사본으로 저장합니다.</p>
         </div>
-        <PhotoComparison photos={data.photos} />
+        <PhotoComparison key={lot.id} photos={data.photos} />
         <div className="photo-guidance"><Camera size={24} /><div><h3>촬영 조건을 맞추면 비교가 쉬워요.</h3><p>같은 거리와 각도, 일정한 조명, 단색 배경을 사용하세요. 색 변화·주름·상처는 측정 기록의 외관 관찰로 남겨 주세요.</p></div></div>
       </>}
+      </div>
     </section>}
+    </div>
     <p className="qt-help lots-foot"><Activity size={13} /> 예전 ‘환경·품질 기록’ 메뉴의 기록은 모두 여기(측정 기록·온습도 이력)에 그대로 있습니다.</p>
   </div>;
 }

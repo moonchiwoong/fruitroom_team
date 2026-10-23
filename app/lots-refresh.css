@@ -1,0 +1,128 @@
+/* Record navigation: broad detail workspace and compact accessible list. */
+.lots-refresh .lots-workspace{display:grid;grid-template-columns:minmax(250px,300px) minmax(0,1fr);gap:24px;align-items:start}
+.lots-refresh .lots-list-panel{min-width:0;position:sticky;top:96px}
+.lots-refresh .lot-search{display:flex;align-items:center;gap:9px;background:#fff;border:1px solid #dce5dd;border-radius:10px;padding:0 12px;color:#496555;min-height:46px}
+.lots-refresh .lot-search input{width:100%;min-width:0;border:0;outline-offset:4px;background:transparent;padding:12px 0;font-size:14px;color:#183c2c}
+.lots-refresh .lot-search-count{font-size:12px;color:#63776a;margin:10px 1px 14px}
+.site .lots-refresh .lot-cards{display:flex;flex-direction:column;gap:8px;max-height:calc(100dvh - 250px);overflow-y:auto;overflow-x:hidden;padding:2px 4px 4px 0;margin:0;scroll-snap-type:none}
+.site .lots-refresh .lot-card{display:flex;flex-direction:column;gap:7px;min-width:0;width:100%;padding:15px 16px;border-radius:10px;border:1px solid #dce5dd;box-shadow:none;background:#fff;text-align:left;flex-shrink:0}
+.site .lots-refresh .lot-card.chosen{border:1px solid #39734f;box-shadow:inset 3px 0 #39734f;background:#f0f6ef}
+.site .lots-refresh .lot-card h2{font-size:17px;line-height:1.45;overflow-wrap:anywhere}
+.site .lots-refresh .lot-card p{margin:0;line-height:1.5}
+.site .lots-refresh .lot-card .lot-card-bottom{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-top:4px;font-size:12px}
+.site .lots-refresh .lot-record-status{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:8px;border-top:1px solid #dce5dd;font-size:12px;color:#63776a}
+.lots-refresh .lot-record-status span{display:flex;align-items:center;gap:4px;font-weight:700;color:#2b6545}
+.lots-refresh .lot-search-empty{padding:28px 15px;border:1px dashed #c9d8cb;border-radius:10px;text-align:center;color:#63776a;display:grid;justify-items:center;gap:10px;line-height:1.6;font-size:14px}
+.lots-refresh .lot-search-empty h3{color:#254e37}
+.lots-refresh .lot-detail{padding:24px;min-width:0;border-radius:14px;gap:20px;box-shadow:none}
+.lots-refresh .lot-detail-head{flex-direction:column;gap:16px}
+.lots-refresh .lot-detail-head h2{font-size:27px;line-height:1.35;overflow-wrap:anywhere;margin:5px 0 7px}
+.lots-refresh .lot-detail-head .subtle{font-size:13px;line-height:1.8}
+.lots-refresh .lot-detail .qt-inline-btns{flex-wrap:wrap}
+.lots-refresh .lot-subtabs{width:100%;display:flex;border-radius:0;border:0;border-bottom:1px solid #dce5dd;background:transparent;padding:0;gap:12px}
+.lots-refresh .lot-subtabs button{min-height:46px;padding:10px 6px;border-radius:0;color:#63776a;background:transparent;border-bottom:3px solid transparent;font-size:14px;white-space:normal}
+.lots-refresh .lot-subtabs button.active{color:#254e37;border-bottom-color:#254e37;background:transparent;box-shadow:none;font-weight:800}
+.lots-refresh .lot-record-panel{display:flex;flex-direction:column;gap:20px;min-width:0}
+.lots-refresh .lot-ov{display:flex;flex-direction:column;gap:16px}
+.lots-refresh .lot-ov>.lot-ov-card{width:100%;border:0;border-radius:0;padding:0}
+.lots-refresh .lot-ov>.lot-basic-info{order:2}
+.lots-refresh .lot-ov>.review{order:3}
+.lots-refresh details.lot-ov-card{display:block;border-top:1px solid #e6ece6;padding:12px 0 0}
+.lots-refresh details.lot-ov-card summary{cursor:pointer;min-height:32px;font-weight:650;font-size:14px;color:#315a41}
+.lots-refresh details.lot-ov-card summary small{font-size:12px;font-weight:400;color:#718276}
+.lots-refresh details.lot-ov-card[open] summary{margin-bottom:14px}
+.lots-refresh .lot-latest-table{margin-top:5px;overflow:visible}
+.lots-refresh .lot-latest-table table{width:100%;table-layout:fixed}
+.lots-refresh .lot-latest-table th,.lots-refresh .lot-latest-table td{white-space:normal;overflow-wrap:anywhere;font-size:14px;line-height:1.6;padding:12px 8px}
+.lots-refresh .lot-latest-table th:first-child,.lots-refresh .lot-latest-table td:first-child{width:16%;padding-left:0}
+.lots-refresh .lot-latest-table small{display:block;font-size:11px;line-height:1.6;color:#718276;font-weight:400}
+.lots-refresh .lot-latest-table .kind{margin-top:4px;max-width:100%;white-space:normal}
+.lots-refresh .lot-back{display:none}
+.lots-refresh .upload-panel,.lots-refresh .stat-card,.lots-refresh .data-panel,.lots-refresh .photo-card{box-shadow:none}
+.lots-refresh .upload-panel{padding:18px;background:#f8faf7}
+.lots-refresh .upload-form,.lots-refresh .photo-upload{max-width:100%;min-width:0}
+.lots-refresh .photo-upload label,.lots-refresh .photo-upload input{min-width:0;max-width:100%}
+.lots-refresh .stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.lots-refresh .environment-charts{grid-template-columns:minmax(0,1fr)}
+.lots-refresh .lot-dl div{flex-wrap:wrap;align-items:flex-start}
+.lots-refresh .lot-dl dd{overflow-wrap:anywhere}
+.lots-refresh .error-box,.lots-refresh .success-notice{overflow-wrap:anywhere}
+.mi-refresh .mi-intro{padding:10px 0 15px;max-width:850px}
+.mi-refresh .mi-intro h2{font-size:28px;line-height:1.4;color:#193f2c;margin:8px 0 12px;letter-spacing:-.7px}
+.mi-refresh .mi-intro p{font-size:15px;line-height:1.85;color:#52685a}
+.mi-refresh .mi-intro .mi-current-model{font-weight:700;color:#254e37;margin-top:12px}
+.mi-refresh .mi-status{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}
+.mi-refresh .mi-status span{background:#f2f5e9;border:1px solid #dde4c9;border-radius:6px;padding:5px 9px;font-size:12px;color:#59663a;font-weight:600}
+.mi-refresh .mi-toc button{font-size:13.5px;font-weight:600;color:var(--brand);background:#fff;border:1px solid var(--line);border-radius:999px;padding:8px 12px;min-height:40px}
+.mi-refresh .mi-card{border-radius:12px;padding:24px;box-shadow:none}
+.mi-refresh .mi-card p{font-size:14px;line-height:1.75;color:#52685a}
+.mi-refresh .mi-input-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:6px 0 18px;padding-bottom:24px;border-bottom:1px solid #e2e9e1}
+.mi-refresh .mi-input-grid h3{font-size:15px;font-weight:700;color:#254e37}
+.mi-refresh .mi-input-grid ul{margin:10px 0 0;padding-left:20px;color:#52685a;font-size:14px;line-height:1.9}
+.mi-refresh details.mi-card{display:block}
+.mi-refresh details.mi-card>summary{font-size:17px;font-weight:700;cursor:pointer;color:#254e37;line-height:1.6}
+.mi-refresh details.mi-card[open]>summary{margin-bottom:18px}
+.mi-refresh details.mi-card[open]>*+*{margin-top:14px}
+.mi-refresh .mi-dl code{overflow-wrap:anywhere;word-break:break-word}
+.mi-refresh .mi-kinds>div{border:0;border-left:2px solid #d8e4d6;border-radius:0;padding:4px 12px}
+@media(max-width:1050px){
+ .lots-refresh .lots-workspace{grid-template-columns:250px minmax(0,1fr);gap:16px}
+ .lots-refresh .lot-detail{padding:20px}
+ .lots-refresh .photo-comparison{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:760px){
+ .lots-refresh .lots-workspace{display:block}
+ .lots-refresh .lots-list-panel{position:static}
+ .site .lots-refresh .lot-cards{max-height:none;padding:0;gap:12px;overflow:visible}
+ .site .lots-refresh .lot-card{min-width:0;padding:18px}
+ .lots-refresh:not(.has-detail) .lot-detail{display:none}
+ .lots-refresh.has-detail .lots-list-panel{display:none}
+ .lots-refresh .lot-back{display:inline-flex;align-self:flex-start;min-height:44px;font-size:13px}
+ .lots-refresh .lot-detail{padding:18px 14px;gap:16px}
+ .lots-refresh .lot-detail-head h2{font-size:24px}
+ .lots-refresh .lot-detail-head .qt-inline-btns{width:100%;gap:8px}
+ .lots-refresh .lot-detail-head .qt-inline-btns>.btn:first-child{width:100%;justify-content:center}
+ .lots-refresh .lot-detail-head .btn{min-height:44px;padding-left:12px;padding-right:12px;font-size:13px}
+ .lots-refresh .lot-subtabs{gap:6px;align-self:stretch;justify-content:space-between}
+ .lots-refresh .lot-subtabs button{font-size:13px;flex:1;padding-left:2px;padding-right:2px;min-height:48px}
+ .lots-refresh .lot-latest-table th,.lots-refresh .lot-latest-table td{font-size:12px;padding:10px 5px;vertical-align:top}
+ .lots-refresh .lot-latest-table td small,.lots-refresh .lot-latest-table th small{font-size:10px}
+ .lots-refresh .lot-latest-table td:first-child,.lots-refresh .lot-latest-table th:first-child{width:15%}
+ .lots-refresh .lot-latest-table .kind{font-size:10px;padding:2px 4px}
+ .lots-refresh .lot-history-table{overflow:visible}
+ .lots-refresh .lot-history-table table,.lots-refresh .lot-history-table tbody{display:block;width:100%;min-width:0}
+ .lots-refresh .lot-history-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ .lots-refresh .lot-history-table tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;padding:14px 0;border-top:1px solid #e0e8df;background:none}
+ .lots-refresh .lot-history-table td{display:block;padding:0!important;border:0;min-width:0;white-space:normal;overflow-wrap:anywhere;font-size:13px;line-height:1.5;text-align:left}
+ .lots-refresh .lot-history-table td::before{content:attr(data-label);display:block;font-size:11px;color:#63776a;margin-bottom:3px;font-weight:400}
+ .lots-refresh .lot-history-table td:nth-child(1),.lots-refresh .lot-history-table td:nth-child(11),.lots-refresh .lot-history-table td:nth-child(12){grid-column:1/-1}
+ .lots-refresh .lot-history-table td:nth-child(1){font-size:15px;font-weight:700;color:#254e37}
+ .lots-refresh .lot-history-table td:nth-child(1)::before{display:inline;margin-right:9px}
+ .lots-refresh .lot-ov-card{padding:12px;min-width:0}
+ .lots-refresh .lot-dl div{display:block;font-size:13px;padding:5px 0}
+ .lots-refresh .lot-dl dd{text-align:left;margin-top:4px}
+ .lots-refresh .upload-panel{padding:15px 12px}
+ .lots-refresh .stat-grid{gap:8px}
+ .lots-refresh .stat-card{padding:12px}
+ .lots-refresh .stat-card strong{font-size:19px;overflow-wrap:anywhere}
+ .lots-refresh .upload-guide{font-size:12px;line-height:1.8;overflow-wrap:anywhere}
+ .lots-refresh .upload-guide ul{padding-left:18px}
+ .lots-refresh .lots-foot{font-size:12px;line-height:1.8;margin-top:16px}
+ .mi-refresh .mi-intro h2{font-size:24px}
+ .mi-refresh .mi-intro p{font-size:14px}
+ .mi-refresh .mi-card{padding:18px 14px;min-width:0}
+ .mi-refresh .mi-input-grid{grid-template-columns:minmax(0,1fr);gap:18px}
+ .mi-refresh .mi-dl>div{grid-template-columns:minmax(0,1fr);gap:5px;font-size:13px}
+ .mi-refresh .mi-kinds{grid-template-columns:minmax(0,1fr);gap:16px}
+ .mi-refresh .mi-toc{gap:6px}
+ .mi-refresh .mi-toc button{font-size:12px;padding:8px 9px}
+ .mi-refresh .mi-formula{min-width:0}
+ .mi-refresh .mi-formula thead{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden}
+ .mi-refresh .mi-formula tbody,.mi-refresh .mi-formula tr,.mi-refresh .mi-formula td{display:block;min-width:0;white-space:normal;overflow-wrap:anywhere}
+ .mi-refresh .mi-formula td{padding:9px 0}
+ .mi-refresh .mi-formula td:first-child{font-weight:700;background:#f4f7f1;padding:10px}
+ .mi-refresh .mi-formula td:nth-child(2)::before{content:'저온저장';display:block;color:#63776a;font-size:12px;margin-bottom:4px}
+ .mi-refresh .mi-formula td:nth-child(3)::before{content:'1-MCP 처리 + 저온저장';display:block;color:#63776a;font-size:12px;margin-bottom:4px}
+ .mi-refresh .mi-formula td:nth-child(4)::before{content:'CA 저장';display:block;color:#63776a;font-size:12px;margin-bottom:4px}
+ .mi-refresh .mi-checks li{font-size:13px;padding:10px 8px;overflow-wrap:anywhere}
+}

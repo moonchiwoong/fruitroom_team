@@ -71,7 +71,7 @@ export default function TeamAuth({children}: {children: ReactNode}) {
     saveProfile,
     signOut: async () => { await supabaseBrowser().auth.signOut(); setUser(null); setState('out'); window.scrollTo(0, 0); },
   };
-  return <SessionContext.Provider value={session}>{children}</SessionContext.Provider>;
+  return <SessionContext.Provider key={user.id} value={session}>{children}</SessionContext.Provider>;
 }
 
 function Splash() {

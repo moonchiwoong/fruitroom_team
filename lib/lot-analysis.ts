@@ -1,6 +1,7 @@
 import type {Lot,EnvRow,Stats,Observation,Prediction} from './lot-types';
+import {parseOptionalNumber, restrictLegacyLoss} from './quality-policy';
 export class InputError extends Error{rows?:string[];constructor(message:string,rows?:string[]){super(message);this.rows=rows;}}
-export function numberOrNull(v:unknown,min:number,max:number,label:string){if(v===null||v===undefined||v==='')return null;if(typeof v!=='string'&&typeof v!=='number')throw new InputError(`${label}는 숫자로 입력해 주세요.`);const n=Number(v);if(!Number.isFinite(n)||n<min||n>max)throw new InputError(`${label}: ${min}~${max} 범위로 입력해 주세요.`);return n;}
+export function numberOrNull(v:unknown,min:number,max:number,label:string){const p=parseOptionalNumber(v);if(p.status==='missing')return null;if(p.status==='invalid')throw new InputError(`${label}: ${p.reason}`);if(p.value<min||p.value>max)throw new InputError(`${label}: 단위와 소수점을 확인해 주세요. 기존 시스템의 저장 허용 범위는 ${min}~${max}이며 정상 품질이나 모델 적용 범위를 뜻하지 않습니다.`);return p.value;}
 export function validDate(v:unknown,label='날짜'){if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v)||!Number.isFinite(Date.parse(v+'T00:00:00Z'))||new Date(v+'T00:00:00Z').toISOString().slice(0,10)!==v)throw new InputError(`${label}를 확인해 주세요.`);return v;}
 export function endOfKoreanDay(day:string){validDate(day);return new Date(day+'T23:59:59.999+09:00').toISOString();}
 export function startOfKoreanDay(day:string){validDate(day);return new Date(day+'T00:00:00+09:00').toISOString();}
@@ -51,5 +52,5 @@ export function demoPrediction(lot:Lot,stats:Stats,observations:Observation[],as
  const base={asOf,horizonDays:7,assumedTemperature:temp,assumedHumidity:humidity,errorRange:null,modelVersion:'연결 확인용 예시 v2',sampleOnly:true as const,limitations:['학습·검증된 예측 모델 미연결','신뢰구간과 예측 오차 미검증','사진으로 경도·당도를 추정하지 않음','표본값은 전체 물량의 확정 상태가 아님']};
  if(initial===null||!stats.count||lot.storage!=='일반 저온'||lot.mcp!=='미처리')return {...base,mode:'unavailable',firmness:null,weightLoss:null,reason:initial===null?'초기 또는 최근 경도 측정이 필요합니다.':!stats.count?'분석 시점까지의 환경 기록이 필요합니다.':'CA·기타 저장, 1-MCP 처리 또는 미확인 조건은 예시 모델의 적용 범위 밖입니다.'};
  const days=Math.max(0,(Date.parse(asOf)-Date.parse(latest?.date??lot.intake_date))/86400000)+7;const heat=Math.pow(2,temp/10),loss=7*0.012*heat*(1+Math.max(0,90-humidity)*0.08);
- return {...base,mode:'demo_only',firmness:Math.max(0,initial-days*0.18*heat),weightLoss:loss};
+ return restrictLegacyLoss({...base,mode:'demo_only' as const,firmness:Math.max(0,initial-days*0.18*heat),weightLoss:loss});
 }

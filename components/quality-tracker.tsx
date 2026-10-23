@@ -1,31 +1,33 @@
 'use client';
-import {Component, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
+import {Component, Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
 import dynamic from 'next/dynamic';
-import {AlertTriangle, BookOpen, Check, ChevronDown, Download, FlaskConical, Info, Loader2, Pin, PinOff, RotateCcw, Save, Thermometer, Undo2} from 'lucide-react';
+import {AlertTriangle, BookOpen, Check, ChevronDown, Download, FlaskConical, Loader2, MessageCircle, Pin, PinOff, RotateCcw, Save, Thermometer, Undo2} from 'lucide-react';
 import {useTeamSession} from '@/components/team-auth';
 import {ObservationForm, requestJson} from '@/components/lot-forms';
 import {ChartLegend, HardnessConvert, KindBadge, TrackerChart} from '@/components/tracker-parts';
 import {demoAnalysis, demoLots} from '@/lib/demo-lots';
 import type {Lot, Observation, Stats} from '@/lib/lot-types';
 import {
-  addDays, calcNoun, computeSeries, daysBetween, describeChange, fmtDate, fmtNum, isDate, measuredPoints, metricIds, metricMeta, MODEL_RANGE, MODEL_VERSION,
+  addDays, computeSeries, daysBetween, describeChange, fmtDate, fmtNum, isDate, measuredPoints, metricIds, metricMeta, MODEL_RANGE, MODEL_VERSION,
   modelLabel, resolveModel, STORAGE_MODEL_VERIFIED, summarySentence, todayKST, valueAt,
-  type Anchor, type DataKind, type MeasuredPoint, type MetricId, type Series, type StorageCondition, type ValueAt,
+  type Anchor, type DataKind, type MeasuredPoint, type MetricId, type Series, type ValueAt,
 } from '@/lib/tracker';
 import {clearDraft, emptyForm, exampleForm, formFromLot, loadDraft, loadPref, payloadFromForm, saveDraft, savePref, signature, validateForm, type Draft, type TrackerForm} from '@/lib/tracker-form';
 import type {StorageId} from '@/lib/initial-quality';
+import {measurementCompatibility, observationFingerprint} from '@/lib/ai/context';
+import {rowsToCsv} from '@/lib/csv';
 
 const FruitViewer = dynamic(() => import('@/components/fruit-viewer'), {ssr: false, loading: () => <div className="t3d-empty"><Loader2 className="spin" size={18} />3D 예시를 불러오는 중…</div>});
 
 type Mode = 'real' | 'example';
-type Loaded = {lot: Lot | null; observations: Observation[]; stats: Stats | null};
-type Baseline = {kind: 'current' | 'fixed'; label: string; conditionLabel: string; sig: string; series: Record<MetricId, Series>; createdAt: string; asOf: string; modelVersion: string; future: StorageId | null};
-const MODEL_COND: Record<StorageId, StorageCondition> = {cold: {storage: '일반 저온', mcp: '미처리'}, mcp: {storage: '일반 저온', mcp: '처리'}, ca: {storage: 'CA', mcp: '미처리'}};
+type Loaded = {scope: string; lot: Lot | null; observations: Observation[]; stats: Stats | null};
+type Baseline = {kind: 'current' | 'fixed'; label: string; conditionLabel: string; sig: string; series: Record<MetricId, Series>; createdAt: string; asOf: string; modelVersion: string; future: StorageId | null; form: TrackerForm; useLatest: boolean; observationsFingerprint: string};
 const num = (v: string) => v.trim() === '' || !Number.isFinite(Number(v)) ? null : Number(v);
 
 export type TrackerRequest = {mode: Mode; lotId?: string; n: number};
-export default function QualityTracker({lots, onLotsChanged, request, openModelInfo, openLot}: {
-  lots: Lot[]; onLotsChanged: () => Promise<Lot[]> | void; request?: TrackerRequest | null; openModelInfo: () => void; openLot: (id: string) => void;
+export type TrackerAIContext = {mode: Mode; scope: 'prediction'; lotId: string | null; metric: MetricId; selectedDate: string; asOf: string; form: TrackerForm; future: StorageId | 'same'; useLatest: boolean; modelVersion: string; baseline: {label: string; conditionLabel: string; createdAt: string; asOf: string; modelVersion: string; future: StorageId | null; form: TrackerForm; useLatest: boolean; observationsFingerprint: string} | null};
+export default function QualityTracker({lots, onLotsChanged, request, openModelInfo, openLot, onAskAI}: {
+  lots: Lot[]; onLotsChanged: () => Promise<Lot[]> | void; request?: TrackerRequest | null; openModelInfo: (context?: {modelId: StorageId | null; metric: MetricId}) => void; openLot: (id: string) => void; onAskAI?: (context: TrackerAIContext) => void;
 }) {
   const session = useTeamSession(); const user = session?.userId ?? 'anon';
   const today = todayKST();
@@ -36,23 +38,29 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   useEffect(() => { savePref(user, 'mode', mode); }, [user, mode]);
   useEffect(() => { savePref(user, 'lot', lotKey); }, [user, lotKey]);
   const key = mode === 'example' ? 'example' : lotKey;
+  const scope = `${user}|${mode}|${key}`;
   useEffect(() => { if (mode === 'real' && lotKey !== 'new' && lots.length && !lots.some(l => l.id === lotKey)) setLotKey('new'); }, [lots, lotKey, mode]);
 
   // ── 저장된 기록 불러오기 ──
-  const [loaded, setLoaded] = useState<Loaded>({lot: null, observations: [], stats: null});
+  const [loaded, setLoaded] = useState<Loaded>({scope: '', lot: null, observations: [], stats: null});
   const [loading, setLoading] = useState(false), [loadError, setLoadError] = useState(''), [reload, setReload] = useState(0);
   useEffect(() => {
-    setLoadError('');
-    if (mode === 'example') { const d = demoLots()[0], a = demoAnalysis(d, today); setLoaded({lot: null, observations: a.observations.map(o => ({...o, acidity: null, tracked_weight: null})), stats: a.stats}); return; }
-    if (lotKey === 'new') { setLoaded({lot: null, observations: [], stats: null}); return; }
-    const lot = lots.find(l => l.id === lotKey); if (!lot) return;
-    const ctl = new AbortController(); setLoading(true);
+    const ctl = new AbortController(); setLoadError('');
+    if (mode === 'example') {
+      const d = demoLots()[0], a = demoAnalysis(d, today);
+      setLoaded({scope, lot: null, observations: a.observations.map(o => ({...o, acidity: null, tracked_weight: null})), stats: a.stats});
+      setLoading(false); return () => ctl.abort();
+    }
+    if (lotKey === 'new') { setLoaded({scope, lot: null, observations: [], stats: null}); setLoading(false); return () => ctl.abort(); }
+    const lot = lots.find(l => l.id === lotKey);
+    if (!lot) { setLoaded({scope, lot: null, observations: [], stats: null}); setLoading(false); setLoadError('선택한 물량을 현재 목록에서 찾을 수 없습니다. 물량을 다시 선택하거나 목록을 새로 불러와 주세요.'); return () => ctl.abort(); }
+    setLoading(true);
     requestJson<{lot: Lot; observations: Observation[]; stats: Stats}>(`/api/lots/${lotKey}/analysis?asOf=${today}`, {signal: ctl.signal})
-      .then(d => setLoaded({lot: d.lot, observations: d.observations, stats: d.stats}))
-      .catch(e => { if (e.name !== 'AbortError') { setLoaded({lot, observations: [], stats: null}); setLoadError((e as Error).message); } })
+      .then(d => { if (!ctl.signal.aborted) setLoaded({scope, lot: d.lot, observations: d.observations, stats: d.stats}); })
+      .catch(e => { if (!ctl.signal.aborted) { setLoaded({scope, lot: null, observations: [], stats: null}); setLoadError((e as Error).message); } })
       .finally(() => { if (!ctl.signal.aborted) setLoading(false); });
     return () => ctl.abort();
-  }, [mode, lotKey, lots, reload, today]);
+  }, [scope, mode, lotKey, lots, reload, today]);
 
   const official = useMemo<TrackerForm>(() => mode === 'example' ? exampleForm() : loaded.lot ? formFromLot(loaded.lot) : emptyForm(), [mode, loaded.lot]);
   const officialSig = signature(official);
@@ -62,16 +70,19 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const [draftNote, setDraftNote] = useState<{tone: 'ok' | 'warn' | 'info'; text: string} | null>(null);
   const [conflict, setConflict] = useState<Draft | null>(null);
   const readyKey = useRef('');
-  const officialReady = mode === 'example' || lotKey === 'new' || (loaded.lot?.id === lotKey);
+  const [readyFormKey, setReadyFormKey] = useState('');
+  const officialReady = loaded.scope === scope && !loading;
+  const expectedFormKey = `${scope}|${officialSig}`;
+  const formReady = officialReady && readyFormKey === expectedFormKey;
   useEffect(() => {
     if (!officialReady) return;
-    const k = `${user}|${mode}|${key}|${officialSig}`; if (readyKey.current === k) return; readyKey.current = k;
+    const k = expectedFormKey; if (readyKey.current === k) return; readyKey.current = k; setReadyFormKey(k);
     const d = loadDraft(user, mode, key); setConflict(null);
     if (!d) { setFormState(official); setDraftNote(null); return; }
     if (d.baseSig !== officialSig) { setFormState(official); setConflict(d); setDraftNote(null); return; }
     if (signature(d.form) !== officialSig) { setFormState(d.form); setDraftNote({tone: 'info', text: `작성 중인 내용을 복구했습니다 (${new Date(d.savedAt).toLocaleString('ko-KR')} 임시 저장).`}); }
     else { setFormState(official); clearDraft(user, mode, key); setDraftNote(null); }
-  }, [officialReady, user, mode, key, officialSig, official]);
+  }, [officialReady, user, mode, key, officialSig, official, expectedFormKey]);
 
   const setForm = useCallback((updater: (f: TrackerForm) => TrackerForm) => {
     setFormState(prev => {
@@ -79,7 +90,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
       if (signature(next) === officialSig) { clearDraft(user, mode, key); setDraftNote(null); }
       else {
         const ok = saveDraft(user, mode, key, {form: next, baseSig: officialSig, savedAt: new Date().toISOString()});
-        setDraftNote(ok ? {tone: 'ok', text: `입력 내용 임시 저장됨 · ${new Date().toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`} : {tone: 'warn', text: '임시 저장에 실패했습니다. 입력 내용은 화면에 남아 있지만, 새로고침하면 사라질 수 있습니다.'});
+        setDraftNote(ok ? {tone: 'ok', text: `이 기기에 임시 저장됨 · ${new Date().toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`} : {tone: 'warn', text: '임시 저장에 실패했습니다. 입력 내용은 화면에 남아 있지만, 새로고침하면 사라질 수 있습니다.'});
       }
       return next;
     });
@@ -87,6 +98,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const set = <K extends keyof TrackerForm>(k: K, v: TrackerForm[K]) => setForm(f => ({...f, [k]: v}));
   const setSub = <K extends 'measure' | 'mcpd' | 'ca' | 'tracked'>(k: K, sub: string, v: string) => setForm(f => ({...f, [k]: {...f[k], [sub]: v}}));
   const dirty = signature(form) !== officialSig;
+  const errors = validateForm(form, false);
   function discardDraft() { clearDraft(user, mode, key); setFormState(official); setDraftNote({tone: 'info', text: '초안을 지웠습니다. 저장된 기록은 그대로입니다.'}); }
 
   // ── 날짜 ──
@@ -96,6 +108,8 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const asOf = startOk && asOfRaw < startDate ? startDate : asOfRaw;
   const asOfDay = startOk ? daysBetween(startDate, asOf) : 0;
   const measuredOn = form.initial_measured_on || startDate;
+  const initialMeasuredAfterAsOf = isDate(measuredOn) && isDate(asOf) && measuredOn > asOf;
+  const initialDateReason = '초기 측정일이 분석 기준일 이후입니다. 해당 초기값은 이 분석의 계산 시작점으로 사용할 수 없습니다. 분석 기준일을 실제 측정일 이후로 선택해 주세요.';
   const t0 = startOk && isDate(measuredOn) ? daysBetween(startDate, measuredOn) : 0;
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const selDay = selectedDay ?? Math.min(MODEL_RANGE.displayDays, Math.max(0, asOfDay + 30));
@@ -108,8 +122,14 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const futureLabel = futureId === 'same' ? `기록 조건 유지${recorded.id ? ` (${modelLabel[recorded.id]})` : ''}` : modelLabel[futureId];
   const [useLatest, setUseLatest] = useState(false);
   const [metric, setMetric] = useState<MetricId>('firmness');
-  // 모바일에서는 입력 영역을 접은 상태로 시작합니다(결과·그래프 먼저).
-  const [narrow] = useState(() => typeof window !== 'undefined' && window.innerWidth < 900);
+  const [editing, setEditing] = useState(false), [showResults, setShowResults] = useState(false), [showConditions, setShowConditions] = useState(false);
+  const [inputNotice, setInputNotice] = useState('');
+  const resultsRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const firstInput = mode === 'real' && key === 'new';
+    setEditing(firstInput); setShowResults(!firstInput); setShowConditions(false); setInputNotice('');
+    setBaseline(null); setSelectedDay(null); setFutureId('same'); setUseLatest(false);
+  }, [scope, mode, key]);
 
   // ── 실측(또는 예시) 기록과 계산 ──
   const exampleMode = mode === 'example';
@@ -117,29 +137,37 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const trackedInitial = num(form.tracked.initial_weight);
   const pastObs = useMemo(() => loaded.observations.filter(o => o.date <= asOf), [loaded.observations, asOf]);
   const excludedLater = loaded.observations.length - pastObs.length;
-  const measured = useMemo(() => Object.fromEntries(metricIds.map(m => [m, startOk ? measuredPoints(m, pastObs, startDate, kind, trackedInitial) : []])) as Record<MetricId, MeasuredPoint[]>, [pastObs, startDate, startOk, kind, trackedInitial]);
+  const observationsFingerprint = useMemo(() => observationFingerprint(pastObs), [pastObs]);
+  const measured = useMemo(() => Object.fromEntries(metricIds.map(m => [m, startOk ? measuredPoints(m, pastObs, startDate, kind, trackedInitial, {sampleId: form.tracked.sample_id, date: form.initial_measured_on}) : []])) as Record<MetricId, MeasuredPoint[]>, [pastObs, startDate, startOk, kind, trackedInitial, form.tracked.sample_id, form.initial_measured_on]);
   const anchors = useMemo(() => Object.fromEntries(metricIds.map(m => {
-    if (!startOk) return [m, null];
+    if (!startOk || initialMeasuredAfterAsOf || errors.storage_start_date || errors.intake_date || errors.initial_measured_on || (m !== 'loss' && errors[m])) return [m, null];
     const latest = useLatest ? [...measured[m]].reverse().find(p => p.day >= t0) : undefined;
     if (latest) return [m, {day: latest.day, date: latest.date, value: latest.value, kind: latest.kind, source: 'latest'} as Anchor];
     const v = m === 'loss' ? 0 : num(form[m]);
-    return [m, v === null ? null : {day: t0, date: measuredOn, value: v, kind: m === 'loss' ? '모델 계산' : kind, source: 'initial'} as Anchor];
-  })) as Record<MetricId, Anchor | null>, [startOk, useLatest, measured, t0, form, measuredOn, kind]);
-  const series = useMemo(() => Object.fromEntries(metricIds.map(m => [m, computeSeries({metric: m, anchor: anchors[m], recorded: recorded.id, recordedReason: recorded.reason, future: future.id, futureReason: future.reason, asOfDay})])) as Record<MetricId, Series>, [anchors, recorded.id, recorded.reason, future.id, future.reason, asOfDay]);
-  const at = (m: MetricId, d = selDay): ValueAt => valueAt(series[m], d);
+    return [m, v === null ? null : {day: t0, date: measuredOn, value: v, kind, source: 'initial'} as Anchor];
+  })) as Record<MetricId, Anchor | null>, [startOk, initialMeasuredAfterAsOf, useLatest, measured, t0, form, measuredOn, kind, errors.storage_start_date, errors.intake_date, errors.initial_measured_on, errors.firmness, errors.brix, errors.acidity]);
+  const series = useMemo(() => Object.fromEntries(metricIds.map(m => [m, initialMeasuredAfterAsOf ? {ok: false, reason: initialDateReason} : computeSeries({metric: m, anchor: anchors[m], recorded: recorded.id, recordedReason: recorded.reason, future: future.id, futureReason: future.reason, asOfDay})])) as Record<MetricId, Series>, [anchors, recorded.id, recorded.reason, future.id, future.reason, asOfDay, initialMeasuredAfterAsOf]);
+  const at = (m: MetricId, d = selDay): ValueAt => {
+    if (initialMeasuredAfterAsOf) return {status: 'unavailable', reason: initialDateReason};
+    if (m === 'loss' && !exampleMode) {
+      const point = measured.loss.find(p => p.day === d);
+      return point ? {status: 'ok', value: point.value, segment: 'past'} : {status: 'unavailable', reason: '이 날짜의 동일 추적 표본 중량 기록이 없습니다. 표본 식별자와 초기·후속 중량, 실제 측정일을 확인해 주세요. 실제 감모율은 기록된 측정 날짜에만 표시합니다.'};
+    }
+    return valueAt(series[m], d);
+  };
 
   // ── 비교 기준 ──
-  const compatSig = JSON.stringify({mode, key, startDate, measuredOn, f: form.firmness, b: form.brix, a: form.acidity, tw: form.tracked.initial_weight, st: form.storage, mcp: form.mcp, obs: pastObs.map(o => [o.id, o.date, o.firmness, o.brix, o.acidity, o.tracked_weight]), asOf, useLatest});
+  const compatSig = JSON.stringify({mode, key, startDate, measuredOn, f: form.firmness, b: form.brix, a: form.acidity, tw: form.tracked.initial_weight, sample: form.tracked.sample_id, measure: form.measure, st: form.storage, mcp: form.mcp, observationsFingerprint, asOf, useLatest});
   const [baseline, setBaseline] = useState<Baseline | null>(null);
   const compatible = !!baseline && baseline.sig === compatSig;
   function fixBaseline(kindB: 'current' | 'fixed') {
     const s = kindB === 'current'
-      ? Object.fromEntries(metricIds.map(m => [m, computeSeries({metric: m, anchor: anchors[m], recorded: recorded.id, recordedReason: recorded.reason, future: recorded.id, futureReason: recorded.reason, asOfDay})])) as Record<MetricId, Series>
+      ? Object.fromEntries(metricIds.map(m => [m, initialMeasuredAfterAsOf ? {ok: false, reason: initialDateReason} : computeSeries({metric: m, anchor: anchors[m], recorded: recorded.id, recordedReason: recorded.reason, future: recorded.id, futureReason: recorded.reason, asOfDay})])) as Record<MetricId, Series>
       : series;
     const condLabel = kindB === 'current' ? `기록 조건 유지${recorded.id ? ` (${modelLabel[recorded.id]})` : ''}` : futureLabel;
-    setBaseline({kind: kindB, label: kindB === 'current' ? '현재 조건 유지' : '고정한 기준', conditionLabel: condLabel, sig: compatSig, series: s, createdAt: new Date().toISOString(), asOf, modelVersion: MODEL_VERSION, future: kindB === 'current' ? recorded.id : future.id});
+    setBaseline({kind: kindB, label: kindB === 'current' ? '현재 조건 유지' : '고정한 기준', conditionLabel: condLabel, sig: compatSig, series: s, createdAt: new Date().toISOString(), asOf, modelVersion: MODEL_VERSION, future: kindB === 'current' ? recorded.id : future.id, form: structuredClone(form), useLatest, observationsFingerprint});
   }
-  const changeLabel = baseline?.kind === 'current' ? `개선 조건 적용: ${futureLabel}` : `변경 조건: ${futureLabel}`;
+  const changeLabel = baseline?.kind === 'current' ? `비교 조건: ${futureLabel}` : `변경 조건: ${futureLabel}`;
   const baseAt = (m: MetricId): ValueAt | null => baseline && compatible ? valueAt(baseline.series[m], selDay) : null;
   const sameAsBaseline = !!baseline && compatible && baseline.future === future.id;
 
@@ -148,13 +176,13 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const step1 = startOk && anyInitial, step2 = !!recorded.id || (!!future.id && asOfDay <= t0);
   const step = !step1 ? 1 : !step2 ? 2 : 3;
   const nextHint = !startOk ? '저장 시작일(또는 입고일)을 입력하세요.' : !anyInitial ? '초기 경도·당도·산도 중 측정한 값을 입력하세요. 한 항목만 있어도 됩니다.'
-    : !step2 ? recorded.reason || '저장 조건을 선택하세요.' : '그래프와 결과 카드에서 날짜를 골라 변화를 확인하세요.';
-  const errors = validateForm(form, false);
-  const focus = (id: string) => { const el = document.getElementById(id); if (el) { el.scrollIntoView({behavior: 'smooth', block: 'center'}); setTimeout(() => (el as HTMLInputElement).focus(), 300); } };
+    : !step2 ? recorded.reason || '저장 조건을 선택하세요.' : '결과와 그래프에서 날짜를 골라 변화를 확인하세요.';
+  const focus = (id: string) => { setEditing(true); requestAnimationFrame(() => { const el = document.getElementById(id); if (!el) return; let parent = el.parentElement; while (parent) { if (parent instanceof HTMLDetailsElement) parent.open = true; parent = parent.parentElement; } el.scrollIntoView({behavior: 'smooth', block: 'center'}); (el as HTMLInputElement).focus({preventScroll: true}); }); };
 
   // ── 정식 기록 저장 (실측 모드) ──
   const [saving, setSaving] = useState(false), [saveMsg, setSaveMsg] = useState<{ok: boolean; text: string} | null>(null), [saveErrors, setSaveErrors] = useState<Partial<Record<string, string>>>({});
   async function saveRecord() {
+    if (!formReady || loadError) { setSaveMsg({ok: false, text: '물량 정보를 정상적으로 불러온 뒤 저장해 주세요.'}); return; }
     const e = validateForm(form, true); setSaveErrors(e); setSaveMsg(null);
     if (Object.keys(e).length) { setSaveMsg({ok: false, text: '표시한 항목을 확인해 주세요.'}); focus('tf-' + Object.keys(e)[0]); return; }
     if (loaded.lot && !window.confirm('저장된 물량 기록을 지금 입력한 값으로 바꿉니다. 계속할까요?')) return;
@@ -165,11 +193,11 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         const {team_shared: _t, ...rest} = payload; void _t;
         await requestJson(`/api/lots/${loaded.lot.id}/update`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(rest)});
         clearDraft(user, mode, key); readyKey.current = ''; setReload(r => r + 1); await onLotsChanged();
-        setSaveMsg({ok: true, text: '물량 기록을 저장했습니다.'});
+        setSaveMsg({ok: true, text: '정식 기록 저장 완료'});
       } else {
         const r = await requestJson<{lot: Lot}>('/api/lots', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
         clearDraft(user, mode, 'new'); readyKey.current = ''; await onLotsChanged(); setLotKey(r.lot.id);
-        setSaveMsg({ok: true, text: `‘${r.lot.name}’ 물량으로 저장했습니다.`});
+        setSaveMsg({ok: true, text: `정식 기록 저장 완료 · ‘${r.lot.name}’`});
       }
     } catch (err) { setSaveMsg({ok: false, text: (err as Error).message}); }
     finally { setSaving(false); }
@@ -178,7 +206,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   // ── 측정값과 비교 ──
   const [showObsCompare, setShowObsCompare] = useState(false);
 
-  const summary = startOk ? summarySentence({
+  const summary = metric === 'loss' && !exampleMode ? (at('loss').status === 'ok' ? `${fmtDate(selDate)}(저장 ${selDay}일차)의 감모율은 ${fmtNum((at('loss') as {value: number}).value, metricMeta.loss.digits)} %입니다. 같은 추적 표본의 초기·후속 실측 중량으로 계산했으며 모델 예측값이 아닙니다.` : '동일 추적 표본의 초기·후속 중량과 측정일이 확인된 날짜를 선택해 주세요. 기록이 없는 날짜의 감모율은 계산하지 않습니다.') : startOk ? summarySentence({
     metric, day: selDay, date: selDate, at: at(metric), anchor: anchors[metric],
     measuredToday: measured[metric].find(p => p.day === selDay) ?? null,
     baseline: baseline && compatible && !sameAsBaseline ? {label: `${baseline.label} · ${baseline.conditionLabel}`, at: valueAt(baseline.series[metric], selDay)} : null,
@@ -187,41 +215,75 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
 
   const lotName = exampleMode ? '예시 물량 · 후지' : loaded.lot?.name ?? (form.name || '새 입력(저장 전)');
   const env = loaded.stats;
+  const selectedValue = at(metric), latestPoint = measured[metric].at(-1);
+  const latestConditions = latestPoint ? measurementCompatibility(form.measure, pastObs.find(o => o.id === latestPoint.id)?.details?.measure) : null;
+  const latestCalculation = latestPoint && latestConditions?.comparable ? valueAt(series[metric], latestPoint.day) : null;
+  const firstInput = mode === 'real' && key === 'new';
+  function viewResults() {
+    if (!startOk || errors.storage_start_date || errors.intake_date) { setInputNotice('저장 시작일(또는 입고일)을 확인해 주세요.'); focus(form.sameStart ? 'tf-intake_date' : 'tf-storage_start_date'); return; }
+    if (!anyInitial && !measured.loss.length) { setInputNotice('경도·당도·산도 중 측정한 값을 하나 이상 입력해 주세요.'); focus('tf-firmness'); return; }
+    if (metric !== 'loss' && errors[metric]) { setInputNotice(errors[metric]!); focus('tf-' + metric); return; }
+    if (initialMeasuredAfterAsOf) { setInputNotice(initialDateReason); document.getElementById('qt-analysis-asof')?.focus(); return; }
+    if (errors.initial_measured_on) { setInputNotice(errors.initial_measured_on); focus('tf-initial_measured_on'); return; }
+    if (metric !== 'loss' && num(form[metric]) === null) {
+      const available = (['firmness', 'brix', 'acidity'] as MetricId[]).find(m => m !== 'loss' && num(form[m]) !== null);
+      if (available) setMetric(available);
+    }
+    setInputNotice(''); setShowResults(true); setEditing(false);
+    requestAnimationFrame(() => resultsRef.current?.scrollIntoView({behavior: 'smooth', block: 'start'}));
+  }
+  function askResult() {
+    onAskAI?.({mode, scope: 'prediction', lotId: exampleMode ? null : loaded.lot?.id ?? null, metric, selectedDate: selDate, asOf, form, future: futureId, useLatest, modelVersion: MODEL_VERSION,
+      baseline: baseline && compatible ? {label: baseline.label, conditionLabel: baseline.conditionLabel, createdAt: baseline.createdAt, asOf: baseline.asOf, modelVersion: baseline.modelVersion, future: baseline.future, form: baseline.form, useLatest: baseline.useLatest, observationsFingerprint: baseline.observationsFingerprint} : null});
+  }
 
-  return <div className={'qt' + (exampleMode ? ' is-example' : '')}>
+  if (!formReady) return <section className="qt-context-loading" role="status" aria-live="polite"><Loader2 className="spin" size={22} /><h2>선택한 물량을 준비하고 있어요</h2><p>입력값과 데이터 종류를 함께 불러오는 중입니다.</p></section>;
+
+  return <div className={'qt qt-refresh' + (exampleMode ? ' is-example' : '') + (firstInput && !showResults ? ' is-first-input' : '')}>
     {/* 상단: 물량 · 품종 · 분석 기준일 · 모드 */}
     <section className="qt-top" aria-label="물량과 입력 모드">
       <div className="qt-mode seg" role="tablist" aria-label="입력 모드">
         <button role="tab" aria-selected={!exampleMode} className={!exampleMode ? 'active' : ''} onClick={() => setMode('real')}>실측값 사용</button>
         <button role="tab" aria-selected={exampleMode} className={exampleMode ? 'active' : ''} onClick={() => setMode('example')}>예시로 체험</button>
       </div>
-      <label className="qt-field">물량
+      <div className="qt-field qt-lot-field">
+        <div className="qt-lot-field-head"><label htmlFor="qt-lot-select">물량</label>{!exampleMode && loaded.lot && <button className="linkbtn qt-open" onClick={() => openLot(loaded.lot!.id)}>물량 상세</button>}</div>
         {exampleMode ? <span className="qt-static">예시 물량 · 후지 <KindBadge kind="예시" /></span>
-          : <select value={lotKey} onChange={e => { setLotKey(e.target.value); setBaseline(null); setSelectedDay(null); }}>
+          : <select id="qt-lot-select" value={lotKey} onChange={e => { setLotKey(e.target.value); setBaseline(null); setSelectedDay(null); }}>
             <option value="new">새 입력 (아직 저장 안 함)</option>
             {lots.map(l => <option key={l.id} value={l.id}>{l.name}{l.team_shared ? ' · 팀 공유' : ''}</option>)}
           </select>}
+      </div>
+      <div className="qt-field qt-variety-field"><span>품종</span><span className="qt-static">{form.variety || '미입력'}</span></div>
+      <label className="qt-field qt-asof-field">분석 기준일
+        <input id="qt-analysis-asof" type="date" value={asOf} min={startOk ? startDate : undefined} max={today} onChange={e => { if (e.target.value) setAsOf(e.target.value); }} />
       </label>
-      <div className="qt-field"><span>품종</span><span className="qt-static">{form.variety || '미입력'}</span></div>
-      <label className="qt-field">분석 기준일
-        <input type="date" value={asOf} min={startOk ? startDate : undefined} max={today} onChange={e => { if (e.target.value) setAsOf(e.target.value); }} />
-      </label>
-      {!exampleMode && loaded.lot && <button className="btn btn-ghost qt-open" onClick={() => openLot(loaded.lot!.id)}>물량 상세</button>}
     </section>
-    {exampleMode && <div className="qt-banner ex"><FlaskConical size={16} /><span><b>예시로 체험 중</b> — 화면의 초기값·측정점은 기능 확인용 예시값이며 실제 측정 기록이 아닙니다. 서버에 저장하지 않습니다.</span></div>}
-    {loadError && <div className="qt-banner warn"><AlertTriangle size={16} />{loadError}</div>}
+    {exampleMode && <div className="qt-banner ex"><FlaskConical size={16} /><span><b>예시로 체험 중</b> — 가상 초기값·측정점입니다. 실제 기록으로 저장되지 않습니다.</span></div>}
+    {loadError && <div className="qt-banner warn" role="alert"><AlertTriangle size={16} /><span>{loadError}</span><button className="btn btn-ghost" onClick={() => { void onLotsChanged(); setReload(r => r + 1); }}>다시 불러오기</button></div>}
+
+    {initialMeasuredAfterAsOf && <div className="qt-banner warn" role="alert"><AlertTriangle size={16} /><span>{initialDateReason}</span></div>}
 
     {/* 단계 안내 */}
-    <ol className="qt-steps" aria-label="진행 단계">
+    {firstInput && <ol className="qt-steps" aria-label="진행 단계">
       {['초기 품질 입력', '저장 조건 선택', '변화 확인'].map((t, i) => <li key={t} className={step === i + 1 ? 'now' : step > i + 1 ? 'done' : ''} aria-current={step === i + 1 ? 'step' : undefined}>
         <span>{step > i + 1 ? <Check size={14} /> : ['①', '②', '③'][i]}</span>{t}</li>)}
       <li className="qt-next"><b>다음:</b> {nextHint}</li>
-    </ol>
+    </ol>}
 
     <div className="qt-grid">
       {/* 왼쪽: 입력 */}
-      <aside className="qt-input" aria-label="입력">
-        <details className="qt-collapse" open={!narrow}>
+      <aside className="qt-input" aria-label="입력 조건">
+        <section className="qt-input-summary">
+          <div className="qt-section-label">계산에 사용한 입력</div><h2>{lotName}</h2>
+          <dl><div><dt>품종</dt><dd>{form.variety || '미입력'}</dd></div><div><dt>저장 시작일</dt><dd>{startOk ? fmtDate(startDate) : '미입력'}</dd></div><div><dt>초기 측정일</dt><dd>{form.initial_measured_on ? fmtDate(form.initial_measured_on) : '미기록'}</dd></div>
+            {(['firmness', 'brix', 'acidity'] as const).map(m => <div key={m}><dt>{metricMeta[m].label}</dt><dd>{num(form[m]) !== null ? `${fmtNum(num(form[m])!, metricMeta[m].digits)} ${metricMeta[m].unit}` : '미측정'}</dd></div>)}
+            <div><dt>저장 환경</dt><dd>{form.storage} · 1-MCP {form.mcp}</dd></div></dl>
+          <p className="qt-help">{dirty ? '수정 중인 초안 · 정식 기록에 아직 반영되지 않음' : exampleMode ? '기능 확인용 예시 입력' : loaded.lot ? '저장된 기록에서 불러옴' : '측정한 값만 입력해 주세요.'}</p>
+          <button className="btn btn-outline" aria-expanded={editing} aria-controls="qt-input-editor" onClick={() => setEditing(v => !v)}>{editing ? '입력 접기' : '입력 수정'}<ChevronDown size={15} /></button>
+        </section>
+        <div id="qt-input-editor" className="qt-editor" hidden={!editing}>
+        <details className="qt-collapse" open>
           <summary><span className="qt-num">①</span>초기 품질 입력</summary>
           <div className="qt-draftbar">
             {draftNote ? <span className={'draft-' + draftNote.tone}>{draftNote.text}</span> : <span className="draft-info">{dirty ? '입력 중' : exampleMode ? '예시값' : loaded.lot ? '저장된 기록과 같음' : '새 입력'}</span>}
@@ -266,7 +328,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
               <F id="fruit_temp" label="과실 온도" unit="°C" err={errors.fruit_temp}><input id="tf-fruit_temp" type="number" inputMode="decimal" step="0.1" value={form.measure.fruit_temp} onChange={e => setSub('measure', 'fruit_temp', e.target.value)} /></F>
               <F id="instrument" label="측정 기기"><input id="tf-instrument" value={form.measure.instrument} onChange={e => setSub('measure', 'instrument', e.target.value)} maxLength={80} /></F>
             </div>
-            <p className="qt-help">같은 탐침·위치·온도에서 잰 값끼리 비교하세요. 탐침 직경이 있어야 kgf/cm² 변환을 보여 드립니다.</p>
+            <p className="qt-help">같은 탐침·위치·온도에서 잰 값끼리 비교하세요. 탐침 직경만으로 압력을 환산하지 않습니다. 유효 접촉 면적과 해당 측정법의 환산 타당성이 모두 확인되어야 합니다.</p>
           </details>
           <details className="qt-sub">
             <summary>선택 입력 (산도·평균 중량·포장·저장고 위치·센서·추적 표본)</summary>
@@ -276,14 +338,15 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
               <F id="packaging" label="포장 형태"><input id="tf-packaging" value={form.packaging} onChange={e => set('packaging', e.target.value)} maxLength={120} /></F>
               <F id="location" label="저장고 위치"><input id="tf-location" value={form.location} onChange={e => set('location', e.target.value)} maxLength={120} /></F>
               <F id="sensor_id" label="온습도 센서 번호" hint="CSV의 sensor_id와 같게"><input id="tf-sensor_id" value={form.sensor_id} onChange={e => set('sensor_id', e.target.value)} maxLength={60} /></F>
-              <F id="tracked_count" label="추적 표본 수" unit="개" hint="같은 과실을 계속 무게만 재는 표본"><input id="tf-tracked_count" type="number" inputMode="numeric" value={form.tracked.count} onChange={e => setSub('tracked', 'count', e.target.value)} placeholder="미입력" /></F>
+              <F id="tracked_sample_id" label="추적 표본 식별자" hint="후속 중량 기록에도 같은 식별자를 사용하세요." err={errors.tracked_sample_id}><input id="tf-tracked_sample_id" value={form.tracked.sample_id ?? ''} onChange={e => setSub('tracked', 'sample_id', e.target.value)} maxLength={80} placeholder="예: A동-추적표본-01" /></F>
+              <F id="tracked_count" label="추적 표본 수" unit="개" err={errors.tracked_count} hint="같은 과실을 계속 무게만 재는 표본"><input id="tf-tracked_count" type="number" inputMode="numeric" value={form.tracked.count} onChange={e => setSub('tracked', 'count', e.target.value)} placeholder="미입력" /></F>
               <F id="tracked_weight" label="추적 표본 초기 평균 중량" unit="g" err={errors.tracked_weight}><input id="tf-tracked_weight" type="number" inputMode="decimal" step="0.1" value={form.tracked.initial_weight} onChange={e => setSub('tracked', 'initial_weight', e.target.value)} placeholder="미입력" /></F>
             </div>
             <p className="qt-help">실측 감모율은 같은 추적 표본의 초기·후속 중량이 모두 있을 때만 계산합니다. 경도처럼 파괴해서 잰 과실의 중량은 쓰지 않습니다.</p>
           </details>
         </details>
 
-        <details className="qt-collapse" open={!narrow}>
+        <details className="qt-collapse" open>
           <summary><span className="qt-num">②</span>저장 조건 선택</summary>
           <p className="qt-help">기록된 조건은 분석 기준일까지(과거 구간) 계산에 쓰입니다.</p>
           <div className="qt-fields two">
@@ -294,21 +357,21 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           {form.mcp === '처리' && <details className="qt-sub" open={!!(form.mcpd.treated_on || form.mcpd.product)}>
             <summary>1-MCP 처리 이력</summary>
             <div className="qt-fields two">
-              <F id="mcp_on" label="처리일"><input type="date" max={today} value={form.mcpd.treated_on} onChange={e => setSub('mcpd', 'treated_on', e.target.value)} /></F>
-              <F id="mcp_product" label="제품명"><input value={form.mcpd.product} onChange={e => setSub('mcpd', 'product', e.target.value)} maxLength={80} /></F>
-              <F id="mcp_conc" label="농도"><input value={form.mcpd.concentration} onChange={e => setSub('mcpd', 'concentration', e.target.value)} maxLength={40} placeholder="예: 1 µL/L" /></F>
-              <F id="mcp_h" label="처리 시간" unit="h"><input type="number" value={form.mcpd.hours} onChange={e => setSub('mcpd', 'hours', e.target.value)} /></F>
-              <F id="mcp_t" label="처리 온도" unit="°C"><input type="number" value={form.mcpd.temp} onChange={e => setSub('mcpd', 'temp', e.target.value)} /></F>
+              <F id="mcp_on" label="처리일"><input type="date" max={today} id="tf-mcp_on" value={form.mcpd.treated_on} onChange={e => setSub('mcpd', 'treated_on', e.target.value)} /></F>
+              <F id="mcp_product" label="제품명"><input id="tf-mcp_product" value={form.mcpd.product} onChange={e => setSub('mcpd', 'product', e.target.value)} maxLength={80} /></F>
+              <F id="mcp_conc" label="농도"><input id="tf-mcp_conc" value={form.mcpd.concentration} onChange={e => setSub('mcpd', 'concentration', e.target.value)} maxLength={40} placeholder="예: 1 µL/L" /></F>
+              <F id="mcp_h" label="처리 시간" unit="h"><input type="number" id="tf-mcp_h" value={form.mcpd.hours} onChange={e => setSub('mcpd', 'hours', e.target.value)} /></F>
+              <F id="mcp_t" label="처리 온도" unit="°C"><input type="number" id="tf-mcp_t" value={form.mcpd.temp} onChange={e => setSub('mcpd', 'temp', e.target.value)} /></F>
             </div>
             <p className="qt-help">처리 세부값은 기록용입니다. 처리 여부만으로 경도·점수를 보정하지 않습니다.</p>
           </details>}
           {form.storage === 'CA' && <details className="qt-sub" open={!!(form.ca.from || form.ca.o2)}>
             <summary>CA 저장 환경</summary>
             <div className="qt-fields two">
-              <F id="ca_from" label="적용 시작일"><input type="date" value={form.ca.from} onChange={e => setSub('ca', 'from', e.target.value)} /></F>
-              <F id="ca_to" label="적용 종료일"><input type="date" value={form.ca.to} onChange={e => setSub('ca', 'to', e.target.value)} /></F>
-              <F id="ca_o2" label="산소 농도" unit="%"><input type="number" step="0.1" value={form.ca.o2} onChange={e => setSub('ca', 'o2', e.target.value)} /></F>
-              <F id="ca_co2" label="이산화탄소 농도" unit="%"><input type="number" step="0.1" value={form.ca.co2} onChange={e => setSub('ca', 'co2', e.target.value)} /></F>
+              <F id="ca_from" label="적용 시작일"><input type="date" id="tf-ca_from" value={form.ca.from} onChange={e => setSub('ca', 'from', e.target.value)} /></F>
+              <F id="ca_to" label="적용 종료일"><input type="date" id="tf-ca_to" value={form.ca.to} onChange={e => setSub('ca', 'to', e.target.value)} /></F>
+              <F id="ca_o2" label="산소 농도" unit="%"><input type="number" step="0.1" id="tf-ca_o2" value={form.ca.o2} onChange={e => setSub('ca', 'o2', e.target.value)} /></F>
+              <F id="ca_co2" label="이산화탄소 농도" unit="%"><input type="number" step="0.1" id="tf-ca_co2" value={form.ca.co2} onChange={e => setSub('ca', 'co2', e.target.value)} /></F>
             </div>
           </details>}
           <div className={'qt-env ' + (env?.count ? '' : 'none')}><Thermometer size={15} />
@@ -317,55 +380,65 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           </div>
         </details>
 
+        <div className="qt-view-action"><button className="btn btn-primary" onClick={viewResults}>품질 변화 보기</button>{inputNotice && <p role="alert" className="auth-error">{inputNotice}</p>}</div>
         {!exampleMode && <div className="qt-savebox">
-          <button className="btn btn-primary" onClick={saveRecord} disabled={saving || (!dirty && !!loaded.lot)}>{saving ? <Loader2 className="spin" size={16} /> : <Save size={16} />}{loaded.lot ? '변경 내용을 기록에 저장' : '물량 기록으로 저장'}</button>
+          <button className="btn btn-primary" onClick={saveRecord} disabled={saving || !!loadError || (!dirty && !!loaded.lot)}>{saving ? <Loader2 className="spin" size={16} /> : <Save size={16} />}{loaded.lot ? '변경 내용을 기록에 저장' : '물량 기록으로 저장'}</button>
           {loaded.lot && <ObservationForm lot={loaded.lot} onSaved={() => { setReload(r => r + 1); }} disabled={false} />}
           {saveMsg && <p className={saveMsg.ok ? 'qt-ok' : 'auth-error'} role="status">{saveMsg.text}</p>}
           <p className="qt-help">임시 저장(초안)은 이 브라우저에만 남습니다. ‘저장’을 눌러야 정식 기록이 됩니다.</p>
         </div>}
+        </div>
       </aside>
 
       {/* 가운데: 요약 · 지표 탭 · 그래프 · 비교 */}
-      <section className="qt-main" aria-label="결과">
-        <div className="qt-dates">
-          <div><span>저장 시작일</span><b>{startOk ? fmtDate(startDate) : '미입력'}</b></div>
-          <div><span>분석 기준일</span><b>{fmtDate(asOf)}{startOk && <small> · {asOfDay}일차</small>}</b></div>
-          <div className="qt-seldate"><span>선택 날짜</span>
-            <input type="date" aria-label="선택 날짜" value={selDate} disabled={!startOk} min={startDate} max={startOk ? addDays(startDate, MODEL_RANGE.displayDays) : undefined}
-              onChange={e => { if (startOk && isDate(e.target.value)) setSelectedDay(Math.max(0, Math.min(MODEL_RANGE.displayDays, daysBetween(startDate, e.target.value)))); }} /></div>
-          <div><span>저장 경과일</span><b className="qt-big">{startOk ? `저장 ${selDay}일차` : '—'}</b></div>
+      <section className="qt-main" aria-label="품질 예측 결과" ref={resultsRef} tabIndex={-1} hidden={!showResults || !!loadError}>
+        <div className="qt-result-heading"><div><span className="qt-section-label">선택 날짜의 품질</span><h2>저장 중 품질 변화</h2></div><span className="qt-date-caption">{startOk ? fmtDate(selDate) : '날짜 미입력'} · 저장 {selDay}일차</span></div>
+        <div className="seg qt-tabs" role="tablist" aria-label="지표" onKeyDown={e => {
+          const i = metricIds.indexOf(metric); const next = e.key === 'ArrowRight' ? (i + 1) % 4 : e.key === 'ArrowLeft' ? (i + 3) % 4 : e.key === 'Home' ? 0 : e.key === 'End' ? 3 : -1;
+          if (next >= 0) { e.preventDefault(); setMetric(metricIds[next]); (e.currentTarget.children[next] as HTMLButtonElement).focus(); }
+        }}>
+          {metricIds.map(m => <button key={m} id={'qt-tab-' + m} role="tab" aria-controls="qt-metric-result" tabIndex={metric === m ? 0 : -1} aria-selected={metric === m} className={metric === m ? 'active' : ''} onClick={() => setMetric(m)}>{metricMeta[m].label}</button>)}
         </div>
-        <input className="qt-slider" type="range" min={0} max={MODEL_RANGE.displayDays} value={selDay} disabled={!startOk} onChange={e => setSelectedDay(+e.target.value)} aria-label="저장 경과일" />
-        {startOk && t0 > 0 && <p className="qt-help">초기 측정일이 저장 {t0}일차라 계산은 그날부터 시작합니다. 그 이전 기간은 채우지 않습니다.</p>}
-        {startOk && !form.initial_measured_on && anyInitial && <p className="qt-help"><Info size={13} /> 측정일이 비어 있어 저장 시작일에 측정한 것으로 가정했습니다.</p>}
-
-        <p className="qt-summary" aria-live="polite">{summary}</p>
-
-        <div className="seg qt-tabs" role="tablist" aria-label="지표">
-          {metricIds.map(m => <button key={m} role="tab" aria-selected={metric === m} className={metric === m ? 'active' : ''} onClick={() => setMetric(m)}>{metricMeta[m].label}</button>)}
+        <div id="qt-metric-result" role="tabpanel" aria-labelledby={'qt-tab-' + metric} className="qt-metric-result">
+          <ResultHero metric={metric} at={selectedValue} anchor={anchors[metric]} actualLoss={metric === 'loss' && !exampleMode} exampleMode={exampleMode} probeMm={num(form.measure.probe_mm)} onFocusInput={() => focus('tf-' + (metric === 'loss' ? 'tracked_sample_id' : metric))} />
+          <p className="qt-summary" aria-live="polite">{summary}</p>
         </div>
         <div className="qt-chartbox">
+          <div className="qt-chart-heading"><h3>{metricMeta[metric].label} 변화</h3><span>{metricMeta[metric].unit}</span></div>
           {startOk ? <TrackerChart metric={metric} series={series[metric]} baseline={baseline && compatible && !sameAsBaseline ? {series: baseline.series[metric], label: baseline.label} : null}
             measured={measured[metric]} startDate={startDate} asOfDay={asOfDay} selectedDay={selDay} onSelect={setSelectedDay} exampleMode={exampleMode} />
             : <div className="qt-empty">저장 시작일(또는 입고일)을 입력하면 그래프가 나타납니다. <button className="linkbtn" onClick={() => focus('tf-intake_date')}>입고일 입력하기</button></div>}
           {startOk && !series[metric].ok && <div className="qt-chart-note"><AlertTriangle size={14} />{(series[metric] as {reason: string}).reason}{!anchors[metric] && metric !== 'loss' && <button className="linkbtn" onClick={() => focus('tf-' + metric)}>입력하기</button>}</div>}
-          <ChartLegend exampleMode={exampleMode} hasBaseline={!!baseline && compatible && !sameAsBaseline} baselineLabel={baseline ? `${baseline.label} (회색 점선)` : ''} />
-          <p className="qt-meta-line"><KindBadge kind="모델 계산" verified={false} /> 저장 모델 계산은 {STORAGE_MODEL_VERIFIED} 상태의 <b>시연용 계산</b>입니다. 오차 범위 미검증 · 표시 범위 0~{MODEL_RANGE.displayDays}일(적용 기간 미확인). <button className="linkbtn" onClick={openModelInfo}><BookOpen size={13} />모델 정보</button></p>
+          {metric === 'loss' && !exampleMode ? <p className="qt-help">점: 같은 추적 표본의 실측 중량으로 계산한 감모율 · 측정 사이와 미래 날짜는 보간하거나 예측하지 않습니다.</p> : <ChartLegend exampleMode={exampleMode} hasBaseline={!!baseline && compatible && !sameAsBaseline} baselineLabel={baseline ? `${baseline.label} (회색 점선)` : ''} />}
+          <div className="qt-date-control">
+            <label htmlFor="qt-selected-date">선택 날짜<input id="qt-selected-date" type="date" value={selDate} disabled={!startOk} min={startDate} max={startOk ? addDays(startDate, MODEL_RANGE.displayDays) : undefined}
+              onChange={e => { if (startOk && isDate(e.target.value)) setSelectedDay(Math.max(0, Math.min(MODEL_RANGE.displayDays, daysBetween(startDate, e.target.value)))); }} /></label>
+            <div className="qt-range-control"><label htmlFor="qt-selected-day">저장 경과일 <strong>{selDay}일차</strong></label><input id="qt-selected-day" className="qt-slider" type="range" min={0} max={MODEL_RANGE.displayDays} value={selDay} disabled={!startOk} onChange={e => setSelectedDay(+e.target.value)} /><div className="qt-range-ends"><span>0일 · 저장 시작</span><span>{MODEL_RANGE.displayDays}일</span></div></div>
+          </div>
+          <p className="qt-help">분석 기준일 {fmtDate(asOf)}{startOk ? ` · 저장 ${asOfDay}일차` : ''} / 그래프 표시 범위 0~{MODEL_RANGE.displayDays}일은 검증된 적용 기간이 아닙니다.</p>
+          {startOk && t0 > 0 && <p className="qt-help">초기 측정은 저장 {t0}일차입니다. 계산도 그날부터 시작하며 이전 날짜를 채우지 않습니다.</p>}
+          {startOk && !form.initial_measured_on && anyInitial && <p className="qt-help">측정일 미기록: 경도·당도·산도 계산은 저장 시작일 측정을 가정합니다. 감모율에는 이 가정을 적용하지 않습니다.</p>}
           {excludedLater > 0 && <p className="qt-help">분석 기준일 이후 측정 {excludedLater}건은 과거 관측에 넣지 않았습니다.</p>}
         </div>
 
-        <div className="qt-actions">
-          <label className="qt-check"><input type="checkbox" checked={useLatest} onChange={e => setUseLatest(e.target.checked)} />최근 측정값을 계산 시작점으로 사용</label>
-          <span className="qt-help inline">모델을 다시 학습하지 않고, 같은 식을 최근 측정값에서 다시 이어 계산합니다.</span>
-          <button className={'btn btn-ghost' + (showObsCompare ? ' on' : '')} onClick={() => setShowObsCompare(v => !v)}>측정값과 비교</button>
+        <section className="qt-latest" aria-label="최근 실측 비교"><div className="qt-latest-head"><h3>최근 {exampleMode ? '예시 측정' : '실측'}과 비교</h3>{!exampleMode && loaded.lot && <ObservationForm lot={loaded.lot} onSaved={() => setReload(r => r + 1)} disabled={false} />}</div>
+          {latestPoint ? <><button className="linkbtn qt-latest-date" disabled={latestPoint.day < 0 || latestPoint.day > MODEL_RANGE.displayDays} onClick={() => setSelectedDay(latestPoint.day)}>최근 측정 날짜 선택</button><p className="qt-help">{fmtDate(latestPoint.date)} · 저장 {latestPoint.day}일차 · 표본 {latestPoint.sampleCount ?? '미기록'}{latestPoint.sampleCount ? '개' : ''}</p>
+            <dl className="qt-latest-values"><div><dt>{exampleMode ? '예시 측정' : metric === 'loss' ? '실측 중량 기반 감모율' : '실측'}</dt><dd>{fmtNum(latestPoint.value, metricMeta[metric].digits)} <small>{metricMeta[metric].unit}</small></dd></div><div><dt>같은 날짜 시연용 계산</dt><dd>{latestCalculation?.status === 'ok' ? <>{fmtNum(latestCalculation.value, metricMeta[metric].digits)} <small>{metricMeta[metric].unit}</small></> : '제공 안 함'}</dd></div><div><dt>측정 − 계산</dt><dd>{latestCalculation?.status === 'ok' ? describeChange(metric, latestPoint.value, latestCalculation.value).short : '비교 불가'}</dd></div></dl>
+            {latestConditions?.reason && <p className="qt-help qt-measure-compatibility"><strong>{latestConditions.status === 'mismatch' ? '측정 조건 불일치' : '측정 조건 확인 필요'}</strong> · {latestConditions.reason}</p>}
+          </> : <p className="qt-help">후속 측정 기록 없음 · {metricMeta[metric].label} {metric === 'loss' ? '계산에 필요한 동일 추적 표본의 중량과 측정일을 기록해 주세요.' : '측정 기록을 추가하면 같은 날짜의 계산값과 비교할 수 있습니다.'}</p>}
+          <div className="qt-latest-actions"><label className="qt-check"><input type="checkbox" checked={useLatest} disabled={!measured[metric].length || metric === 'loss'} onChange={e => setUseLatest(e.target.checked)} />최근 측정값을 계산 시작점으로 사용</label><button className="btn btn-ghost" aria-expanded={showObsCompare} onClick={() => setShowObsCompare(v => !v)}>측정값과 비교</button></div>
+          {useLatest && <p className="qt-help">기존 식을 최근 측정값에서 이어 계산합니다. 모델 재학습이나 정확도 검증이 아닙니다.</p>}
+          {showObsCompare && <ObsCompare metric={metric} measured={measured[metric]} series={series[metric]} exampleMode={exampleMode} initialMeasure={form.measure} observations={pastObs} />}
+        </section>
+
+        <div className="qt-actions qt-result-actions">
+          {onAskAI && <button className="btn btn-outline" data-ai-return onClick={askResult} disabled={!startOk || !!loadError}><MessageCircle size={16} />이 결과 물어보기</button>}
           <button className="btn btn-ghost" onClick={() => exportCsv({mode, lotName, form, startDate, asOf, asOfDay, selDay, recorded, futureLabel, series, measured, anchors, baseline: compatible ? baseline : null, changeLabel, useLatest})} disabled={!startOk}><Download size={15} />결과 내보내기</button>
         </div>
 
-        {showObsCompare && <ObsCompare metric={metric} measured={measured[metric]} series={series[metric]} exampleMode={exampleMode} />}
-
-        {/* 조건 비교 */}
-        <section className="qt-compare" aria-label="조건 비교">
-          <div className="qt-compare-head"><h3>조건 비교 <span className="kind k-example">체험용 비교</span></h3>
+        <button className="btn btn-outline qt-compare-toggle" aria-expanded={showConditions} aria-controls="qt-condition-comparison" onClick={() => setShowConditions(v => !v)}>저장 조건 비교<ChevronDown size={16} /></button>
+        {showConditions && <section id="qt-condition-comparison" className="qt-compare" aria-label="조건 비교">
+          <div className="qt-compare-head"><h3>저장 조건 비교 <span className="kind k-example">체험용 비교</span></h3>
             <p>저장 방식 간 효과를 검증한 모델이 없어, 각 저장 방식 식의 일별 변화를 분석 기준일 값에 이어 붙인 <b>체험용 비교</b>입니다. 같은 물량·초기값·과거 이력을 공유합니다.</p></div>
           <div className="qt-future">
             <span>분석 기준일 이후 저장 조건</span>
@@ -382,27 +455,26 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           </div>
           {baseline && !compatible && <div className="qt-banner warn small"><AlertTriangle size={15} /><span>물량·초기값·과거 이력·분석 기준일이 고정한 기준과 달라 같은 조건 비교가 아닙니다. <b>기준 다시 설정</b>을 눌러 주세요. 고정한 기준은 바뀌지 않았습니다.</span></div>}
           {baseline && compatible && <>
-            {baseline.kind === 'current' && sameAsBaseline && <p className="qt-help">위에서 개선 조건(다른 저장 조건)을 고르면 ‘현재 조건 유지’와 비교합니다.</p>}
+            {baseline.kind === 'current' && sameAsBaseline && <p className="qt-help">위에서 비교 조건(다른 저장 조건)을 고르면 ‘현재 조건 유지’와 비교합니다.</p>}
             <div className="qt-vs">
-              <div className="qt-vs-card base"><span className="qt-vs-tag">기준 · {baseline.label}</span><b>{baseline.conditionLabel}</b><small>고정 {new Date(baseline.createdAt).toLocaleString('ko-KR')} · 분석 기준일 {fmtDate(baseline.asOf)}</small></div>
-              <div className="qt-vs-card chg"><span className="qt-vs-tag">{baseline.kind === 'current' ? '개선 조건 적용' : '변경 조건'}</span><b>{futureLabel}</b><small>같은 날짜 저장 {selDay}일차({fmtDate(selDate)})에서 비교</small></div>
+              <div className="qt-vs-card base"><span className="qt-vs-tag">현재 조건 · {baseline.label}</span><b>{baseline.conditionLabel}</b><small>고정 {new Date(baseline.createdAt).toLocaleString('ko-KR')} · 분석 기준일 {fmtDate(baseline.asOf)}</small></div>
+              <div className="qt-vs-card chg"><span className="qt-vs-tag">비교 조건</span><b>{futureLabel}</b><small>같은 날짜 저장 {selDay}일차({fmtDate(selDate)})에서 비교</small></div>
             </div>
             <div className="qt-table-wrap"><table className="qt-table">
-              <thead><tr><th>지표</th><th>기준</th><th>{baseline.kind === 'current' ? '개선 조건' : '변경 조건'}</th><th>차이</th></tr></thead>
+              <thead><tr><th>지표</th><th>기준</th><th>비교 조건</th><th>차이</th></tr></thead>
               <tbody>{metricIds.map(m => { const b = baseAt(m), c = at(m), meta = metricMeta[m];
                 return <tr key={m}><td>{meta.label}</td><td>{b?.status === 'ok' ? `${fmtNum(b.value, meta.digits)} ${meta.unit}` : '계산 불가'}</td><td>{c.status === 'ok' ? `${fmtNum(c.value, meta.digits)} ${meta.unit}` : '계산 불가'}</td>
                   <td>{b?.status === 'ok' && c.status === 'ok' ? describeChange(m, c.value, b.value).short : '—'}</td></tr>; })}</tbody>
             </table></div>
           </>}
-        </section>
+          </section>}
+        <details className="qt-basis"><summary><BookOpen size={16} />계산 근거·적용 범위</summary><div>
+          <h3>{metric === 'loss' && !exampleMode ? '실측 중량의 변화' : `${recorded.id ? modelLabel[recorded.id] : '현재 조건: 모델 미지원'} · ${metricMeta[metric].label}`}</h3>
+          <p>현재 저장 모델은 초기 품질, 저장 경과일, 저장 환경·1-MCP 처리 구분을 사용합니다. 입력한 품종, 세부 처리 농도, 실제 온습도 이력은 계산에 반영하지 않습니다.</p>
+          <p><strong>시연용 계산 · 검증 미확인</strong> — 적용 기간 미확인, 오차 범위 미검증. 확인되지 않은 적용 조건에서 출하일·안전성·보관 가능 기간을 판단할 수 없습니다.</p>
+          <p className="qt-help">모델: {MODEL_VERSION}</p><button className="linkbtn" onClick={() => openModelInfo({modelId: selDay <= asOfDay ? recorded.id : future.id, metric})}>전체 모델 정보 보기</button>
+        </div></details>
       </section>
-
-      {/* 오른쪽: 선택 날짜 결과 */}
-      <aside className="qt-results" aria-label="선택 날짜 결과">
-        <h3>저장 {selDay}일차 결과 <small>{startOk ? fmtDate(selDate) : ''}</small></h3>
-        {metricIds.map(m => <ResultCard key={m} metric={m} active={metric === m} onPick={() => setMetric(m)} at={at(m)} anchor={anchors[m]} measured={measured[m]} kind={kind}
-          probeMm={num(form.measure.probe_mm)} onFocusInput={() => focus('tf-' + (m === 'loss' ? 'tracked_weight' : m))} selDay={selDay} />)}
-      </aside>
     </div>
 
     <ThreeDExample />
@@ -411,38 +483,38 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
 
 function F({id, label, unit, hint, err, extra, children}: {id: string; label: string; unit?: string; hint?: string; err?: string; extra?: ReactNode; children: ReactNode}) {
   return <div className={'qf' + (err ? ' has-err' : '')} data-field={id}>
-    <div className="qf-head"><span className="qf-label">{label}{unit && <small> ({unit})</small>}</span>{extra}</div>
+    <div className="qf-head"><label htmlFor={'tf-' + id} className="qf-label">{label}{unit && <small> ({unit})</small>}</label>{extra}</div>
     {children}
     {hint && !err && <span className="qf-hint">{hint}</span>}
     {err && <span className="qf-err" role="alert">{err}</span>}
   </div>;
 }
 
-function ResultCard({metric, active, onPick, at, anchor, measured, kind, probeMm, onFocusInput, selDay}: {metric: MetricId; active: boolean; onPick: () => void; at: ValueAt; anchor: Anchor | null; measured: MeasuredPoint[]; kind: DataKind; probeMm: number | null; onFocusInput: () => void; selDay: number}) {
-  const meta = metricMeta[metric], latest = measured.at(-1), same = measured.find(p => p.day === selDay);
-  return <div className={'qt-card' + (active ? ' active' : '')} onClick={onPick} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter') onPick(); }} aria-pressed={active}>
-    <div className="qt-card-head"><b>{meta.label}</b>{at.status === 'ok' ? <KindBadge kind="모델 계산" verified={false} /> : anchor || metric === 'loss' ? <span className="kind k-missing">계산 불가</span> : <KindBadge kind="미측정" />}</div>
-    {at.status === 'ok' ? <>
-      <div className="qt-card-val">{fmtNum(at.value, meta.digits)}<small>{meta.unit}</small>{metric === 'firmness' && <span onClick={e => e.stopPropagation()}><HardnessConvert valueN={at.value} probeMm={probeMm} /></span>}</div>
-      <div className="qt-card-sub">{calcNoun(metric)} · {at.segment === 'past' ? '과거 구간' : '미래 가정'}</div>
-      {anchor && <div className="qt-card-sub">{anchor.source === 'latest' ? '계산 시작점' : '초기값'} {metric === 'loss' && anchor.source === 'initial' ? '0.00 % (계산 시작 기준)' : `${fmtNum(anchor.value, meta.digits)} ${meta.unit} · ${anchor.kind}`} → <b>{describeChange(metric, at.value, anchor.value).short}</b></div>}
-    </> : <div className="qt-card-na">{metric === 'loss' && !anchor ? '' : ''}{at.reason}
-      {!anchor && metric !== 'loss' && <button className="linkbtn" onClick={e => { e.stopPropagation(); onFocusInput(); }}>초기 {meta.label} 입력하기</button>}</div>}
-    <div className="qt-card-obs">{same ? <>이 날 {kind === '예시' ? '예시 측정' : '실측'} <b>{fmtNum(same.value, meta.digits)} {meta.unit}</b></>
-      : latest ? <>최근 {kind === '예시' ? '예시 측정' : '실측'} {fmtNum(latest.value, meta.digits)} {meta.unit} <small>({fmtDate(latest.date)}{latest.sampleCount ? ` · 표본 ${latest.sampleCount}개` : ''})</small></>
-      : <>최근 측정: <span className="kind k-missing">미측정</span>{metric === 'loss' && <small> 같은 추적 표본의 중량 기록이 필요합니다.</small>}</>}</div>
-    {(metric === 'brix' || metric === 'loss') && <p className="qt-card-note">{meta.note}</p>}
+function ResultHero({metric, at, anchor, actualLoss, exampleMode, probeMm, onFocusInput}: {metric: MetricId; at: ValueAt; anchor: Anchor | null; actualLoss: boolean; exampleMode: boolean; probeMm: number | null; onFocusInput: () => void}) {
+  const meta = metricMeta[metric];
+  return <div className="qt-result-hero">
+    <div className="qt-result-kind"><b>{meta.label}</b>{exampleMode && <KindBadge kind="예시" />}{at.status === 'ok' ? <KindBadge kind={actualLoss ? '실측' : '모델 계산'} verified={actualLoss ? undefined : false} /> : anchor && !actualLoss ? <span className="kind k-missing">계산 불가</span> : <KindBadge kind="미측정" />}</div>
+    {at.status === 'ok' ? <><div className="qt-result-number">{fmtNum(at.value, meta.digits)}<span>{meta.unit}</span>{metric === 'firmness' && <HardnessConvert valueN={at.value} probeMm={probeMm} />}</div>
+      {actualLoss ? <p className="qt-result-change">동일 추적 표본의 초기 중량 대비 변화 · 실제 측정 날짜</p> : anchor && <p className="qt-result-change">{anchor.source === 'latest' ? '계산 시작점' : '초기값'} {fmtNum(anchor.value, meta.digits)} {meta.unit} 대비 <strong>{describeChange(metric, at.value, anchor.value).short}</strong></p>}
+      <p className="qt-result-status">{actualLoss ? '실측 중량 기반 계산 · 품질 판정 아님' : `시연용 계산 · ${at.segment === 'past' ? '과거 구간' : '미래 가정'} · 검증 미확인`}</p>
+    </> : <div className="qt-result-unavailable"><strong>결과를 표시할 수 없습니다</strong><p>{at.reason}</p><button className="linkbtn" onClick={onFocusInput}>필요한 입력 확인</button></div>}
   </div>;
 }
 
-function ObsCompare({metric, measured, series, exampleMode}: {metric: MetricId; measured: MeasuredPoint[]; series: Series; exampleMode: boolean}) {
+function ObsCompare({metric, measured, series, exampleMode, initialMeasure, observations}: {metric: MetricId; measured: MeasuredPoint[]; series: Series; exampleMode: boolean; initialMeasure: TrackerForm['measure']; observations: Observation[]}) {
   const meta = metricMeta[metric];
   if (!measured.length) return <div className="qt-obs"><p className="qt-help">분석 기준일까지 {meta.label} {exampleMode ? '예시 측정' : '실측'} 기록이 없습니다.</p></div>;
   return <div className="qt-obs qt-table-wrap"><table className="qt-table">
     <caption>측정값과 같은 날짜 계산값 비교 — {meta.label} ({meta.unit})</caption>
     <thead><tr><th>측정일</th><th>경과일</th><th>{exampleMode ? '예시 측정' : '실측'}</th><th>시연용 계산</th><th>측정 − 계산</th></tr></thead>
-    <tbody>{measured.map(p => { const v = valueAt(series, p.day); return <tr key={p.id}><td>{fmtDate(p.date)}</td><td>{p.day}일차</td><td>{fmtNum(p.value, meta.digits)}</td>
-      <td>{v.status === 'ok' ? fmtNum(v.value, meta.digits) : v.status === 'before' ? '계산 시작 전' : '계산 불가'}</td><td>{v.status === 'ok' ? describeChange(metric, p.value, v.value).short : '—'}</td></tr>; })}</tbody>
+    <tbody>{measured.map(p => {
+      const conditions = measurementCompatibility(initialMeasure, observations.find(o => o.id === p.id)?.details?.measure);
+      const v = conditions.comparable ? valueAt(series, p.day) : null;
+      return <Fragment key={p.id}><tr><td>{fmtDate(p.date)}</td><td>{p.day}일차</td><td>{fmtNum(p.value, meta.digits)}</td>
+        <td>{v?.status === 'ok' ? fmtNum(v.value, meta.digits) : !conditions.comparable ? '제공 안 함' : v?.status === 'before' ? '계산 시작 전' : '계산 불가'}</td><td>{v?.status === 'ok' ? describeChange(metric, p.value, v.value).short : '비교 불가'}</td></tr>
+        {conditions.reason && <tr className="qt-obs-condition"><td colSpan={5}><p className="qt-help qt-measure-compatibility"><strong>{conditions.status === 'mismatch' ? '측정 조건 불일치' : '측정 조건 확인 필요'}</strong> · {conditions.reason}</p></td></tr>}
+      </Fragment>;
+    })}</tbody>
   </table><p className="qt-help">차이는 검증 지표가 아닙니다. 표본이 다르면(파괴 측정) 같은 과실의 변화가 아닙니다.</p></div>;
 }
 
@@ -477,10 +549,12 @@ function exportCsv(o: {mode: Mode; lotName: string; form: TrackerForm; startDate
     ['측정일', o.form.initial_measured_on || `미입력(저장 시작일로 가정)`, '', ''], ['표본 수', v(o.form.initial_sample_count), '개', kindIn],
     ['초기 경도', v(o.form.firmness), 'N', o.form.firmness ? kindIn : '미측정'], ['초기 당도', v(o.form.brix), '°Brix', o.form.brix ? kindIn : '미측정'], ['초기 산도', v(o.form.acidity), '%', o.form.acidity ? kindIn : '미측정'], ['평균 중량', v(o.form.weight), 'g', o.form.weight ? kindIn : '미측정'],
     ['탐침 직경', v(o.form.measure.probe_mm), 'mm', ''], ['껍질 제거 여부', o.form.measure.peeled || '미기록', '', ''], ['측정 위치', o.form.measure.position || '미기록', '', ''], ['과실 온도', v(o.form.measure.fruit_temp), '°C', ''],
-    ['추적 표본 초기 평균 중량', v(o.form.tracked.initial_weight), 'g', ''], ['저장 환경', o.form.storage, '', ''], ['1-MCP 처리 이력', o.form.mcp, '', ''],
+    ['추적 표본 식별자', o.form.tracked.sample_id || '미기록', '', ''], ['추적 표본 초기 평균 중량', v(o.form.tracked.initial_weight), 'g', ''], ['저장 환경', o.form.storage, '', ''], ['1-MCP 처리 이력', o.form.mcp, '', ''],
     ['과거 구간 모델(기록 조건)', o.recorded.id ? modelLabel[o.recorded.id] : `없음 — ${o.recorded.reason}`, '', ''], ['미래 구간 조건', o.futureLabel, '', ''],
     ['분석 기준일', o.asOf, '', `저장 ${o.asOfDay}일차`], ['계산 시작점', o.useLatest ? '지표별 최근 측정값' : '초기값', '', ''], []);
   rows.push(['[모델 정보]'], ['저장 모델', MODEL_VERSION], ['검증 상태', `${STORAGE_MODEL_VERIFIED} — 시연용 계산`], ['오차 범위', '미검증'], ['적용 범위', `표시 0~${MODEL_RANGE.displayDays}일, 원자료의 관측·검증 기간 미확인`], ['경도 지표', '최대 힘 N (kgf 등 변환값은 표시용, 내보내기에는 원래 단위만 포함)'], []);
+  if (o.baseline) rows.push(['[고정 비교 기준]'], ['고정 시각', o.baseline.createdAt], ['분석 기준일', o.baseline.asOf], ['조건', o.baseline.conditionLabel], ['모델 버전', o.baseline.modelVersion], ['고정 입력', JSON.stringify(o.baseline.form)], ['고정 측정 이력 식별값', o.baseline.observationsFingerprint], ['계산 시작점', o.baseline.useLatest ? '지표별 최근 측정값' : '초기값'], []);
+  rows.push(['결과 제한', '실제 감모율은 동일 추적 표본의 실측 중량과 측정일이 확인된 측정 기록에서만 제공합니다. 압력 환산은 유효 면적과 측정법 근거 없이는 제공하지 않습니다.'], []);
   const head = ['저장 경과일', '날짜', '구간'];
   for (const m of metricIds) { head.push(`${metricMeta[m].label}(${metricMeta[m].unit}) 계산`); if (o.baseline) head.push(`${metricMeta[m].label} 기준`); }
   rows.push([o.baseline ? `[계산 결과 — 기준: ${o.baseline.label}(${o.baseline.conditionLabel}) / ${o.changeLabel}]` : '[계산 결과 — 시연용 계산]'], head);
@@ -494,8 +568,8 @@ function exportCsv(o: {mode: Mode; lotName: string; form: TrackerForm; startDate
     rows.push(r);
   });
   rows.push([], ['[측정 기록]', '날짜', '경과일', '값', '단위', '데이터 종류', '표본 수']);
-  for (const m of metricIds) for (const p of o.measured[m]) rows.push([metricMeta[m].label, p.date, p.day, p.value, metricMeta[m].unit, p.kind === '예시' ? '예시 측정' : '실측', p.sampleCount ?? '']);
-  const csv = rows.map(r => r.map(c => { const s = String(c); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }).join(',')).join('\n');
+  for (const m of metricIds) for (const p of o.measured[m]) rows.push([metricMeta[m].label, p.date, p.day, fmtNum(p.value, metricMeta[m].digits).replace(/,/g, ''), metricMeta[m].unit, p.kind === '예시' ? '예시 측정' : '실측', p.sampleCount ?? '']);
+  const csv = rowsToCsv(rows);
   const url = URL.createObjectURL(new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8'}));
   const a = document.createElement('a'); a.href = url; a.download = `애플트랙_결과_${o.asOf}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

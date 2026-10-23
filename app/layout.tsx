@@ -1,6 +1,10 @@
 import TeamAuth from '@/components/team-auth';
 import type { Metadata } from "next";
 import "./globals.css";
+import "./refresh.css";
+import "./tracker-refresh.css";
+import "./lots-refresh.css";
+import "./ai-assistant.css";
 
 export const metadata: Metadata = {
   applicationName: "애플트랙",

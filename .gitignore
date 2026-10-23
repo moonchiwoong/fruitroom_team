@@ -44,3 +44,9 @@ next-env.d.ts
 /.codex/
 /outputs/
 /work/
+
+# Local validation artifacts
+*.tsbuildinfo
+/artifacts/
+
+/tests/browser/artifacts/

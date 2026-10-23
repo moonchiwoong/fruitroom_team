@@ -37,8 +37,8 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
     <LandingApple />
     <header className="landing-nav">
       <div className="landing-nav-inner">
-        <span className="brand2"><span className="brand-mark2"><Apple size={20} /></span><span className="brand-text">애플트랙<small>by FarmBridge</small></span></span>
-        <nav>
+        <button className="brand2" onClick={() => window.scrollTo({top:0,behavior:"smooth"})} aria-label="애플트랙 홈"><span className="brand-mark2"><Apple size={20} /></span><span className="brand-text">애플트랙<small>by FarmBridge</small></span></button>
+        <nav aria-label="주요 메뉴" className="landing-main-menu"><button className="landing-link" aria-current="page" onClick={() => window.scrollTo({top:0,behavior:"smooth"})}>홈</button><button className="landing-link" onClick={() => start('real')}>품질 예측</button><button className="landing-link" onClick={() => { history.replaceState(null,'','#lots'); goJoin('login'); }}>물량 관리</button></nav><nav aria-label="계정 메뉴">
           <button className="landing-link" onClick={() => goJoin('login')}>로그인</button>
           <button className="btn btn-primary" onClick={() => start('real')}>시작하기</button>
         </nav>

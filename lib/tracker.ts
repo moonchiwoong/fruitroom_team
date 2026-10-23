@@ -2,15 +2,16 @@
 // 저장 중 변화식은 data/storage-quality-model.xlsx(lib/initial-quality.ts의 storageValue)를 그대로 씁니다.
 // 수식·계수를 임의로 보정하지 않으며, 검증 자료가 확인되지 않아 모든 계산은 "시연용 계산"으로 표시합니다.
 import {storageValue, type StorageId} from './initial-quality';
+import {allowModelMetric, isCalendarDate, trackedLoss} from './quality-policy';
 
 // ─────────────────────────────── 날짜 ───────────────────────────────
 // 날짜는 'YYYY-MM-DD' 문자열로만 다룹니다. UTC 자정 기준으로 계산해 시간대·서머타임 때문에 하루가 어긋나지 않습니다.
 const DAY = 86400000;
-export function isDate(s: unknown): s is string { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && new Date(s + 'T00:00:00Z').toISOString().slice(0, 10) === s; }
-export function dayIndex(s: string) { const [y, m, d] = s.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / DAY); }
+export function isDate(s: unknown): s is string { return isCalendarDate(s); }
+export function dayIndex(s: string) { return isDate(s) ? Date.parse(s + 'T00:00:00Z') / DAY : NaN; }
 /** b − a (일). 저장 시작일 9/1, 선택 날짜 9/11 → 10 */
 export function daysBetween(a: string, b: string) { return dayIndex(b) - dayIndex(a); }
-export function addDays(s: string, n: number) { return new Date((dayIndex(s) + n) * DAY).toISOString().slice(0, 10); }
+export function addDays(s: string, n: number) { const ms = (dayIndex(s) + n) * DAY; return Number.isFinite(ms) ? new Date(ms).toISOString().slice(0, 10) : ''; }
 export function todayKST() { return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10); }
 export function fmtDate(s: string) { const [y, m, d] = s.split('-'); return `${y}.${m}.${d}`; }
 
@@ -73,6 +74,9 @@ export type Series = {ok: true; startDay: number; endDay: number; points: Series
 export function computeSeries(o: {metric: MetricId; anchor: Anchor | null; recorded: StorageId | null; recordedReason?: string; future: StorageId | null; futureReason?: string; asOfDay: number; horizon?: number}): Series {
   const {metric, anchor} = o, horizon = o.horizon ?? MODEL_RANGE.displayDays;
   if (!anchor) return {ok: false, reason: `초기 ${metricMeta[metric].label}${metric === 'loss' ? ' 계산에 필요한 추적 표본 초기 중량' : ''}이 없습니다.`};
+  const policy = allowModelMetric(metric, anchor.kind); if (!policy.ok) return policy;
+  if (!Number.isFinite(anchor.value) || anchor.value < 0 || !Number.isInteger(anchor.day) || !Number.isInteger(o.asOfDay) || !Number.isInteger(horizon) || horizon < 0 || horizon > MODEL_RANGE.displayDays) return {ok: false, reason: '계산 입력값·날짜·표시 범위를 확인해 주세요.'};
+  if (MODEL_RANGE.validatedDays !== null && horizon > MODEL_RANGE.validatedDays) return {ok: false, reason: '확인된 모델 적용 기간 밖의 수치는 제공하지 않습니다.'};
   if (anchor.day < 0) return {ok: false, reason: '측정일이 저장 시작일보다 빠릅니다. 날짜를 확인해 주세요.'};
   if (anchor.day > horizon) return {ok: false, reason: `계산 시작점(저장 ${anchor.day}일차)이 표시 범위(0~${horizon}일) 밖입니다.`};
   if (!o.future) return {ok: false, reason: o.futureReason || '선택한 저장 조건에 맞는 모델이 없습니다.'};
@@ -88,22 +92,25 @@ export function computeSeries(o: {metric: MetricId; anchor: Anchor | null; recor
 export type ValueAt = {status: 'ok'; value: number; segment: 'past' | 'future'} | {status: 'before' | 'out' | 'unavailable'; reason: string};
 export function valueAt(s: Series, day: number): ValueAt {
   if (!s.ok) return {status: 'unavailable', reason: s.reason};
+  if (!Number.isInteger(day)) return {status: 'unavailable', reason: '유효한 날짜를 선택해 주세요.'};
   if (day < s.startDay) return {status: 'before', reason: `선택한 날짜는 계산 시작점(저장 ${s.startDay}일차) 이전이라 계산값이 없습니다.`};
   if (day > s.endDay) return {status: 'out', reason: `선택한 날짜(저장 ${day}일차)는 표시 범위(0~${s.endDay}일) 밖입니다.`};
   const p = s.points[day - s.startDay];
-  return {status: 'ok', value: p.value, segment: p.segment};
+  return p && Number.isFinite(p.value) ? {status: 'ok', value: p.value, segment: p.segment} : {status: 'unavailable', reason: '해당 날짜의 유효한 계산값이 없습니다.'};
 }
 
 // ─────────────────────────────── 실측 기록 ───────────────────────────────
 export type MeasuredPoint = {date: string; day: number; value: number; sampleCount: number | null; kind: DataKind; id: string};
-type ObsLike = {id: string; date: string; firmness: number | null; brix: number | null; acidity?: number | null; tracked_weight?: number | null; sample_count: number};
+type ObsLike = {id: string; date: string; firmness: number | null; brix: number | null; acidity?: number | null; tracked_weight?: number | null; sample_count: number; details?: {tracked?: {sample_id?: string | null}} | null};
 /** 지표별 측정점. 감모율은 같은 추적 표본의 초기·후속 중량이 모두 있을 때만 계산합니다. */
-export function measuredPoints(m: MetricId, observations: ObsLike[], startDate: string, kind: DataKind, trackedInitial: number | null): MeasuredPoint[] {
+export function measuredPoints(m: MetricId, observations: ObsLike[], startDate: string, kind: DataKind, trackedInitial: number | null, initialEvidence?: {sampleId?: string | null; date?: string | null}): MeasuredPoint[] {
+  if (!isDate(startDate)) return [];
   return observations.flatMap(o => {
+    if (!isDate(o.date) || o.date < startDate) return [];
     let v: number | null | undefined;
-    if (m === 'loss') v = trackedInitial && o.tracked_weight ? (trackedInitial - o.tracked_weight) / trackedInitial * 100 : null;
+    if (m === 'loss') { const loss = trackedLoss({sampleId: initialEvidence?.sampleId, date: initialEvidence?.date, weight: trackedInitial}, {sampleId: o.details?.tracked?.sample_id, date: o.date, weight: o.tracked_weight}); v = loss.ok ? loss.value : null; }
     else v = o[m] as number | null | undefined;
-    return v === null || v === undefined ? [] : [{date: o.date, day: daysBetween(startDate, o.date), value: v, sampleCount: o.sample_count, kind, id: o.id}];
+    return v === null || v === undefined || !Number.isFinite(v) ? [] : [{date: o.date, day: daysBetween(startDate, o.date), value: v, sampleCount: o.sample_count, kind, id: o.id}];
   }).sort((a, b) => a.day - b.day);
 }
 

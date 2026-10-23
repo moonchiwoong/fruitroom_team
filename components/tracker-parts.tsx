@@ -1,7 +1,8 @@
 'use client';
 import {useEffect, useId, useMemo, useRef, useState} from 'react';
 import {ArrowLeftRight, X} from 'lucide-react';
-import {addDays, fmtDate, fmtNum, kgfToN, metricMeta, MODEL_RANGE, N_PER_KGF, nToKgf, probeAreaCm2, roundTo, type DataKind, type MeasuredPoint, type MetricId, type Series} from '@/lib/tracker';
+import {addDays, fmtDate, fmtNum, kgfToN, metricMeta, MODEL_RANGE, N_PER_KGF, nToKgf, roundTo, type DataKind, type MeasuredPoint, type MetricId, type Series} from '@/lib/tracker';
+import {pressureConversion, parseOptionalNumber} from '@/lib/quality-policy';
 
 /** 데이터 종류 표시. 색만이 아니라 글자와 테두리 모양으로도 구분합니다. */
 export function KindBadge({kind, verified}: {kind: DataKind | '시연용 계산'; verified?: boolean}) {
@@ -20,7 +21,8 @@ export function HardnessConvert({valueN, probeMm, label = '단위 변환'}: {val
     document.addEventListener('mousedown', close); document.addEventListener('keydown', close);
     return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close); };
   }, [open]);
-  const nv = Number(n), area = probeMm ? probeAreaCm2(probeMm) : null;
+  const parsed = parseOptionalNumber(n), nv = parsed.status === 'valid' ? parsed.value : null;
+  const pressure = pressureConversion(nv, {diameterMm: probeMm});
   return <span className="conv" ref={box}>
     <button type="button" className="conv-btn" aria-expanded={open} aria-controls={id} onClick={() => setOpen(o => !o)}><ArrowLeftRight size={13} />{label}</button>
     {open && <div className="conv-pop" id={id} role="dialog" aria-label="경도 단위 변환">
@@ -30,13 +32,11 @@ export function HardnessConvert({valueN, probeMm, label = '단위 변환'}: {val
         <span aria-hidden="true">≈</span>
         <label>kgf<input type="number" inputMode="decimal" value={k} onChange={e => { setK(e.target.value); const v = Number(e.target.value); setN(e.target.value === '' || !Number.isFinite(v) ? '' : String(roundTo(kgfToN(v), 2))); }} /></label>
       </div>
-      {n !== '' && Number.isFinite(nv) && <p className="conv-result">{fmtNum(nv, 1)} N ≈ {fmtNum(nToKgf(nv), 2)} kgf</p>}
+      {nv !== null && <p className="conv-result">{fmtNum(nv, 1)} N ≈ {fmtNum(nToKgf(nv), 2)} kgf</p>}
       <p className="conv-note">1 kgf = {N_PER_KGF} N 기준입니다. 저장되는 원래 측정값은 N이며, 변환값은 표시용입니다.</p>
       <div className="conv-area">
         <b>kgf/cm² (압력)</b>
-        {area && n !== '' && Number.isFinite(nv)
-          ? <><p>{fmtNum(nToKgf(nv) / area, 2)} kgf/cm²</p><p className="conv-note">가정: 원형 탐침 직경 {probeMm} mm → 접촉 면적 {fmtNum(area, 3)} cm², 측정한 최대 힘을 이 면적으로 나눈 평균 압력. 탐침이 끝까지 같은 면적으로 접촉했다는 가정이며, 측정법에서 이 환산이 타당한지는 기기 설명서로 확인하세요.</p></>
-          : <p className="conv-note">탐침 직경(측정 정보)이 없어 압력으로 바꾸지 않습니다. 힘(N)과 압력(kgf/cm²)은 다른 지표라 접촉 면적 없이 환산할 수 없습니다.</p>}
+        <p className="conv-note">{pressure.ok ? '환산 근거 표시 기능을 준비 중입니다.' : pressure.reason} 힘(N), 강성(N/mm), 압력(N/mm²)은 서로 다른 지표입니다.</p>
       </div>
     </div>}
   </span>;
