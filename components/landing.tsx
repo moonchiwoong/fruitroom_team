@@ -1,5 +1,5 @@
 'use client';
-import {useEffect, useMemo, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 import {Apple, ArrowRight, Loader2, MailCheck} from 'lucide-react';
 import {authMessage, supabaseBrowser} from '@/lib/supabase-browser';
 import {regions, type RegionId} from '@/lib/initial-quality';
@@ -8,10 +8,49 @@ import {HANDOFF_KEY} from '@/lib/tracker-form';
 
 type Mode = 'signup' | 'login' | 'reset' | 'recovery';
 
+/** 움직임 줄이기를 켠 사용자에게는 애니메이션 없이 바로 보여 줍니다. */
+const motionOK = () => typeof window !== 'undefined' && !!window.matchMedia && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** 화면에 들어오면 한 번만 true가 됩니다. */
+function useInView<T extends Element>(enabled: boolean) {
+  const ref = useRef<T>(null), [seen, setSeen] = useState(!enabled);
+  useEffect(() => {
+    if (seen || !ref.current) return;
+    if (!('IntersectionObserver' in window)) { setSeen(true); return; }
+    const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { setSeen(true); io.disconnect(); } }, {threshold: 0.25});
+    io.observe(ref.current); return () => io.disconnect();
+  }, [seen]);
+  return [ref, seen] as const;
+}
+
+/** 0에서 목표값까지 부드럽게 올라가는 숫자 */
+function CountUp({to, digits, play, animate}: {to: number; digits: number; play: boolean; animate: boolean}) {
+  const [v, setV] = useState(animate ? 0 : to);
+  useEffect(() => {
+    if (!animate) { setV(to); return; }
+    if (!play) return;
+    let raf = 0; const t0 = performance.now(), dur = 1100;
+    const tick = (t: number) => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); setV(to * e); if (k < 1) raf = requestAnimationFrame(tick); };
+    raf = requestAnimationFrame(tick); return () => cancelAnimationFrame(raf);
+  }, [to, play, animate]);
+  return <>{fmtNum(v, digits)}</>;
+}
+
 /** 로그인 전 첫 화면. 체험은 /try 에서 로그인 없이 바로 시작합니다. */
 export default function Landing({recovery = false, onRecovered}: {recovery?: boolean; onRecovered?: () => void}) {
   const [mode, setMode] = useState<Mode>(recovery ? 'recovery' : 'signup');
   const [handoff, setHandoff] = useState(false);
+  const [motion] = useState(motionOK);
+  const rootRef = useRef<HTMLDivElement>(null);
+  // 스크롤해서 화면에 들어온 요소(data-reveal)를 차례로 떠오르게 합니다.
+  useEffect(() => {
+    const root = rootRef.current; if (!root) return;
+    const items = Array.from(root.querySelectorAll<HTMLElement>('[data-reveal]'));
+    if (!motion || !('IntersectionObserver' in window)) { items.forEach(el => el.classList.add('is-in')); return; }
+    const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('is-in'); io.unobserve(e.target); } }), {threshold: 0.15, rootMargin: '0px 0px -8% 0px'});
+    items.forEach(el => io.observe(el));
+    return () => io.disconnect();
+  }, [motion]);
   useEffect(() => {
     if (recovery) { setMode('recovery'); goJoin(); return; }
     // 체험 화면의 ‘로그인’·‘로그인하고 저장하기’로 들어온 경우 가입·로그인 영역을 바로 보여 줍니다.
@@ -22,7 +61,8 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
   }, [recovery]);
   function goJoin(m?: Mode) { if (m) setMode(m); document.getElementById('join')?.scrollIntoView({block: 'start'}); }
 
-  return <div className="landing landing-v2">
+  const d = (i: number) => ({'data-reveal': '', style: {'--d': `${i * 90}ms`} as React.CSSProperties});
+  return <div ref={rootRef} className={'landing landing-v2' + (motion ? ' lv-motion' : '')}>
     <header className="landing-nav">
       <div className="landing-nav-inner">
         <a className="brand2" href="/" aria-label="애플트랙 첫 화면"><span className="brand-mark2"><Apple size={20} /></span><span className="brand-text">애플트랙<small>by FarmBridge</small></span></a>
@@ -37,30 +77,30 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
     <main>
       <section className="lv-hero" aria-labelledby="lv-title">
         <div className="lv-hero-copy">
-          <p className="lv-kicker">사과 품질 예측·저장 관리</p>
-          <h1 id="lv-title">초기 품질부터<br />저장 중 변화까지</h1>
-          <p className="lv-lead">초기 품질을 입력하고, 저장 기간에 따른 변화를 예측해 실제 측정값과 비교하세요.</p>
-          <div className="lv-actions">
+          <p className="lv-kicker" {...d(0)}>사과 품질 예측·저장 관리</p>
+          <h1 id="lv-title"><span className="lv-line" {...d(1)}>초기 품질부터</span><span className="lv-line" {...d(2)}>저장 중 변화까지</span></h1>
+          <p className="lv-lead" {...d(3)}>초기 품질을 입력하고, 저장 기간에 따른 변화를 예측해 실제 측정값과 비교하세요.</p>
+          <div className="lv-actions" {...d(4)}>
             <a className="btn btn-primary btn-lg" href="/try">예시로 체험하기<ArrowRight size={18} /></a>
             <a className="btn btn-soft btn-lg" href="/try?mode=real">내 측정값 입력하기</a>
           </div>
-          <p className="lv-note">가입하지 않아도 바로 볼 수 있어요. 기록으로 저장할 때만 로그인합니다.</p>
+          <p className="lv-note" {...d(5)}>가입하지 않아도 바로 볼 수 있어요. 기록으로 저장할 때만 로그인합니다.</p>
         </div>
-        <ServicePreview />
+        <div className="lv-preview-wrap" {...d(4)}><ServicePreview animate={motion} /></div>
       </section>
 
       <section className="lv-section" aria-labelledby="lv-how">
-        <h2 id="lv-how">세 단계면 충분해요</h2>
+        <h2 id="lv-how" {...d(0)}>세 단계면 충분해요</h2>
         <ol className="lv-steps">
-          <li><span>1</span><div><b>초기 품질 입력</b><p>측정일, 표본 수와 경도(N)·당도(°Brix)·산도(%)를 넣어요. 한 항목만 있어도 됩니다.</p></div></li>
-          <li><span>2</span><div><b>저장 조건 선택</b><p>저장 시작일을 0일로 두고, 저온·1-MCP·CA 등 저장 조건을 고릅니다.</p></div></li>
-          <li><span>3</span><div><b>변화 확인</b><p>날짜를 고르면 변화를 한 문장으로 요약하고, 후속 측정값과 그래프로 비교해요.</p></div></li>
+          <li {...d(1)}><span>1</span><div><b>초기 품질 입력</b><p>측정일, 표본 수와 경도(N)·당도(°Brix)·산도(%)를 넣어요. 한 항목만 있어도 됩니다.</p></div></li>
+          <li {...d(2)}><span>2</span><div><b>저장 조건 선택</b><p>저장 시작일을 0일로 두고, 저온·1-MCP·CA 등 저장 조건을 고릅니다.</p></div></li>
+          <li {...d(3)}><span>3</span><div><b>변화 확인</b><p>날짜를 고르면 변화를 한 문장으로 요약하고, 후속 측정값과 그래프로 비교해요.</p></div></li>
         </ol>
       </section>
 
       <section className="lv-section lv-split" aria-labelledby="lv-kinds">
-        <div className="lv-apple"><img src="/assets/apple-still.webp" alt="" width={210} height={210} loading="lazy" /></div>
-        <div>
+        <div className="lv-apple" {...d(0)}><img src="/assets/apple-still.webp" alt="" width={210} height={210} loading="lazy" /></div>
+        <div {...d(1)}>
           <h2 id="lv-kinds">값이 어디서 왔는지 항상 보여 줍니다</h2>
           <p className="lv-body">측정한 값과 계산한 값, 예시 값을 섞지 않아요. 측정하지 않은 항목은 0으로 바꾸지 않고 ‘미측정’으로 남깁니다.</p>
           <ul className="lv-kinds">
@@ -73,11 +113,11 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
       </section>
 
       <section id="join" className="lv-join" aria-labelledby="lv-join-title">
-        <div className="lv-join-copy">
+        <div className="lv-join-copy" {...d(0)}>
           <h2 id="lv-join-title">{mode === 'login' ? '다시 오셨네요' : '내 기록을 저장하려면'}</h2>
           <p>{handoff ? '로그인하면 체험 화면에서 입력하던 내용으로 돌아가 이어서 저장할 수 있어요.' : '가입하면 물량별 측정 기록, 온습도 이력, 사진을 내 계정에 저장합니다. 내 기록은 나만 볼 수 있어요.'}</p>
         </div>
-        <AuthCard mode={mode} setMode={setMode} onRecovered={onRecovered} />
+        <div className="lv-join-card" {...d(1)}><AuthCard mode={mode} setMode={setMode} onRecovered={onRecovered} /></div>
       </section>
     </main>
 
@@ -89,7 +129,8 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
 }
 
 /** 첫 화면의 서비스 미리보기: 실제 계산 엔진으로 만든 예시 결과. 예시·시연용임을 함께 표시합니다. */
-function ServicePreview() {
+function ServicePreview({animate}: {animate: boolean}) {
+  const [ref, play] = useInView<HTMLElement>(animate);
   const data = useMemo(() => {
     const today = todayKST(), start = addDays(today, -28), asOfDay = 28, day = 60;
     const init: Record<Exclude<MetricId, 'loss'>, number> = {firmness: 72, brix: 14.2, acidity: 0.38};
@@ -104,17 +145,20 @@ function ServicePreview() {
   const x = (d: number) => L + d / 300 * (W - L - R), y = (v: number) => T + (hi - v) / (hi - lo) * (H - T - B);
   const path = (seg: 'past' | 'future') => { const ff = pts.findIndex(p => p.segment === 'future'); const list = seg === 'past' ? pts.filter(p => p.segment === 'past') : pts.slice(Math.max(0, ff - 1)); return list.map((p, i) => `${i ? 'L' : 'M'}${x(p.day).toFixed(1)},${y(p.value).toFixed(1)}`).join(''); };
   const units = {firmness: 'N', brix: '°Brix', acidity: '%'} as const, digits = {firmness: 1, brix: 1, acidity: 3} as const, labels = {firmness: '경도', brix: '당도', acidity: '산도'} as const;
-  return <aside className="lv-preview" aria-label="서비스 미리보기 (예시 데이터)">
+  return <aside ref={ref} className={'lv-preview' + (animate ? ' lv-anim' : '') + (play ? ' is-play' : '')} aria-label="서비스 미리보기 (예시 데이터)">
     <div className="lv-preview-head"><span className="kind k-example">예시 데이터</span><span>후지 · 저온저장 · 저장 시작 {fmtDate(data.start)}</span></div>
     <p className="lv-preview-day">저장 {data.day}일차 · {fmtDate(addDays(data.start, data.day))}</p>
-    <dl className="lv-preview-values">{(['firmness', 'brix', 'acidity'] as const).map(m => { const v = data.values[m]; return <div key={m}><dt>{labels[m]}</dt><dd>{v.status === 'ok' ? fmtNum(v.value, digits[m]) : '—'}<small>{units[m]}</small></dd></div>; })}</dl>
+    <dl className="lv-preview-values">{(['firmness', 'brix', 'acidity'] as const).map(m => { const v = data.values[m]; return <div key={m}><dt>{labels[m]}</dt><dd>{v.status === 'ok' ? <CountUp to={v.value} digits={digits[m]} play={play} animate={animate} /> : '—'}<small>{units[m]}</small></dd></div>; })}</dl>
     <p className="lv-preview-sentence">{data.sentence}</p>
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="예시 경도 변화 그래프. 실선은 분석 기준일까지, 점선은 이후 가정 구간">
       {[0, 100, 200, 300].map(t => <g key={t}><line x1={x(t)} x2={x(t)} y1={T} y2={H - B} stroke="#eef0f2" /><text x={x(t)} y={H - 6} textAnchor="middle" fontSize="12" fill="#6b7684">{t}일</text></g>)}
       <line x1={x(data.asOfDay)} x2={x(data.asOfDay)} y1={T} y2={H - B} stroke="#4e5968" strokeDasharray="3 3" />
-      <path d={path('past')} fill="none" stroke="#1d5c3c" strokeWidth="2.6" />
-      <path d={path('future')} fill="none" stroke="#1d5c3c" strokeWidth="2.4" strokeDasharray="7 5" />
-      <circle cx={x(data.day)} cy={data.values.firmness.status === 'ok' ? y(data.values.firmness.value) : 0} r="5" fill="#fff" stroke="#1d5c3c" strokeWidth="2.4" />
+ <defs><clipPath id="lv-draw"><rect className="lv-draw-rect" x={L - 4} y={0} width={W - L - R + 8} height={H} /></clipPath></defs>
+      <g clipPath="url(#lv-draw)">
+        <path d={path('past')} fill="none" stroke="#1d5c3c" strokeWidth="2.6" />
+        <path d={path('future')} fill="none" stroke="#1d5c3c" strokeWidth="2.4" strokeDasharray="7 5" />
+      </g>
+      <circle className="lv-dot" cx={x(data.day)} cy={data.values.firmness.status === 'ok' ? y(data.values.firmness.value) : 0} r="5" fill="#fff" stroke="#1d5c3c" strokeWidth="2.4" />
     </svg>
     <p className="lv-preview-foot"><span className="kind k-model">시연용 계산</span>검증 미확인 · 오차 범위 미검증 · 출하·안전 판정이 아닙니다</p>
   </aside>;
