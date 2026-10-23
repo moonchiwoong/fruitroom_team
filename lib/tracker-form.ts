@@ -145,3 +145,7 @@ export function saveDraft(user: string, mode: string, lot: string, d: Draft): bo
 export function clearDraft(user: string, mode: string, lot: string) { try { window.localStorage.removeItem(draftKey(user, mode, lot)); } catch { /* 저장소를 쓸 수 없는 환경 */ } }
 export function loadPref<T>(user: string, key: string, fallback: T): T { try { const v = window.localStorage.getItem(`appletrack:pref:${user}:${key}`); return v ? JSON.parse(v) as T : fallback; } catch { return fallback; } }
 export function savePref(user: string, key: string, v: unknown) { try { window.localStorage.setItem(`appletrack:pref:${user}:${key}`, JSON.stringify(v)); } catch { /* 무시 */ } }
+
+/** 비회원이 입력하던 내용을 로그인 후 그대로 이어 가기 위한 인계 정보(이 브라우저의 sessionStorage에만 보관). */
+export type TrackerHandoff = {cultivar: 'fuji' | 'hongro'; draftKey: string; draft: Draft};
+export const HANDOFF_KEY = 'appletrack:handoff';

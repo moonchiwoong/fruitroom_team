@@ -12,7 +12,7 @@ import {
   modelLabel, resolveModel, STORAGE_MODEL_VERIFIED, summarySentence, todayKST, valueAt,
   type Anchor, type DataKind, type MeasuredPoint, type MetricId, type Series, type ValueAt,
 } from '@/lib/tracker';
-import {clearDraft, emptyForm, exampleForm, formFromLot, loadDraft, loadPref, payloadFromForm, saveDraft, savePref, signature, validateForm, type Draft, type TrackerForm} from '@/lib/tracker-form';
+import {HANDOFF_KEY, type TrackerHandoff, clearDraft, emptyForm, exampleForm, formFromLot, loadDraft, loadPref, payloadFromForm, saveDraft, savePref, signature, validateForm, type Draft, type TrackerForm} from '@/lib/tracker-form';
 import type {StorageId} from '@/lib/initial-quality';
 import {measurementCompatibility, observationFingerprint} from '@/lib/ai/context';
 import {isHongroVariety} from '@/lib/cultivar';
@@ -27,17 +27,20 @@ type Loaded = {scope: string; lot: Lot | null; observations: Observation[]; stat
 type Baseline = {kind: 'current' | 'fixed'; label: string; conditionLabel: string; sig: string; series: Record<MetricId, Series>; createdAt: string; asOf: string; modelVersion: string; future: StorageId | null; form: TrackerForm; useLatest: boolean; observationsFingerprint: string};
 const num = (v: string) => v.trim() === '' || !Number.isFinite(Number(v)) ? null : Number(v);
 
-export type TrackerRequest = {mode: Mode; lotId?: string; n: number};
+export type TrackerRequest = {mode: Mode; lotId?: string; cultivar?: 'fuji' | 'hongro'; n: number};
+
 export type TrackerAIContext = {mode: Mode; scope: 'prediction'; lotId: string | null; metric: MetricId; selectedDate: string; asOf: string; form: TrackerForm; future: StorageId | 'same'; useLatest: boolean; modelVersion: string; baseline: {label: string; conditionLabel: string; createdAt: string; asOf: string; modelVersion: string; future: StorageId | null; form: TrackerForm; useLatest: boolean; observationsFingerprint: string} | null};
-export default function QualityTracker({lots, onLotsChanged, request, openModelInfo, openLot, onAskAI}: {
+export default function QualityTracker({lots, onLotsChanged, request, openModelInfo, openLot, onAskAI, guest = false, onRequireLogin, onModeChange}: {
   lots: Lot[]; onLotsChanged: () => Promise<Lot[]> | void; request?: TrackerRequest | null; openModelInfo: (context?: {modelId: StorageId | null; metric: MetricId}) => void; openLot: (id: string) => void; onAskAI?: (context: TrackerAIContext) => void;
+  /** 비회원 체험: 서버 기록을 읽거나 쓰지 않고, 저장할 때 로그인으로 안내합니다. */
+  guest?: boolean; onRequireLogin?: () => void; onModeChange?: (mode: Mode) => void;
 }) {
   const session = useTeamSession(); const user = session?.userId ?? 'anon';
   const today = todayKST();
   const [mode, setMode] = useState<Mode>(() => request?.mode ?? loadPref<Mode>(user, 'mode', 'real'));
   const [lotKey, setLotKey] = useState<string>(() => request?.lotId ?? loadPref<string>(user, 'lot', 'new'));
   // 다른 화면에서 ‘실측값 입력’·‘예시로 체험’·‘품질 변화 보기’로 들어온 경우
-  useEffect(() => { if (!request) return; setMode(request.mode); if (request.lotId !== undefined) setLotKey(request.lotId); setBaseline(null); setSelectedDay(null); }, [request?.n]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!request) return; setMode(request.mode); if (request.lotId !== undefined) setLotKey(request.lotId); if (request.cultivar) setCultivar(request.cultivar); setBaseline(null); setSelectedDay(null); }, [request?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { savePref(user, 'mode', mode); }, [user, mode]);
   useEffect(() => { savePref(user, 'lot', lotKey); }, [user, lotKey]);
   const key = mode === 'example' ? 'example' : lotKey;
@@ -112,9 +115,17 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     });
   }, [officialSig, user, mode, draftKey]);
   const set = <K extends keyof TrackerForm>(k: K, v: TrackerForm[K]) => setForm(f => ({...f, [k]: v}));
+  /** 체크하면 입고일과 연결, 해제하면 현재 날짜에서 바로 고칠 수 있게 입고일을 출발값으로 둡니다(오늘 날짜를 임의로 넣지 않음). */
+  const toggleSameStart = (checked: boolean) => setForm(f => ({...f, sameStart: checked, storage_start_date: !checked && !f.storage_start_date ? f.intake_date : f.storage_start_date}));
   const setSub = <K extends 'measure' | 'mcpd' | 'ca' | 'tracked'>(k: K, sub: string, v: string) => setForm(f => ({...f, [k]: {...f[k], [sub]: v}}));
   const dirty = signature(form) !== officialSig;
   const errors = validateForm(form, false);
+  // 접힌 영역 안에 오류가 생기면 그 영역을 열어 문제 위치가 보이게 합니다.
+  const measureRef = useRef<HTMLDetailsElement>(null), optionalRef = useRef<HTMLDetailsElement>(null);
+  const measureErr = !!(errors.probe_mm || errors.fruit_temp);
+  const optionalErr = !!(errors.acidity || errors.weight || errors.tracked_weight || errors.tracked_count || errors.tracked_sample_id);
+  useEffect(() => { if (measureErr && measureRef.current) measureRef.current.open = true; }, [measureErr]);
+  useEffect(() => { if (optionalErr && optionalRef.current) optionalRef.current.open = true; }, [optionalErr]);
   function discardDraft() { clearDraft(user, mode, draftKey); setFormState(official); setDraftNote({tone: 'info', text: '초안을 지웠습니다. 저장된 기록은 그대로입니다.'}); }
 
   function switchCultivar(value: string) {
@@ -224,6 +235,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const [saving, setSaving] = useState(false), [saveMsg, setSaveMsg] = useState<{ok: boolean; text: string} | null>(null), [saveErrors, setSaveErrors] = useState<Partial<Record<string, string>>>({});
   async function saveRecord() {
     if (mode === 'example') { setSaveMsg({ok: false, text: '예시 데이터는 실제 물량 기록으로 저장할 수 없습니다.'}); return; }
+    if (guest || !session) { handoffToLogin(); return; }
     if (!formReady || loadError) { setSaveMsg({ok: false, text: '물량 정보를 정상적으로 불러온 뒤 저장해 주세요.'}); return; }
     const e = validateForm(form, true); setSaveErrors(e); setSaveMsg(null);
     if (Object.keys(e).length) { setSaveMsg({ok: false, text: '표시한 항목을 확인해 주세요.'}); focus('tf-' + Object.keys(e)[0].replaceAll('.', '-')); return; }
@@ -244,6 +256,17 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     } catch (err) { setSaveMsg({ok: false, text: (err as Error).message}); }
     finally { setSaving(false); }
   }
+
+  /** 로그인 후 같은 입력으로 돌아오도록 현재 입력을 넘기고 로그인 화면으로 이동합니다. 예시 모드 값은 넘기지 않습니다. */
+  function handoffToLogin() {
+    if (mode !== 'real') return;
+    try {
+      const handoff: TrackerHandoff = {cultivar, draftKey, draft: {form, baseSig: officialSig, savedAt: new Date().toISOString()}};
+      sessionStorage.setItem(HANDOFF_KEY, JSON.stringify(handoff)); sessionStorage.setItem('appletrack:intent', 'real');
+    } catch { setSaveMsg({ok: false, text: '이 브라우저에서 입력 내용을 넘길 수 없습니다. 입력은 화면에 그대로 있으니, 로그인 후 다시 입력해 주세요.'}); return; }
+    onRequireLogin?.();
+  }
+  const changeMode = (m: Mode) => { if (onModeChange) onModeChange(m); else setMode(m); };
 
   // ── 측정값과 비교 ──
   const [showObsCompare, setShowObsCompare] = useState(false);
@@ -291,12 +314,13 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     {/* 상단: 물량 · 품종 · 분석 기준일 · 모드 */}
     <section className="qt-top" aria-label="물량과 입력 모드">
       <div className="qt-mode seg" role="tablist" aria-label="입력 모드">
-        <button role="tab" aria-selected={!exampleMode} className={!exampleMode ? 'active' : ''} onClick={() => setMode('real')}>실측값 사용</button>
-        <button role="tab" aria-selected={exampleMode} className={exampleMode ? 'active' : ''} onClick={() => setMode('example')}>예시로 체험</button>
+        <button role="tab" aria-selected={exampleMode} className={exampleMode ? 'active' : ''} onClick={() => changeMode('example')}>예시로 체험</button>
+        <button role="tab" aria-selected={!exampleMode} className={!exampleMode ? 'active' : ''} onClick={() => changeMode('real')}>내 측정값 입력</button>
       </div>
       <div className="qt-field qt-lot-field">
         <div className="qt-lot-field-head"><label htmlFor="qt-lot-select">물량</label>{!exampleMode && activeLot && <button className="linkbtn qt-open" onClick={() => openLot(activeLot!.id)}>물량 상세</button>}</div>
         {exampleMode ? <span className="qt-static">예시 물량 · {hongro ? '홍로' : '후지'} <KindBadge kind="예시" /></span>
+          : guest ? <span className="qt-static">새 입력 · 아직 저장 안 함</span>
           : <select id="qt-lot-select" value={lotKey} onChange={e => { setLotKey(e.target.value); setBaseline(null); setSelectedDay(null); }}>
             <option value="new">새 입력 (아직 저장 안 함)</option>
             {lots.map(l => <option key={l.id} value={l.id}>{l.name}{l.team_shared ? ' · 팀 공유' : ''}</option>)}
@@ -307,7 +331,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         <input id="qt-analysis-asof" type="date" value={asOf} min={startOk ? startDate : undefined} max={today} onChange={e => { if (e.target.value) setAsOf(e.target.value); }} />
       </label>
     </section>
-    {exampleMode && <div className="qt-banner ex"><FlaskConical size={16} /><span><b>예시로 체험 중</b> — 가상 초기값·측정점입니다. 실제 기록으로 저장되지 않습니다.</span></div>}
+    {exampleMode && <div className="qt-banner ex" role="note"><FlaskConical size={16} /><span><b>예시 데이터 · 실제 측정 기록이 아닙니다</b></span></div>}
     {loadError && <div className="qt-banner warn" role="alert"><AlertTriangle size={16} /><span>{loadError}</span><button className="btn btn-ghost" onClick={() => { void onLotsChanged(); setReload(r => r + 1); }}>다시 불러오기</button></div>}
 
     {initialMeasuredAfterAsOf && <div className="qt-banner warn" role="alert"><AlertTriangle size={16} /><span>{initialDateReason}</span></div>}
@@ -352,9 +376,15 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
             <F id="intake_date" label="입고일" err={saveErrors.intake_date || errors.intake_date}><input id="tf-intake_date" type="date" max={today} value={form.intake_date} onChange={e => set('intake_date', e.target.value)} /></F>
           </div>
           <div className="qt-fields">
-            <F id="storage_start_date" label="저장 시작일" hint="이 날을 저장 0일차로 계산합니다." err={errors.storage_start_date}>
-              <label className="qt-check"><input type="checkbox" checked={form.sameStart} onChange={e => set('sameStart', e.target.checked)} />입고일과 같음</label>
-              {!form.sameStart && <input id="tf-storage_start_date" type="date" max={today} value={form.storage_start_date} onChange={e => set('storage_start_date', e.target.value)} />}
+            <F id="storage_start_date" label="저장 시작일" err={errors.storage_start_date}>
+              <div className="qt-datepair">
+                <input id="tf-storage_start_date" type="date" max={today} value={form.sameStart ? form.intake_date : form.storage_start_date} disabled={form.sameStart} aria-describedby="tf-start-link"
+                  onChange={e => set('storage_start_date', e.target.value)} />
+                <label className="qt-check qt-check-inline" htmlFor="tf-sameStart"><input id="tf-sameStart" type="checkbox" checked={form.sameStart} onChange={e => toggleSameStart(e.target.checked)} /><span>입고일과 같음</span></label>
+              </div>
+              <p id="tf-start-link" className={'qt-link-note' + (form.sameStart && !form.intake_date ? ' warn' : '')}>{form.sameStart
+                ? form.intake_date ? <>입고일과 연결됨 · 입고일을 바꾸면 함께 바뀝니다. 이 날이 저장 0일차입니다.</> : <>입고일을 먼저 입력해 주세요. 입력하면 저장 시작일도 같은 날짜가 됩니다.</>
+                : <>직접 입력한 날짜를 저장 0일차로 계산합니다.</>}</p>
             </F>
           </div>
           {hongro ? <HongroInputs form={form} setForm={setForm} errors={errors} /> : <>
@@ -368,8 +398,8 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
             <F id="brix" label="초기 당도" unit="°Brix" err={errors.brix}><input id="tf-brix" type="number" inputMode="decimal" step="0.1" value={form.brix} onChange={e => set('brix', e.target.value)} placeholder="미측정" /></F>
           </div>
           <p className="qt-help">경도는 최대 힘(N)으로 기록합니다. {metricMeta.firmness.note}</p>
-          <details className="qt-sub">
-            <summary>경도 측정 정보 (탐침 직경·껍질·위치·과실 온도)</summary>
+          <details className="qt-sub" ref={measureRef}>
+            <summary>경도 측정 정보 (탐침 직경·껍질·위치·과실 온도){measureErr && <span className="qt-sub-err">확인 필요</span>}</summary>
             <div className="qt-fields two">
               <F id="probe_mm" label="탐침 직경" unit="mm" err={errors.probe_mm}><input id="tf-probe_mm" type="number" inputMode="decimal" step="0.1" value={form.measure.probe_mm} onChange={e => setSub('measure', 'probe_mm', e.target.value)} placeholder="예: 11.1" /></F>
               <F id="peeled" label="껍질 제거 여부"><select id="tf-peeled" value={form.measure.peeled} onChange={e => setSub('measure', 'peeled', e.target.value)}><option value="">미기록</option><option>껍질 제거</option><option>껍질 포함</option></select></F>
@@ -379,8 +409,8 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
             </div>
             <p className="qt-help">같은 탐침·위치·온도에서 잰 값끼리 비교하세요. 탐침 직경만으로 압력을 환산하지 않습니다. 유효 접촉 면적과 해당 측정법의 환산 타당성이 모두 확인되어야 합니다.</p>
           </details>
-          <details className="qt-sub">
-            <summary>선택 입력 (산도·평균 중량·포장·저장고 위치·센서·추적 표본)</summary>
+          <details className="qt-sub" ref={optionalRef}>
+            <summary>선택 입력 (산도·평균 중량·포장·저장고 위치·센서·추적 표본){optionalErr && <span className="qt-sub-err">확인 필요</span>}</summary>
             <div className="qt-fields two">
               <F id="acidity" label="초기 산도" unit="%" err={errors.acidity}><input id="tf-acidity" type="number" inputMode="decimal" step="0.01" value={form.acidity} onChange={e => set('acidity', e.target.value)} placeholder="미측정" /></F>
               <F id="weight" label="평균 중량" unit="g" err={errors.weight}><input id="tf-weight" type="number" inputMode="decimal" step="0.1" value={form.weight} onChange={e => set('weight', e.target.value)} placeholder="미측정" /></F>
@@ -433,7 +463,13 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         </details>
 
         <div className="qt-view-action"><button className="btn btn-primary" onClick={viewResults}>품질 변화 보기</button>{inputNotice && <p role="alert" className="auth-error">{inputNotice}</p>}</div>
-        {!exampleMode && <div className="qt-savebox">
+        {!exampleMode && guest && <div className="qt-savebox qt-guest-save">
+          <p><b>기록으로 저장하려면 로그인이 필요해요.</b> 지금 입력한 내용은 로그인한 뒤 같은 화면에서 이어집니다.</p>
+          <button className="btn btn-primary" onClick={handoffToLogin}><Save size={16} />로그인하고 저장하기</button>
+          {saveMsg && <p className="auth-error" role="status">{saveMsg.text}</p>}
+          <p className="qt-help">저장 전 입력은 이 기기에만 임시 보관됩니다.</p>
+        </div>}
+        {!exampleMode && !guest && <div className="qt-savebox">
           <button className="btn btn-primary" onClick={saveRecord} disabled={saving || !!loadError || (!dirty && !!activeLot)}>{saving ? <Loader2 className="spin" size={16} /> : <Save size={16} />}{activeLot ? '변경 내용을 기록에 저장' : '물량 기록으로 저장'}</button>
           {activeLot && <ObservationForm lot={activeLot} onSaved={() => { setReload(r => r + 1); }} disabled={false} />}
           {saveMsg && <p className={saveMsg.ok ? 'qt-ok' : 'auth-error'} role="status">{saveMsg.text}</p>}
@@ -487,6 +523,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         </section>}
 
         <div className="qt-actions qt-result-actions">
+          {guest && !exampleMode && <button className="btn btn-primary" onClick={handoffToLogin}><Save size={16} />로그인하고 저장하기</button>}
           {onAskAI && !hongro && <button className="btn btn-outline" data-ai-return onClick={askResult} disabled={!startOk || !!loadError}><MessageCircle size={16} />이 결과 물어보기</button>}
           <button className="btn btn-ghost" onClick={() => hongro ? hongroResult && exportHongroCsv(hongroResult, {mode, lotName, startDate, selDate}) : exportCsv({mode, lotName, form, startDate, asOf, asOfDay, selDay, recorded, futureLabel, series, measured, anchors, baseline: compatible ? baseline : null, changeLabel, useLatest})} disabled={!startOk || (hongro && !hongroResult)}><Download size={15} />결과 내보내기</button>
         </div>

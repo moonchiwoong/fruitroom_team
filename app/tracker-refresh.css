@@ -7,7 +7,7 @@
 .qt-refresh .qt-field { min-width: 0; }
 .qt-lot-field-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .qt-lot-field-head .qt-open { font-size: 12px; line-height: 1.2; padding: 0; margin: 0 0 0 auto; }
-.qt-refresh .qt-field input, .qt-refresh .qt-field select { max-width: 100%; }
+.qt-refresh .qt-field input:not([type=checkbox]):not([type=radio]), .qt-refresh .qt-field select { max-width: 100%; }
 .qt-refresh .qt-grid { display: grid; grid-template-columns: minmax(255px, 290px) minmax(0, 1fr); gap: 28px; align-items: start; }
 .qt-refresh .qt-input { min-width: 0; order: 0; }
 .qt-refresh .qt-main { min-width: 0; order: 1; gap: 20px; scroll-margin-top: 100px; outline: none; }
@@ -24,7 +24,7 @@
 .qt-refresh .qt-collapse { border-radius: 10px; padding: 4px 16px 16px; }
 .qt-refresh .qt-input .qt-fields.two { grid-template-columns: minmax(0, 1fr); }
 .qt-refresh .qt-input .qt-fields.two .span2 { grid-column: auto; }
-.qt-refresh .qf input, .qt-refresh .qf select { min-width: 0; width: 100%; min-height: 42px; }
+.qt-refresh .qf input:not([type=checkbox]):not([type=radio]), .qt-refresh .qf select { min-width: 0; width: 100%; min-height: 42px; }
 .qt-refresh .qf-label { font-weight: 650; font-size: 13px; }
 .qt-refresh .qf-head { flex-wrap: wrap; gap: 5px; }
 .qt-refresh .qt-collapse > summary { font-size: 15px; min-height: 46px; }
@@ -121,7 +121,7 @@
   .qt-refresh .qt-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 10px 14px; padding: 12px 14px; align-items: end; }
   .qt-refresh .qt-field { width: 100%; min-width: 0; gap: 3px; font-size: 11px; }
   .qt-refresh .qt-top .qt-static { min-height: 40px; padding: 6px 0; font-size: 14px; }
-  .qt-refresh .qt-top .qt-field input, .qt-refresh .qt-top .qt-field select { min-height: 40px; padding: 7px 8px; font-size: 13px; }
+  .qt-refresh .qt-top .qt-field input:not([type=checkbox]):not([type=radio]), .qt-refresh .qt-top .qt-field select { min-height: 40px; padding: 7px 8px; font-size: 13px; }
   .qt-refresh .qt-mode, .qt-refresh .qt-lot-field { grid-column: 1 / -1; }
   .qt-refresh .qt-mode { width: 100%; }
   .qt-refresh .qt-lot-field-head .qt-open { min-height: 32px; margin-top: -8px; margin-bottom: -7px; padding: 7px 2px; }

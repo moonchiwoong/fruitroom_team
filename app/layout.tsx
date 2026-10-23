@@ -6,6 +6,7 @@ import "./tracker-refresh.css";
 import "./lots-refresh.css";
 import "./ai-assistant.css";
 import "./hongro.css";
+import "./design-system.css";
 
 export const metadata: Metadata = {
   applicationName: "애플트랙",

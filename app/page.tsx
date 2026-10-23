@@ -7,6 +7,7 @@ import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Dia
 import {requestJson} from '@/components/lot-forms';
 import {KindBadge} from '@/components/tracker-parts';
 import type {TrackerRequest} from '@/components/quality-tracker';
+import {clearDraft, HANDOFF_KEY, loadDraft, saveDraft, type TrackerHandoff} from '@/lib/tracker-form';
 import AIAssistant, {type AssistantContext} from '@/components/ai-assistant';
 import type {Lot} from '@/lib/lot-types';
 import type {StorageId} from '@/lib/initial-quality';
@@ -21,7 +22,7 @@ const Account = dynamic(() => import('@/components/account'), {ssr: false});
 type Page = 'home' | 'track' | 'lots' | 'model' | 'account';
 const pages: {id: Page; label: string; icon: typeof Apple; kicker: string; title: string; desc: string; hidden?: boolean}[] = [
   {id: 'home', label: '홈', icon: HomeIcon, kicker: '', title: '', desc: ''},
-  {id: 'track', label: '품질 예측', icon: LineChart, kicker: '① 초기 품질 입력 → ② 저장 조건 선택 → ③ 변화 확인', title: '품질 예측', desc: '초기 품질을 입력하고, 저장 기간에 따른 변화를 계산해 실제 측정값과 비교하세요.'},
+  {id: 'track', label: '품질 예측', icon: LineChart, kicker: '', title: '품질 예측', desc: '초기 품질을 입력하고, 저장 기간에 따른 변화를 계산해 실제 측정값과 비교하세요.'},
   {id: 'lots', label: '물량 관리', icon: ClipboardList, kicker: 'STORAGE LOTS', title: '물량 관리', desc: '물량별 초기·후속 측정 기록, 온습도 이력, 사진을 한곳에서 확인합니다.'},
   {id: 'model', hidden: true, label: '모델 정보', icon: BookOpen, kicker: 'MODEL INFO', title: '모델 정보', desc: '계산에 쓰는 수식과 출처, 적용 조건, 검증 상태를 확인합니다. 기상 기반 회귀식도 여기에서 볼 수 있어요.'},
   {id: 'account', label: '내 정보', icon: UserRound, kicker: 'MY ACCOUNT', title: '내 정보', desc: '이름·소속·주 산지를 관리합니다.', hidden: true},
@@ -42,14 +43,31 @@ export default function Home() {
     finally { setLotsLoaded(true); }
   }, []);
   useEffect(() => { void reload(); }, [reload]);
-  const setTab = useCallback((p: Page) => { setTabState(p); setMenu(false); history.replaceState(null, '', '#' + p); window.scrollTo({top: 0, behavior: 'smooth'}); }, []);
+  const setTab = useCallback((p: Page) => { setTabState(p); setMenu(false); history.replaceState(null, '', '/#' + p); window.scrollTo({top: 0, behavior: 'smooth'}); }, []);
   const openTracker = useCallback((mode: 'real' | 'example', lotId?: string) => { setTrackReq(r => ({mode, lotId, n: (r?.n ?? 0) + 1})); setTab('track'); }, [setTab]);
   useEffect(() => {
     const h = window.location.hash.slice(1); const p = (legacy[h] ?? h) as Page;
     if (pages.some(x => x.id === p)) setTabState(p);
-    // 소개 화면에서 ‘실측값 입력’·‘예시로 체험’을 누르고 로그인한 경우
-    try { const intent = sessionStorage.getItem('appletrack:intent'); if (intent === 'real' || intent === 'example') { sessionStorage.removeItem('appletrack:intent'); openTracker(intent, intent === 'real' ? 'new' : undefined); } } catch { /* 무시 */ }
   }, [openTracker]);
+  // 소개·체험 화면에서 ‘실측값 입력’·‘예시로 체험’을 누르고 로그인한 경우
+  const sessionUser = session?.userId;
+  useEffect(() => {
+    try {
+      const intent = sessionStorage.getItem('appletrack:intent');
+      if (intent === 'real' || intent === 'example') {
+        sessionStorage.removeItem('appletrack:intent');
+        // 체험 화면에서 입력하던 내용이 있으면 이 계정의 ‘새 입력’ 초안으로 옮겨 이어서 저장할 수 있게 합니다.
+        const raw = intent === 'real' ? sessionStorage.getItem(HANDOFF_KEY) : null;
+        const handoff = raw ? JSON.parse(raw) as TrackerHandoff : null;
+        if (handoff && sessionUser) {
+          const existing = loadDraft(sessionUser, 'real', handoff.draftKey);
+          if (!existing || existing.savedAt < handoff.draft.savedAt) saveDraft(sessionUser, 'real', handoff.draftKey, handoff.draft);
+          clearDraft('anon', 'real', handoff.draftKey); sessionStorage.removeItem(HANDOFF_KEY);
+        }
+        setTrackReq(r => ({mode: intent, lotId: intent === 'real' ? 'new' : undefined, cultivar: handoff?.cultivar, n: (r?.n ?? 0) + 1})); setTab('track');
+      }
+    } catch { /* 무시 */ }
+  }, [sessionUser]); // eslint-disable-line react-hooks/exhaustive-deps
   const current = pages.find(p => p.id === tab)!;
 
   return <div className="site">
