@@ -1,10 +1,11 @@
 'use client';
 import {useEffect, useMemo, useRef, useState} from 'react';
-import {Activity, AlertTriangle, Apple, ArrowLeft, Camera, Check, ClipboardList, Download, Info, LineChart, Loader2, Lock, MapPin, MessageCircle, Search, Upload, Users} from 'lucide-react';
+import {AlertTriangle, ArrowLeft, ArrowRight, ArrowUpRight, Camera, Check, ClipboardList, Download, Info, Loader2, MessageCircle, Search, Upload} from 'lucide-react';
+import {useTeamSession} from '@/components/team-auth';
+import {applePhoto} from '@/lib/photos';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
 import {ObservationForm, requestJson} from '@/components/lot-forms';
 import {EnvironmentChart} from '@/components/lot-charts';
-import {KindBadge} from '@/components/tracker-parts';
 import {reviewLot} from '@/lib/lot-analysis';
 import {preparePhoto} from '@/lib/prepare-photo';
 import {today, type Lot, type Observation, type Photo, type Stats} from '@/lib/lot-types';
@@ -12,22 +13,26 @@ import {daysBetween, fmtDate, fmtNum} from '@/lib/tracker';
 
 type Analysis = {lot: Lot; asOf: string; stats: Stats; observations: Observation[]; photos: Photo[]};
 type Sub = 'records' | 'environment' | 'photos';
+const shortDate = (d: string) => { const [, m, day] = d.split('-').map(Number); return `${m}월 ${day}일`; };
 const fmt = (n: number | null | undefined, d = 1) => n === null || n === undefined ? null : fmtNum(n, d);
 const V = ({v, d = 1, unit}: {v: number | null | undefined; d?: number; unit?: string}) => { const t = fmt(v, d); return t === null ? <span className="kind k-missing">미측정</span> : <>{t}{unit && <small> {unit}</small>}</>; };
 
 export default function LotsPage({lots, loadError, reload, openTracker, focusId, onAskAI}: {lots: Lot[]; loadError: string; reload: () => Promise<Lot[]>; openTracker: (mode: 'real' | 'example', lotId?: string) => void; focusId?: string | null; onAskAI?: (lotId: string) => void}) {
   const [id, setId] = useState<string>(focusId ?? lots[0]?.id ?? '');
   const [sub, setSub] = useState<Sub>('records');
+  const session = useTeamSession();
+  const shared = (l: Lot) => !!l.owner_id && !!session?.userId && l.owner_id !== session.userId;
+  const [owner, setOwner] = useState<'all' | 'mine' | 'shared'>('all'), [showAll, setShowAll] = useState(false);
   const [query, setQuery] = useState(''), [mobileDetail, setMobileDetail] = useState(!!focusId);
   const detailRef = useRef<HTMLElement>(null);
-  const filteredLots = useMemo(() => { const q = query.trim().toLocaleLowerCase('ko-KR'); return lots.filter(l => !q || [l.name, l.variety, l.location ?? ''].some(v => v.toLocaleLowerCase('ko-KR').includes(q))); }, [lots, query]);
+  const filteredLots = useMemo(() => { const q = query.trim().toLocaleLowerCase('ko-KR'); return lots.filter(l => (owner === 'all' || (owner === 'shared') === shared(l)) && (!q || [l.name, l.variety, l.location ?? ''].some(v => v.toLocaleLowerCase('ko-KR').includes(q)))); }, [lots, query, owner, session?.userId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [loadedData, setData] = useState<Analysis | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState(''), [version, setVersion] = useState(0);
   const [notice, setNotice] = useState(''), [busy, setBusy] = useState(''), [rowErrors, setRowErrors] = useState<string[]>([]);
   useEffect(() => { if (focusId) { setId(focusId); setMobileDetail(true); } }, [focusId]);
   useEffect(() => { if (!lots.some(l => l.id === id)) setId(lots[0]?.id ?? ''); }, [lots, id]);
   const selected = lots.find(l => l.id === id);
   const data = loadedData?.lot.id === selected?.id ? loadedData : null;
-  useEffect(() => { setNotice(''); setRowErrors([]); setSub('records'); }, [id]);
+  useEffect(() => { setNotice(''); setRowErrors([]); setSub('records'); setShowAll(false); }, [id]);
   useEffect(() => {
     setData(null); setError(''); if (!selected) { setLoading(false); return; }
     const ctl = new AbortController(); setLoading(true);
@@ -67,41 +72,83 @@ export default function LotsPage({lots, loadError, reload, openTracker, focusId,
   const start = lot.storage_start_date || lot.intake_date;
   const latest = (k: 'firmness' | 'brix' | 'acidity') => [...(data?.observations ?? [])].reverse().find(o => o[k] !== null && o[k] !== undefined);
 
-  return <div className={"lots lots-refresh" + (mobileDetail ? " has-detail" : "")}>
-    <div className="lot-toolbar">
-      <div className="lot-count"><strong>{lots.length}</strong>개 물량<span>접근 가능한 내 물량과 공유 물량</span></div>
-      <div className="toolbar-controls"><button className="btn btn-primary" onClick={() => openTracker('real', 'new')}>실측값 입력</button></div>
+  const latestObs = data?.observations.length ? data.observations[data.observations.length - 1] : null;
+  const recent = latestObs ? {date: latestObs.date, firmness: latestObs.firmness, brix: latestObs.brix, acidity: latestObs.acidity ?? null}
+    : {date: lot.initial_measured_on || start, firmness: lot.firmness, brix: lot.brix, acidity: lot.acidity};
+  const simpleRows = data ? [...data.observations].reverse().map(o => ({id: o.id, date: o.date, firmness: o.firmness, brix: o.brix, note: o.notes || (o.defects && o.defects !== '미확인' ? `외관: ${o.defects}` : '정기 측정')}))
+    .concat([{id: 'initial', date: lot.initial_measured_on || start, firmness: lot.firmness, brix: lot.brix, note: '첫 측정'}]) : [];
+  const counts = {all: lots.length, mine: lots.filter(l => !shared(l)).length, shared: lots.filter(shared).length};
+
+  return <div className={"lots lots-v2" + (mobileDetail ? " has-detail" : "")}>
+    <div className="lv2-toolbar">
+      <label className="lv2-search"><Search size={20} aria-hidden="true" /><span className="sr-only">사과 이름·품종·저장고로 찾기</span><input id="lot-search-input" type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="사과 이름 · 품종 · 저장고로 찾기" /></label>
+      <div className="lv2-filter" role="tablist" aria-label="사과 구분">
+        {([['all', '전체'], ['mine', '내 사과'], ['shared', '공유받음']] as const).map(([k, t]) => <button key={k} role="tab" aria-selected={owner === k} className={owner === k ? 'active' : ''} onClick={() => setOwner(k)}>{t} <span>{counts[k]}</span></button>)}
+      </div>
     </div>
     {loadError && <div className="error-box" role="alert">목록을 새로 불러오지 못했습니다. {loadError}<button onClick={() => void reload()}>목록 다시 불러오기</button></div>}
     {notice && <div className="success-notice" role="status"><Check size={16} />{notice}<button onClick={() => setNotice('')} aria-label="알림 닫기">×</button></div>}
     {error && <div className="error-box" role="alert">{error}{rowErrors.length > 0 && <ul className="row-errors">{rowErrors.map(r => <li key={r}>{r}</li>)}</ul>}<button onClick={refresh}>다시 불러오기</button></div>}
 
-    <div className="lots-workspace">
-    <aside className="lots-list-panel" aria-label="물량 목록">
-      <label className="lot-search"><Search size={17} aria-hidden="true" /><span className="sr-only">물량 이름·품종·저장고 검색</span><input id="lot-search-input" type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="물량 이름·품종·저장고" /></label>
-      <p className="lot-search-count" role="status">{query.trim() ? `${filteredLots.length}개 검색 결과` : '품질을 확인할 물량을 선택하세요.'}</p>
-      <div className="lot-cards">{filteredLots.map(l => <button key={l.id} id={'lot-choice-' + l.id} disabled={!!busy} onClick={() => selectLot(l.id)} className={'lot-card ' + (selected?.id === l.id ? 'chosen' : '')} aria-pressed={selected?.id === l.id}>
-        <div><span className="lot-card-icon"><Apple size={19} /></span><span className={'share-badge' + (l.team_shared ? ' team' : '')}>{l.team_shared ? <><Users size={12} />팀 공유</> : <><Lock size={12} />나만 보기</>}</span></div>
-        <h2>{l.name}</h2><p><MapPin size={13} />{l.location || '저장고 위치 미입력'}</p>
-        <div className="lot-card-bottom"><span>{l.variety}</span><span>저장 {Math.max(0, daysBetween(l.storage_start_date || l.intake_date, today()))}일차</span></div>
-        <p className="lot-record-status">{l.observation_count ? `후속 측정 ${l.observation_count}건` : '후속 측정 기록 없음'}{selected?.id === l.id && <span><Check size={14} />선택됨</span>}</p>
-      </button>)}</div>
-      {!filteredLots.length && <div className="lot-search-empty"><Search size={25} /><h3>검색 결과가 없어요.</h3><p>물량 이름, 품종 또는 저장고 위치로 다시 찾아보세요.</p><button className="btn btn-outline" onClick={() => setQuery('')}>검색 지우기</button></div>}
+    <div className="lv2-workspace">
+    <aside className="lv2-list" aria-label="저장 사과 목록">
+      <h2 className="app-subtitle">저장 사과 목록</h2>
+      {query.trim() && <p className="lot-search-count" role="status">{filteredLots.length}개 검색 결과</p>}
+      <ul>{filteredLots.map(l => { const o = l.latest_observation; return <li key={l.id}><button id={'lot-choice-' + l.id} disabled={!!busy} onClick={() => selectLot(l.id)} className={'lv2-item' + (selected?.id === l.id ? ' chosen' : '')} aria-pressed={selected?.id === l.id}>
+        <img src={applePhoto(l.id)} alt="" loading="lazy" />
+        <span className="lv2-item-copy"><b>{l.name}{!l.name.includes(l.variety) && <> · {l.variety}</>}{shared(l) && <em className="lv2-shared">공유받음</em>}</b>
+          <span>저장 {Math.max(0, daysBetween(l.storage_start_date || l.intake_date, today()))}일째</span>
+          <span>{o ? `최근 측정 ${shortDate(o.date)}` : '아직 측정 기록 없음'}</span></span>
+      </button></li>; })}</ul>
+      {!filteredLots.length && <div className="lot-search-empty"><Search size={25} /><h3>찾는 사과가 없어요.</h3><p>사과 이름, 품종 또는 저장고로 다시 찾아보세요.</p><button className="btn btn-outline" onClick={() => { setQuery(''); setOwner('all'); }}>검색 지우기</button></div>}
     </aside>
 
-    {selected && <section className="lot-detail" ref={detailRef} tabIndex={-1} aria-label="선택 물량 상세">
-      <button className="lot-back btn btn-outline" disabled={!!busy} onClick={() => { setMobileDetail(false); requestAnimationFrame(() => (document.getElementById('lot-choice-' + id) ?? document.getElementById('lot-search-input'))?.focus()); }}><ArrowLeft size={16} />물량 목록으로</button>
-      <div className="lot-detail-head">
-        <div><span className="section-label">물량 상세 · {lot.team_shared ? '팀 공유' : '나만 보기'}</span><h2>{lot.name}</h2><p className="subtle">{lot.variety} · 저장 시작 {fmtDate(start)}{!lot.storage_start_date && ' (입고일과 같음)'} · {lot.storage}{lot.mcp === '처리' ? ' + 1-MCP 처리' : lot.mcp === '미확인' ? ' · 1-MCP 미확인' : ''}</p></div>
-        <div className="qt-inline-btns"><button className="btn btn-primary" onClick={() => openTracker('real', lot.id)}><LineChart size={16} />품질 변화 보기</button><ObservationForm lot={lot} onSaved={() => { setNotice('측정 기록을 저장했습니다.'); refresh(); }} disabled={!data || loading || !!busy} />{onAskAI && <button className="btn btn-outline" disabled={!data || loading || !!error} data-ai-return onClick={() => onAskAI(lot.id)}><MessageCircle size={16} />이 물량 상태 요약</button>}</div>
+    {selected && <section className="lv2-detail" ref={detailRef} tabIndex={-1} aria-label="선택한 사과 상세">
+      <button className="lot-back btn btn-outline" disabled={!!busy} onClick={() => { setMobileDetail(false); requestAnimationFrame(() => (document.getElementById('lot-choice-' + id) ?? document.getElementById('lot-search-input'))?.focus()); }}><ArrowLeft size={16} />사과 목록으로</button>
+      <div className="lv2-detail-head">
+        <div><h2 className="app-subtitle">{lot.name}{!lot.name.includes(lot.variety) && <> · {lot.variety}</>}</h2>
+          <p>{shortDate(start)} 저장 시작 · {lot.storage}{lot.mcp === '처리' ? ' · 1-MCP 처리' : lot.mcp === '미확인' ? ' · 1-MCP 미확인' : ''}{shared(lot) ? ' · 공유받음' : lot.team_shared ? ' · 팀 공유' : ''}</p></div>
+        <button className="ah-textlink" onClick={() => openTracker('real', lot.id)}>품질 변화 보기<ArrowUpRight size={16} /></button>
       </div>
-      <div className="seg lot-subtabs" role="tablist" aria-label="물량 기록 종류">
-        {([['records', '품질 기록'], ['environment', '온습도 이력'], ['photos', '사진']] as [Sub, string][]).map(([k, t]) => <button key={k} id={'lot-tab-' + k} role="tab" aria-controls="lot-record-panel" aria-selected={sub === k} tabIndex={sub === k ? 0 : -1} className={sub === k ? 'active' : ''} onKeyDown={tabKeys} onClick={() => changeSub(k)}>{t}</button>)}
+      <div className="lv2-tabs" role="tablist" aria-label="기록 종류">
+        {([['records', '측정 기록'], ['environment', '온습도 기록'], ['photos', '사진']] as [Sub, string][]).map(([k, t]) => <button key={k} id={'lot-tab-' + k} role="tab" aria-controls="lot-record-panel" aria-selected={sub === k} tabIndex={sub === k ? 0 : -1} className={sub === k ? 'active' : ''} onKeyDown={tabKeys} onClick={() => changeSub(k)}>{t}</button>)}
       </div>
       {loading && <div className="loading-strip"><Loader2 size={17} className="spin" />기록을 불러오는 중입니다.</div>}
 
       <div id="lot-record-panel" role="tabpanel" aria-labelledby={'lot-tab-' + sub} className="lot-record-panel">
-      {sub === 'records' && data && <div className="lot-ov">
+      {sub === 'records' && data && <>
+        <section className="lv2-recent">
+          <h3>{latestObs ? '최근 측정' : '처음 측정'} · {recent.date ? shortDate(recent.date) : '측정일 미입력'}</h3>
+          <dl>
+            <div><dt>경도<small>(단단한 정도)</small></dt><dd><V v={recent.firmness} unit="N" /></dd></div>
+            <div><dt>당도</dt><dd><V v={recent.brix} unit="°Brix" /></dd></div>
+            <div><dt>산도</dt><dd><V v={recent.acidity} d={2} unit="%" /></dd></div>
+          </dl>
+        </section>
+        <section className="lv2-records">
+          <div className="lv2-records-head"><h3>측정 기록</h3><ObservationForm lot={lot} label="오늘 측정값 기록" className="btn btn-outline" onSaved={() => { setNotice('측정 기록을 저장했습니다.'); refresh(); }} disabled={!data || loading || !!busy} /></div>
+          {!showAll ? <div className="lv2-table-wrap"><table className="lv2-table">
+            <thead><tr><th>측정일</th><th>경도</th><th>당도</th><th>메모</th></tr></thead>
+            <tbody>{simpleRows.slice(0, 6).map(r => <tr key={r.id}><td>{r.date ? shortDate(r.date) : '—'}</td><td><V v={r.firmness} unit="N" /></td><td><V v={r.brix} unit="°Brix" /></td><td>{r.note}</td></tr>)}</tbody>
+          </table></div> : <>
+        <div className="qt-table-wrap lot-history-table"><table className="qt-table">
+          <thead><tr><th>측정일</th><th>구분</th><th>경과일</th><th>표본 수</th><th>경도 N</th><th>당도 °Brix</th><th>산도 %</th><th>평균 중량 g</th><th>추적 표본 중량 g</th><th>외관</th><th>측정 조건</th><th>메모</th></tr></thead>
+          <tbody>
+            <tr className="row-initial"><td data-label="측정일">{lot.initial_measured_on ? fmtDate(lot.initial_measured_on) : <small>측정일 미입력</small>}</td><td data-label="구분">초기</td><td data-label="저장 경과일">{lot.initial_measured_on ? `${daysBetween(start, lot.initial_measured_on)}일차` : '—'}</td><td data-label="표본 수">{lot.initial_sample_count ?? '—'}</td>
+              <td data-label="경도 N"><V v={lot.firmness} /></td><td data-label="당도 °Brix"><V v={lot.brix} /></td><td data-label="산도 %"><V v={lot.acidity} d={3} /></td><td data-label="평균 중량 g"><V v={lot.weight} /></td><td data-label="추적 표본 중량 g"><V v={lot.details?.tracked?.initial_weight} /></td><td data-label="외관">—</td>
+              <td data-label="측정 조건"><small>{measureText(lot.details?.measure)}</small></td><td data-label="메모"><small>{lot.notes || '—'}</small></td></tr>
+            {data.observations.map(o => <tr key={o.id}><td data-label="측정일">{fmtDate(o.date)}</td><td data-label="구분">후속</td><td data-label="저장 경과일">{daysBetween(start, o.date)}일차</td><td data-label="표본 수">{o.sample_count}</td>
+              <td data-label="경도 N"><V v={o.firmness} /></td><td data-label="당도 °Brix"><V v={o.brix} /></td><td data-label="산도 %"><V v={o.acidity} d={3} /></td><td data-label="평균 중량 g"><V v={o.weight} /></td><td data-label="추적 표본 중량 g"><V v={o.tracked_weight} /></td><td data-label="외관">{o.defects}</td><td data-label="측정 조건"><small>{measureText(o.details?.measure)}</small></td><td data-label="메모"><small>{o.notes || '—'}</small></td></tr>)}
+          </tbody>
+        </table></div>
+          </>}
+          <div className="lv2-records-foot">
+            <button className="ah-textlink" aria-expanded={showAll} onClick={() => setShowAll(v => !v)}>{showAll ? '간단히 보기' : '전체 기록 보기'}<ArrowRight size={16} /></button>
+            <span aria-hidden="true" className="lv2-sep" />
+            <button className="ah-textlink" onClick={() => openTracker('real', lot.id)}>사과 정보 수정<ArrowUpRight size={16} /></button>
+          </div>
+        </section>
+        <div className="lot-ov lv2-more">
         <details className="lot-ov-card lot-basic-info">
           <summary>물량·저장 조건 상세</summary>
           <dl className="lot-dl">
@@ -116,37 +163,15 @@ export default function LotsPage({lots, loadError, reload, openTracker, focusId,
             {lot.details?.ca && (lot.details.ca.from || lot.details.ca.o2 != null) && <div><dt>CA 환경</dt><dd>{[lot.details.ca.from && `${fmtDate(lot.details.ca.from)}~${lot.details.ca.to ? fmtDate(lot.details.ca.to) : ''}`, lot.details.ca.o2 != null && `O₂ ${lot.details.ca.o2}%`, lot.details.ca.co2 != null && `CO₂ ${lot.details.ca.co2}%`].filter(Boolean).join(' · ')}</dd></div>}
           </dl>
         </details>
-        <section className="lot-ov-card">
-          <h3>초기 측정과 최근 측정</h3>
-          <div className="qt-table-wrap lot-latest-table"><table className="qt-table">
-            <thead><tr><th>지표</th><th>초기 <small>{lot.initial_measured_on ? fmtDate(lot.initial_measured_on) : '측정일 미입력'}{lot.initial_sample_count ? ` · ${lot.initial_sample_count}개` : ''}</small></th><th>최근</th></tr></thead>
-            <tbody>{([['firmness', '경도', 'N', 1], ['brix', '당도', '°Brix', 1], ['acidity', '산도', '%', 3]] as const).map(([k, label, unit, d]) => { const o = latest(k); return <tr key={k}>
-              <td>{label}</td><td><V v={lot[k]} d={d} unit={unit} />{lot[k] != null && <> <KindBadge kind="실측" /></>}</td>
-              <td>{o ? <><V v={o[k] as number} d={d} unit={unit} /> <small>{fmtDate(o.date)} · 표본 {o.sample_count}개</small></> : <span className="kind k-missing">후속 측정 없음</span>}</td></tr>; })}</tbody>
-          </table></div>
-        </section>
         <details className="lot-ov-card review">
           <summary>기록 점검 메모 <small>규칙 기반 · 안전 판정 아님</small></summary>
           <p className="lot-review-label">{review?.label}</p>
           <ul>{review?.reasons.map(r => <li key={r}><AlertTriangle size={13} />{r}</li>)}</ul>
           <p className="qt-help">보관 가능일·출하일은 제공하지 않습니다.</p>
         </details>
-      </div>}
-
-      {sub === 'records' && data && <section className="lot-ov-card">
-        <h3>측정 기록 <small>빈칸은 ‘미측정’ · 파괴 측정 표본은 매번 다른 과실</small></h3>
-        <div className="qt-table-wrap lot-history-table"><table className="qt-table">
-          <thead><tr><th>측정일</th><th>구분</th><th>경과일</th><th>표본 수</th><th>경도 N</th><th>당도 °Brix</th><th>산도 %</th><th>평균 중량 g</th><th>추적 표본 중량 g</th><th>외관</th><th>측정 조건</th><th>메모</th></tr></thead>
-          <tbody>
-            <tr className="row-initial"><td data-label="측정일">{lot.initial_measured_on ? fmtDate(lot.initial_measured_on) : <small>측정일 미입력</small>}</td><td data-label="구분">초기</td><td data-label="저장 경과일">{lot.initial_measured_on ? `${daysBetween(start, lot.initial_measured_on)}일차` : '—'}</td><td data-label="표본 수">{lot.initial_sample_count ?? '—'}</td>
-              <td data-label="경도 N"><V v={lot.firmness} /></td><td data-label="당도 °Brix"><V v={lot.brix} /></td><td data-label="산도 %"><V v={lot.acidity} d={3} /></td><td data-label="평균 중량 g"><V v={lot.weight} /></td><td data-label="추적 표본 중량 g"><V v={lot.details?.tracked?.initial_weight} /></td><td data-label="외관">—</td>
-              <td data-label="측정 조건"><small>{measureText(lot.details?.measure)}</small></td><td data-label="메모"><small>{lot.notes || '—'}</small></td></tr>
-            {data.observations.map(o => <tr key={o.id}><td data-label="측정일">{fmtDate(o.date)}</td><td data-label="구분">후속</td><td data-label="저장 경과일">{daysBetween(start, o.date)}일차</td><td data-label="표본 수">{o.sample_count}</td>
-              <td data-label="경도 N"><V v={o.firmness} /></td><td data-label="당도 °Brix"><V v={o.brix} /></td><td data-label="산도 %"><V v={o.acidity} d={3} /></td><td data-label="평균 중량 g"><V v={o.weight} /></td><td data-label="추적 표본 중량 g"><V v={o.tracked_weight} /></td><td data-label="외관">{o.defects}</td><td data-label="측정 조건"><small>{measureText(o.details?.measure)}</small></td><td data-label="메모"><small>{o.notes || '—'}</small></td></tr>)}
-          </tbody>
-        </table></div>
-        {!data.observations.length && <p className="qt-help">아직 후속 측정이 없습니다. 위의 ‘후속 측정 추가’로 기록하세요.</p>}
-      </section>}
+        </div>
+        {onAskAI && <button className="ah-textlink lv2-ask" disabled={!data || loading || !!error} data-ai-return onClick={() => onAskAI(lot.id)}><MessageCircle size={16} />이 사과 상태 요약해 보기</button>}
+      </>}
 
       {sub === 'environment' && data && <>
         <div className="upload-panel">
@@ -193,7 +218,7 @@ export default function LotsPage({lots, loadError, reload, openTracker, focusId,
       </div>
     </section>}
     </div>
-    <p className="qt-help lots-foot"><Activity size={13} /> 예전 ‘환경·품질 기록’ 메뉴의 기록은 모두 여기(측정 기록·온습도 이력)에 그대로 있습니다.</p>
+    <div className="lv2-foot"><span>측정한 날에 기록하면, 실제 품질 변화를 비교하기 쉬워요.</span></div>
   </div>;
 }
 

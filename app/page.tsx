@@ -1,18 +1,18 @@
 'use client';
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useCallback, useEffect, useState, type ReactNode} from 'react';
 import dynamic from 'next/dynamic';
-import {Apple, ArrowRight, BookOpen, ChevronRight, ClipboardList, FlaskConical, Home as HomeIcon, Info, LineChart, LogOut, Menu, MessageCircle, ShieldCheck, UserRound, X} from 'lucide-react';
+import {Apple, ArrowRight, ArrowUpRight, BookOpen, ClipboardList, Home as HomeIcon, Info, LineChart, LogOut, Menu, MessageCircle, ShieldCheck, UserRound, X} from 'lucide-react';
+import {applePhoto, PHOTOS} from '@/lib/photos';
 import {useTeamSession} from '@/components/team-auth';
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog';
 import {requestJson} from '@/components/lot-forms';
-import {KindBadge} from '@/components/tracker-parts';
 import type {TrackerRequest} from '@/components/quality-tracker';
 import {clearDraft, HANDOFF_KEY, loadDraft, saveDraft, type TrackerHandoff} from '@/lib/tracker-form';
 import AIAssistant, {type AssistantContext} from '@/components/ai-assistant';
 import type {Lot} from '@/lib/lot-types';
 import type {StorageId} from '@/lib/initial-quality';
 import type {MetricId} from '@/lib/tracker';
-import {computeSeries, fmtNum, valueAt, daysBetween, todayKST, fmtDate} from '@/lib/tracker';
+import {fmtNum, daysBetween, todayKST} from '@/lib/tracker';
 
 const QualityTracker = dynamic(() => import('@/components/quality-tracker'), {ssr: false, loading: () => <div className="loading-strip">화면을 준비하고 있어요…</div>});
 const LotsPage = dynamic(() => import('@/components/lots-page'), {ssr: false, loading: () => <div className="loading-strip">물량을 불러오는 중…</div>});
@@ -25,7 +25,7 @@ const pages: {id: Page; label: string; icon: typeof Apple; kicker: string; title
   {id: 'track', label: '품질 예측', icon: LineChart, kicker: '', title: '품질 예측', desc: '초기 품질을 입력하고, 저장 기간에 따른 변화를 계산해 실제 측정값과 비교하세요.'},
   {id: 'lots', label: '물량 관리', icon: ClipboardList, kicker: 'STORAGE LOTS', title: '물량 관리', desc: '물량별 초기·후속 측정 기록, 온습도 이력, 사진을 한곳에서 확인합니다.'},
   {id: 'model', hidden: true, label: '모델 정보', icon: BookOpen, kicker: 'MODEL INFO', title: '모델 정보', desc: '계산에 쓰는 수식과 출처, 적용 조건, 검증 상태를 확인합니다. 기상 기반 회귀식도 여기에서 볼 수 있어요.'},
-  {id: 'account', label: '내 정보', icon: UserRound, kicker: 'MY ACCOUNT', title: '내 정보', desc: '이름·소속·주 산지를 관리합니다.', hidden: true},
+  {id: 'account', label: '내 정보', icon: UserRound, kicker: 'MY ACCOUNT', title: '내 정보', desc: '이름·소속·주 산지를 관리합니다.'},
 ];
 // 예전 주소(#predict 등)로 들어와도 새 화면으로 연결합니다.
 const legacy: Record<string, Page> = {predict: 'model', overview: 'lots', environment: 'lots', photos: 'lots', simulator: 'track'};
@@ -73,8 +73,11 @@ export default function Home() {
   return <div className="site">
     <SiteHeader tab={tab} setTab={setTab} menu={menu} setMenu={setMenu} />
     <main className="site-main">
-      {tab === 'home' && <HomePage lots={lots} loaded={lotsLoaded} error={lotsError} retry={reload} openTracker={openTracker} setTab={setTab} onAskAI={() => setAIContext({mode:'real',scope:'all'})} />}
-      {tab !== 'home' && <div className={"page-hero" + (tab === "track" ? " page-hero-track" : "")}><div className="page-hero-inner"><span className="page-kicker">{current.kicker}</span><h1>{current.title}</h1><p>{current.desc}</p></div></div>}
+      {tab === 'home' && <HomePage lots={lots} loaded={lotsLoaded} error={lotsError} retry={reload} openTracker={openTracker} setTab={setTab} openLot={id => { setLotFocus(id); setTab('lots'); }} onAskAI={() => setAIContext({mode:'real',scope:'all'})} />}
+      {tab === 'track' && <PageHead title={<>사과의 변화,<br />쉽게 확인하세요.</>} desc="측정한 값과 앞으로의 계산값을 비교해 보세요." />}
+      {tab === 'lots' && <PageHead title={<>저장한 사과,<br />기록을 이어가세요.</>} desc={<>사과별 측정 기록을<br />한곳에서 확인하세요.</>} action={<button className="btn btn-primary btn-lg" onClick={() => openTracker('real', 'new')}>+ 새 사과 등록</button>} />}
+      {tab === 'account' && <PageHead title="내 정보" desc="이름·소속·주 산지를 관리합니다." />}
+      {tab === 'model' && <PageHead title={current.title} desc={current.desc} />}
       <div className="page-body">
         {tab === 'track' && <QualityTracker lots={lots} onLotsChanged={reload} request={trackReq} onAskAI={setAIContext} openModelInfo={context => {setModelContext(context); setTab('model');}} openLot={id => { setLotFocus(id); setTab('lots'); }} />}
         {tab === 'lots' && (lotsLoaded ? <LotsPage lots={lots} loadError={lotsError} reload={reload} openTracker={openTracker} focusId={lotFocus} onAskAI={id => setAIContext({mode:'real',scope:'lot',lotId:id})} /> : <div className="loading-strip">물량을 불러오는 중…</div>)}
@@ -105,44 +108,72 @@ function ProjectGuide() {
 
 function SiteHeader({tab, setTab, menu, setMenu}: {tab: Page; setTab: (p: Page) => void; menu: boolean; setMenu: (v: boolean) => void}) {
   const session = useTeamSession();
-  return <header className="site-header2"><div className="site-header-inner">
+  return <header className="site-header2 app-header"><div className="site-header-inner">
     <Brand onClick={() => setTab('home')} />
     <nav className={'site-nav' + (menu ? ' open' : '')} aria-label="주요 메뉴">
-      {pages.filter(p => !p.hidden).map(p => { const Icon = p.icon; return <button key={p.id} className={'nav-link' + (tab === p.id ? ' active' : '')} aria-current={tab === p.id ? 'page' : undefined} onClick={() => setTab(p.id)}><Icon size={16} />{p.label}</button>; })}
-      <div className="nav-mobile-foot">{session && <><button onClick={() => setTab('account')}><UserRound size={15} />{session.displayName} · 내 정보</button><button onClick={() => void session.signOut()}><LogOut size={15} />로그아웃</button></>}</div>
+      {pages.filter(p => !p.hidden).map(p => <button key={p.id} className={'nav-link' + (tab === p.id ? ' active' : '')} aria-current={tab === p.id ? 'page' : undefined} onClick={() => setTab(p.id)}>{p.label}</button>)}
+      <div className="nav-mobile-foot">{session && <button onClick={() => void session.signOut()}><LogOut size={15} />로그아웃</button>}</div>
     </nav>
     <div className="site-utils"><ProjectGuide />
-      {session && <div className="user-chip"><button className={'user-btn' + (tab === 'account' ? ' active' : '')} onClick={() => setTab('account')} title="내 정보"><span className="user-avatar">{session.displayName.slice(0, 1).toUpperCase()}</span><span className="account-menu-label">내 정보</span></button>
-        <button className="nav-util" onClick={() => void session.signOut()} title="로그아웃"><LogOut size={16} /><span>로그아웃</span></button></div>}
+      {session && <button className="nav-util app-logout" onClick={() => void session.signOut()} title="로그아웃"><LogOut size={16} /><span>로그아웃</span></button>}
       <button className="menu-toggle" aria-label={menu ? '메뉴 닫기' : '메뉴 열기'} aria-expanded={menu} onClick={() => setMenu(!menu)}>{menu ? <X size={22} /> : <Menu size={22} />}</button>
     </div>
   </div></header>;
 }
 
-function HomePage({lots, loaded, error, retry, openTracker, setTab, onAskAI}: {lots: Lot[]; loaded: boolean; error: string; retry: () => void; onAskAI: () => void; openTracker: (m: 'real' | 'example', lotId?: string) => void; setTab: (p: Page) => void}) {
-  const session = useTeamSession();
-  return <div className="refreshed-home">
-    <section className="home-hero refresh-hero">
-      <div className="home-hero-text">
-        <span className="page-kicker">APPLETRACK · BY FARMBRIDGE</span>
-        <h1>초기 품질부터<br /><em>저장 중 변화까지</em></h1>
-        <p>초기 품질을 입력하고, 저장 기간에 따른 변화를 예측해 실제 측정값과 비교하세요.</p>
-        <div className="hero-actions">
-          <button className="btn btn-primary btn-lg" onClick={() => openTracker('real', 'new')}>실측값 입력<ArrowRight size={18} /></button>
-          <button className="btn btn-outline btn-lg" onClick={() => openTracker('example')}><FlaskConical size={17} />예시로 체험</button>
+/** 화면 제목: 큰 제목(왼쪽) + 짧은 설명 + 오른쪽 주요 버튼 */
+function PageHead({title, desc, action}: {title: ReactNode; desc?: ReactNode; action?: ReactNode}) {
+  return <div className="app-head"><div className="app-head-inner">
+    <h1 className="app-title">{title}</h1>
+    {desc && <p className="app-desc">{desc}</p>}
+    {action && <div className="app-head-action">{action}</div>}
+  </div></div>;
+}
+
+const storageDays = (l: Lot) => Math.max(0, daysBetween(l.storage_start_date || l.intake_date, todayKST()));
+const shortDate = (d: string) => { const [, m, day] = d.split('-').map(Number); return `${m}월 ${day}일`; };
+
+function HomePage({lots, loaded, error, retry, openTracker, setTab, onAskAI, openLot}: {lots: Lot[]; loaded: boolean; error: string; retry: () => void; onAskAI: () => void; openTracker: (m: 'real' | 'example', lotId?: string) => void; setTab: (p: Page) => void; openLot: (id: string) => void}) {
+  return <div className="app-home">
+    <section className="ah-hero">
+      <div className="ah-hero-copy">
+        <h1 className="app-title">저장한 사과,<br />변화를 살피세요.</h1>
+        <p className="app-lead">측정한 값을 기록하고, 저장 중 품질 변화를 확인하세요.</p>
+        <div className="ah-actions">
+          <button className="btn btn-primary btn-lg" onClick={() => openTracker('real', 'new')}>새 사과 등록하기<ArrowUpRight size={18} /></button>
+          <button className="ah-textlink" onClick={() => openTracker('example')}>처음이라면 예시로 체험<ArrowRight size={17} /></button>
         </div>
-        <span className="home-calc-note">계산은 시연용입니다. 출하·안전 판정을 대신하지 않습니다.</span>
       </div>
-      <aside className="home-start-guide" aria-label="품질 예측 시작 안내">
-        <div className="start-guide-title"><Apple size={24} /><span>기록에서 시작하는<br /><strong>나의 사과 품질 예측</strong></span></div>
-        <ol>{[['01','초기 품질 입력','측정한 값만, 단위와 날짜까지'],['02','저장 조건 선택','기록된 조건과 미래 가정을 구분'],['03','품질 변화 확인','계산은 선, 실측은 점으로 비교']].map(([n,title,desc]) => <li key={n}><span>{n}</span><div><b>{title}</b><p>{desc}</p></div></li>)}</ol>
-      </aside>
+      <div className="ah-hero-photo"><img src={PHOTOS.hero} alt="나무 상자에 담겨 저장 중인 사과" /></div>
     </section>
-    <section className="recent-lots home-section">
-      <div className="home-section-head"><div><span className="section-label">{session?.displayName ? `${session.displayName}님의 작업 공간` : '내 작업 공간'}</span><h2>최근 물량에서 이어가기</h2></div><button className="btn btn-plain" onClick={() => setTab('lots')}>물량 관리<ArrowRight size={16}/></button></div>
-      {!loaded ? <div className="loading-strip" role="status">접근 가능한 물량을 불러오는 중입니다.</div> : error ? <div className="error-box" role="alert">{error}<button onClick={retry}>다시 불러오기</button></div> : lots.length ? <div className="recent-lot-list">{lots.slice(0,3).map(l => <button key={l.id} className="recent-lot" onClick={() => openTracker('real',l.id)}><span className="recent-lot-icon"><Apple size={23}/></span><span className="recent-lot-copy"><b>{l.name}</b><span>{l.variety} · {l.location || '저장고 미입력'}</span><small>저장 {Math.max(0,daysBetween(l.storage_start_date || l.intake_date,todayKST()))}일차 · {l.observation_count ? `후속 측정 ${l.observation_count}건` : '후속 측정 기록 없음'}</small></span><span className="recent-lot-action">품질 변화 보기<ChevronRight size={18}/></span></button>)}</div> : <div className="home-empty"><ClipboardList size={28}/><div><b>아직 등록한 물량이 없어요.</b><p>실측값을 입력해 기록을 시작하거나, 예시로 먼저 둘러보세요.</p></div><button className="btn btn-outline" onClick={() => openTracker('real','new')}>첫 물량 입력</button></div>}
+
+    <section className="ah-section" aria-labelledby="ah-my">
+      <div className="ah-section-head"><div><p className="ah-eyebrow">MY APPLES</p><h2 id="ah-my" className="app-subtitle">내 저장 사과</h2></div>
+        {lots.length > 0 && <button className="ah-textlink" onClick={() => setTab('lots')}>전체 보기<ArrowUpRight size={16} /></button>}</div>
+      {!loaded ? <div className="loading-strip" role="status">내 사과를 불러오는 중입니다.</div>
+        : error ? <div className="error-box" role="alert">{error}<button onClick={retry}>다시 불러오기</button></div>
+        : lots.length ? <ul className="ah-lots">{lots.slice(0, 4).map(l => { const o = l.latest_observation; const brix = o?.brix ?? null;
+          return <li key={l.id} className="ah-lot">
+            <img className="ah-lot-photo" src={applePhoto(l.id)} alt="" loading="lazy" />
+            <div className="ah-lot-name"><b>{l.name}{!l.name.includes(l.variety) && <> · {l.variety}</>}</b><span>저장 {storageDays(l)}일째</span></div>
+            <dl className="ah-lot-meta">
+              <div><dt>최근 측정</dt><dd>{o ? shortDate(o.date) : '아직 기록 없음'}</dd></div>
+              <div><dt>당도</dt><dd>{brix !== null ? `${fmtNum(brix, 1)} °Brix` : l.brix !== null && !o ? <>{fmtNum(l.brix, 1)} °Brix <small>처음 측정</small></> : '미측정'}</dd></div>
+            </dl>
+            <div className="ah-lot-action">{o || l.firmness !== null || l.brix !== null
+              ? <button className="ah-textlink" onClick={() => openTracker('real', l.id)}>변화 보기<ArrowUpRight size={16} /></button>
+              : <button className="btn btn-outline" onClick={() => openLot(l.id)}>측정값 기록<ArrowUpRight size={16} /></button>}</div>
+          </li>; })}</ul>
+        : <div className="ah-empty"><img src={applePhoto('empty')} alt="" /><div><b>아직 등록한 사과가 없어요.</b><p>저장을 시작한 사과를 등록하고, 측정한 값을 기록해 보세요.</p></div>
+          <button className="btn btn-primary" onClick={() => openTracker('real', 'new')}>새 사과 등록하기</button></div>}
     </section>
-    <section className="home-ai-entry"><MessageCircle size={30}/><div><h3>기록에 궁금한 점이 있나요?</h3><p>최근 측정과 계산에 반영된 조건을 쉽게 확인하세요.</p></div><button className="btn btn-outline" data-ai-return onClick={onAskAI}>내 물량에 질문하기<ArrowRight size={16}/></button></section>
+
+    <section className="ah-section ah-steps" aria-labelledby="ah-how">
+      <h2 id="ah-how" className="app-subtitle">기록에서 변화까지,<br />세 단계면 충분해요.</h2>
+      <ol>{[['01', '사과 등록', '저장하는 사과를 등록하세요.'], ['02', '측정값 기록', '주기적으로 측정한 값을 기록하세요.'], ['03', '품질 변화 확인', '저장 중인 사과의 품질 변화를 한눈에 확인하세요.']].map(([n, t, d]) =>
+        <li key={n}><span>{n}</span><b>{t}</b><p>{d}</p></li>)}</ol>
+    </section>
+    <div className="ah-ask"><MessageCircle size={18} /><span>기록에 궁금한 점이 있나요?</span><button className="ah-textlink" data-ai-return onClick={onAskAI}>내 사과에 질문하기<ArrowRight size={16} /></button></div>
   </div>;
 }
 
