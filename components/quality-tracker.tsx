@@ -15,6 +15,7 @@ import {
 import {clearDraft, emptyForm, exampleForm, formFromLot, loadDraft, loadPref, payloadFromForm, saveDraft, savePref, signature, validateForm, type Draft, type TrackerForm} from '@/lib/tracker-form';
 import type {StorageId} from '@/lib/initial-quality';
 import {measurementCompatibility, observationFingerprint} from '@/lib/ai/context';
+import {isHongroVariety, HONGRO_DEDICATED_NOTICE} from '@/lib/cultivar';
 import {rowsToCsv} from '@/lib/csv';
 
 const FruitViewer = dynamic(() => import('@/components/fruit-viewer'), {ssr: false, loading: () => <div className="t3d-empty"><Loader2 className="spin" size={18} />3D 예시를 불러오는 중…</div>});
@@ -26,8 +27,8 @@ const num = (v: string) => v.trim() === '' || !Number.isFinite(Number(v)) ? null
 
 export type TrackerRequest = {mode: Mode; lotId?: string; n: number};
 export type TrackerAIContext = {mode: Mode; scope: 'prediction'; lotId: string | null; metric: MetricId; selectedDate: string; asOf: string; form: TrackerForm; future: StorageId | 'same'; useLatest: boolean; modelVersion: string; baseline: {label: string; conditionLabel: string; createdAt: string; asOf: string; modelVersion: string; future: StorageId | null; form: TrackerForm; useLatest: boolean; observationsFingerprint: string} | null};
-export default function QualityTracker({lots, onLotsChanged, request, openModelInfo, openLot, onAskAI}: {
-  lots: Lot[]; onLotsChanged: () => Promise<Lot[]> | void; request?: TrackerRequest | null; openModelInfo: (context?: {modelId: StorageId | null; metric: MetricId}) => void; openLot: (id: string) => void; onAskAI?: (context: TrackerAIContext) => void;
+export default function QualityTracker({lots, onLotsChanged, request, openModelInfo, openLot, onAskAI, onOpenHongro}: {
+  onOpenHongro?: () => void; lots: Lot[]; onLotsChanged: () => Promise<Lot[]> | void; request?: TrackerRequest | null; openModelInfo: (context?: {modelId: StorageId | null; metric: MetricId}) => void; openLot: (id: string) => void; onAskAI?: (context: TrackerAIContext) => void;
 }) {
   const session = useTeamSession(); const user = session?.userId ?? 'anon';
   const today = todayKST();
@@ -116,9 +117,9 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const selDate = startOk ? addDays(startDate, selDay) : '';
 
   // ── 조건과 모델 ──
-  const recorded = resolveModel({storage: form.storage, mcp: form.mcp});
+  const recorded = resolveModel(form);
   const [futureId, setFutureId] = useState<StorageId | 'same'>('same');
-  const future = futureId === 'same' ? recorded : {id: futureId, reason: ''};
+  const future = isHongroVariety(form.variety) || futureId === 'same' ? recorded : {id: futureId, reason: ''};
   const futureLabel = futureId === 'same' ? `기록 조건 유지${recorded.id ? ` (${modelLabel[recorded.id]})` : ''}` : modelLabel[futureId];
   const [useLatest, setUseLatest] = useState(false);
   const [metric, setMetric] = useState<MetricId>('firmness');
@@ -146,7 +147,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     const v = m === 'loss' ? 0 : num(form[m]);
     return [m, v === null ? null : {day: t0, date: measuredOn, value: v, kind, source: 'initial'} as Anchor];
   })) as Record<MetricId, Anchor | null>, [startOk, initialMeasuredAfterAsOf, useLatest, measured, t0, form, measuredOn, kind, errors.storage_start_date, errors.intake_date, errors.initial_measured_on, errors.firmness, errors.brix, errors.acidity]);
-  const series = useMemo(() => Object.fromEntries(metricIds.map(m => [m, initialMeasuredAfterAsOf ? {ok: false, reason: initialDateReason} : computeSeries({metric: m, anchor: anchors[m], recorded: recorded.id, recordedReason: recorded.reason, future: future.id, futureReason: future.reason, asOfDay})])) as Record<MetricId, Series>, [anchors, recorded.id, recorded.reason, future.id, future.reason, asOfDay, initialMeasuredAfterAsOf]);
+  const series = useMemo(() => Object.fromEntries(metricIds.map(m => [m, initialMeasuredAfterAsOf ? {ok: false, reason: initialDateReason} : computeSeries({variety: form.variety, metric: m, anchor: anchors[m], recorded: recorded.id, recordedReason: recorded.reason, future: future.id, futureReason: future.reason, asOfDay})])) as Record<MetricId, Series>, [form.variety, anchors, recorded.id, recorded.reason, future.id, future.reason, asOfDay, initialMeasuredAfterAsOf]);
   const at = (m: MetricId, d = selDay): ValueAt => {
     if (initialMeasuredAfterAsOf) return {status: 'unavailable', reason: initialDateReason};
     if (m === 'loss' && !exampleMode) {
@@ -157,12 +158,12 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   };
 
   // ── 비교 기준 ──
-  const compatSig = JSON.stringify({mode, key, startDate, measuredOn, f: form.firmness, b: form.brix, a: form.acidity, tw: form.tracked.initial_weight, sample: form.tracked.sample_id, measure: form.measure, st: form.storage, mcp: form.mcp, observationsFingerprint, asOf, useLatest});
+  const compatSig = JSON.stringify({mode, key, variety: form.variety, modelVersion: MODEL_VERSION, startDate, measuredOn, f: form.firmness, b: form.brix, a: form.acidity, tw: form.tracked.initial_weight, sample: form.tracked.sample_id, measure: form.measure, st: form.storage, mcp: form.mcp, observationsFingerprint, asOf, useLatest});
   const [baseline, setBaseline] = useState<Baseline | null>(null);
   const compatible = !!baseline && baseline.sig === compatSig;
   function fixBaseline(kindB: 'current' | 'fixed') {
     const s = kindB === 'current'
-      ? Object.fromEntries(metricIds.map(m => [m, initialMeasuredAfterAsOf ? {ok: false, reason: initialDateReason} : computeSeries({metric: m, anchor: anchors[m], recorded: recorded.id, recordedReason: recorded.reason, future: recorded.id, futureReason: recorded.reason, asOfDay})])) as Record<MetricId, Series>
+      ? Object.fromEntries(metricIds.map(m => [m, initialMeasuredAfterAsOf ? {ok: false, reason: initialDateReason} : computeSeries({variety: form.variety, metric: m, anchor: anchors[m], recorded: recorded.id, recordedReason: recorded.reason, future: recorded.id, futureReason: recorded.reason, asOfDay})])) as Record<MetricId, Series>
       : series;
     const condLabel = kindB === 'current' ? `기록 조건 유지${recorded.id ? ` (${modelLabel[recorded.id]})` : ''}` : futureLabel;
     setBaseline({kind: kindB, label: kindB === 'current' ? '현재 조건 유지' : '고정한 기준', conditionLabel: condLabel, sig: compatSig, series: s, createdAt: new Date().toISOString(), asOf, modelVersion: MODEL_VERSION, future: kindB === 'current' ? recorded.id : future.id, form: structuredClone(form), useLatest, observationsFingerprint});
@@ -240,6 +241,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   if (!formReady) return <section className="qt-context-loading" role="status" aria-live="polite"><Loader2 className="spin" size={22} /><h2>선택한 물량을 준비하고 있어요</h2><p>입력값과 데이터 종류를 함께 불러오는 중입니다.</p></section>;
 
   return <div className={'qt qt-refresh' + (exampleMode ? ' is-example' : '') + (firstInput && !showResults ? ' is-first-input' : '')}>
+    {isHongroVariety(form.variety) && <div className="error-box" role="status">{HONGRO_DEDICATED_NOTICE}{onOpenHongro && <button type="button" onClick={onOpenHongro}>홍로 · 거창 계산 열기</button>}<p>물량과 측정 기록은 계속 관리할 수 있습니다.</p></div>}
     {/* 상단: 물량 · 품종 · 분석 기준일 · 모드 */}
     <section className="qt-top" aria-label="물량과 입력 모드">
       <div className="qt-mode seg" role="tablist" aria-label="입력 모드">
@@ -470,7 +472,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           </section>}
         <details className="qt-basis"><summary><BookOpen size={16} />계산 근거·적용 범위</summary><div>
           <h3>{metric === 'loss' && !exampleMode ? '실측 중량의 변화' : `${recorded.id ? modelLabel[recorded.id] : '현재 조건: 모델 미지원'} · ${metricMeta[metric].label}`}</h3>
-          <p>현재 저장 모델은 초기 품질, 저장 경과일, 저장 환경·1-MCP 처리 구분을 사용합니다. 입력한 품종, 세부 처리 농도, 실제 온습도 이력은 계산에 반영하지 않습니다.</p>
+          <p>현재 저장 모델은 초기 품질, 저장 경과일, 저장 환경·1-MCP 처리 구분을 사용합니다. 홍로는 상단의 ‘홍로 · 거창’ 전용 계산에서만 제공합니다. 그 외 품종별 보정, 세부 처리 농도, 실제 온습도 이력은 이 기존 모델 계산에 반영하지 않습니다.</p>
           <p><strong>시연용 계산 · 검증 미확인</strong> — 적용 기간 미확인, 오차 범위 미검증. 확인되지 않은 적용 조건에서 출하일·안전성·보관 가능 기간을 판단할 수 없습니다.</p>
           <p className="qt-help">모델: {MODEL_VERSION}</p><button className="linkbtn" onClick={() => openModelInfo({modelId: selDay <= asOfDay ? recorded.id : future.id, metric})}>전체 모델 정보 보기</button>
         </div></details>

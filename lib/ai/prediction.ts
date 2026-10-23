@@ -3,6 +3,7 @@ import {parseOptionalNumber, PRESSURE_REASON, QUALITY_POLICY_VERSION, TRACKED_LO
 import {validateForm} from '../tracker-form';
 import {AIError,type PredictionInput} from './contracts';
 import {measurementCompatibility} from './context';
+import {HONGRO_DEDICATED_REASON,isHongroVariety} from '../cultivar';
 
 const number=(v:unknown)=>{const n=parseOptionalNumber(v);return n.status==='valid'?n.value:null;};
 export const modelInformation = () => ({
@@ -15,6 +16,7 @@ export const modelInformation = () => ({
 /** UI의 같은 순수 계산 엔진과 입력·출력 정책을 사용합니다. 계수나 수식을 복제하지 않습니다. */
 export function evaluatePrediction(input:PredictionInput){
   const {form,mode,metric,asOf,selectedDate}=input;
+  if(isHongroVariety(form.variety))throw new AIError('unsupported_cultivar',HONGRO_DEDICATED_REASON,422);
   const errors=validateForm(form,false);
   const relevant=['intake_date','storage_start_date','initial_measured_on',...(metric==='loss'?['tracked_weight','tracked_count','tracked_sample_id']:[metric])].flatMap(k=>errors[k]?[errors[k]]:[]);
   if(relevant.length)throw new AIError('invalid_input','입력 조건을 확인해 주세요. '+relevant.join(' '));
@@ -31,7 +33,7 @@ export function evaluatePrediction(input:PredictionInput){
   const initial=metric==='loss'?0:number(form[metric]);
   const anchor:Anchor|null=latest?{day:latest.day,date:latest.date,value:latest.value,kind:latest.kind,source:'latest'}:initial===null?null:{day:t0,date:measuredOn,value:initial,kind,source:'initial'};
   const recorded=resolveModel(form),future=input.future==='same'?recorded:{id:input.future,reason:input.future?'':'선택 조건을 확인해 주세요.'};
-  const series=computeSeries({metric,anchor,recorded:recorded.id,recordedReason:recorded.reason,future:future.id,futureReason:future.reason,asOfDay});
+  const series=computeSeries({variety:form.variety,metric,anchor,recorded:recorded.id,recordedReason:recorded.reason,future:future.id,futureReason:future.reason,asOfDay});
   const realLoss=mode==='real'&&metric==='loss';
   const measuredAt=measured.find(p=>p.date===selectedDate);
   const at=realLoss?(measuredAt?{status:'ok' as const,value:measuredAt.value,segment:'past' as const}:{status:'unavailable' as const,reason:TRACKED_LOSS_REASON}):valueAt(series,day);

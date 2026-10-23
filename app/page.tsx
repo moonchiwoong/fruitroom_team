@@ -14,6 +14,7 @@ import type {MetricId} from '@/lib/tracker';
 import {computeSeries, fmtNum, valueAt, daysBetween, todayKST, fmtDate} from '@/lib/tracker';
 
 const QualityTracker = dynamic(() => import('@/components/quality-tracker'), {ssr: false, loading: () => <div className="loading-strip">화면을 준비하고 있어요…</div>});
+const HongroPredictor = dynamic(() => import('@/components/hongro-predictor'), {ssr: false, loading: () => <div className="loading-strip">홍로 계산을 준비하고 있어요…</div>});
 const LotsPage = dynamic(() => import('@/components/lots-page'), {ssr: false, loading: () => <div className="loading-strip">물량을 불러오는 중…</div>});
 const ModelInfo = dynamic(() => import('@/components/model-info'), {ssr: false, loading: () => <div className="loading-strip">모델 정보를 불러오는 중…</div>});
 const Account = dynamic(() => import('@/components/account'), {ssr: false});
@@ -31,6 +32,7 @@ const legacy: Record<string, Page> = {predict: 'model', overview: 'lots', enviro
 
 export default function Home() {
   const session = useTeamSession();
+  const [predictionModel, setPredictionModel] = useState<'fuji' | 'hongro'>('fuji');
   const [aiContext, setAIContext] = useState<AssistantContext | null>(null);
   const [modelContext, setModelContext] = useState<{modelId: StorageId | null; metric: MetricId} | undefined>();
   const [tab, setTabState] = useState<Page>('home'), [menu, setMenu] = useState(false);
@@ -43,7 +45,7 @@ export default function Home() {
   }, []);
   useEffect(() => { void reload(); }, [reload]);
   const setTab = useCallback((p: Page) => { setTabState(p); setMenu(false); history.replaceState(null, '', '#' + p); window.scrollTo({top: 0, behavior: 'smooth'}); }, []);
-  const openTracker = useCallback((mode: 'real' | 'example', lotId?: string) => { setTrackReq(r => ({mode, lotId, n: (r?.n ?? 0) + 1})); setTab('track'); }, [setTab]);
+  const openTracker = useCallback((mode: 'real' | 'example', lotId?: string) => { setPredictionModel('fuji'); setTrackReq(r => ({mode, lotId, n: (r?.n ?? 0) + 1})); setTab('track'); }, [setTab]);
   useEffect(() => {
     const h = window.location.hash.slice(1); const p = (legacy[h] ?? h) as Page;
     if (pages.some(x => x.id === p)) setTabState(p);
@@ -58,7 +60,7 @@ export default function Home() {
       {tab === 'home' && <HomePage lots={lots} loaded={lotsLoaded} error={lotsError} retry={reload} openTracker={openTracker} setTab={setTab} onAskAI={() => setAIContext({mode:'real',scope:'all'})} />}
       {tab !== 'home' && <div className={"page-hero" + (tab === "track" ? " page-hero-track" : "")}><div className="page-hero-inner"><span className="page-kicker">{current.kicker}</span><h1>{current.title}</h1><p>{current.desc}</p></div></div>}
       <div className="page-body">
-        {tab === 'track' && <QualityTracker lots={lots} onLotsChanged={reload} request={trackReq} onAskAI={setAIContext} openModelInfo={context => {setModelContext(context); setTab('model');}} openLot={id => { setLotFocus(id); setTab('lots'); }} />}
+        {tab === 'track' && <><div className="hongro-model-switch" role="group" aria-label="품종별 예측 모델"><button type="button" aria-pressed={predictionModel === 'fuji'} onClick={() => setPredictionModel('fuji')}>후지 · 기존 모델</button><button type="button" aria-pressed={predictionModel === 'hongro'} onClick={() => setPredictionModel('hongro')}>홍로 · 거창</button></div>{predictionModel === 'hongro' ? <HongroPredictor key={session?.userId || 'anonymous'} userId={session?.userId || 'anonymous'} /> : <QualityTracker onOpenHongro={() => setPredictionModel('hongro')} lots={lots} onLotsChanged={reload} request={trackReq} onAskAI={setAIContext} openModelInfo={context => {setModelContext(context); setTab('model');}} openLot={id => { setLotFocus(id); setTab('lots'); }} />}</>}
         {tab === 'lots' && (lotsLoaded ? <LotsPage lots={lots} loadError={lotsError} reload={reload} openTracker={openTracker} focusId={lotFocus} onAskAI={id => setAIContext({mode:'real',scope:'lot',lotId:id})} /> : <div className="loading-strip">물량을 불러오는 중…</div>)}
         {tab === 'model' && <ModelInfo {...modelContext} />}
         {tab === 'account' && <Account onOpenPredict={() => { setTab('model'); }} />}

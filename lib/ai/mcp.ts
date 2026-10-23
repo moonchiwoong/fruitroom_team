@@ -11,6 +11,7 @@ import type {Lot} from '../lot-types';
 import {AIError,type AIContext,type Actor,type Analysis,type DataAccess,type Evidence,type EvidenceField} from './contracts';
 import {evaluatePrediction,modelInformation} from './prediction';
 import {baselineCore,observationFingerprint,measurementCompatibility} from './context';
+import {HONGRO_DEDICATED_REASON,isHongroVariety} from '../cultivar';
 
 export const TOOL_NAMES=['list_accessible_lots','get_lot_details','get_quality_measurements','get_environment_history_summary','run_existing_quality_prediction','compare_measurement_with_prediction','get_model_information'] as const;
 export type ToolName=typeof TOOL_NAMES[number];
@@ -67,6 +68,7 @@ export function createQualityMcpServer(options:{data:DataAccess;actor:Actor;cont
   async function predictionFor(args:{lot_id?:string},current:Actor){
     if(context.scope!=='prediction')throw new AIError('prediction_context_required','품질 예측 화면에서 지표와 날짜를 선택한 뒤 질문해 주세요.');
     const loaded=await load(args,current),c=context.scope==='prediction'?context:null;
+    if(isHongroVariety(loaded.analysis.lot.variety))throw new AIError('unsupported_cultivar',HONGRO_DEDICATED_REASON,422);
     const f=c?c.form:formFromLot(loaded.analysis.lot);
     const draft=loaded.draft||(context.mode==='real'&&!!c&&signature(c.form)!==signature(formFromLot(loaded.analysis.lot)));
     const result=evaluatePrediction({form:f,mode:context.mode,observations:loaded.analysis.observations,asOf:c?.asOf??todayKST(),selectedDate:c?.selectedDate??todayKST(),metric:c?.metric??'firmness',future:c?.future??'same',useLatest:c?.useLatest??false});

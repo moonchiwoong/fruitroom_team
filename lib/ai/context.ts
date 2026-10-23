@@ -8,7 +8,7 @@ export function observationFingerprint(observations:Observation[]){
   return `v1:${observations.length}:${encoded.length}:${(a>>>0).toString(16)}:${(b>>>0).toString(16)}`;
 }
 export function baselineCore(form:TrackerForm,useLatest:boolean){
-  return JSON.stringify({start:form.sameStart?form.intake_date:form.storage_start_date,measuredOn:form.initial_measured_on,firmness:form.firmness,brix:form.brix,acidity:form.acidity,tracked:form.tracked,measure:form.measure,storage:form.storage,mcp:form.mcp,useLatest});
+  return JSON.stringify({variety:form.variety,start:form.sameStart?form.intake_date:form.storage_start_date,measuredOn:form.initial_measured_on,firmness:form.firmness,brix:form.brix,acidity:form.acidity,tracked:form.tracked,measure:form.measure,storage:form.storage,mcp:form.mcp,useLatest});
 }
 type MeasurementConditions={probe_mm?:unknown;peeled?:unknown;position?:unknown;fruit_temp?:unknown;instrument?:unknown}|null|undefined;
 /** Explicit differences prohibit comparisons; missing metadata remains clearly unverified. */

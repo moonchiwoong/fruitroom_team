@@ -1,5 +1,6 @@
 import type {Lot,EnvRow,Stats,Observation,Prediction} from './lot-types';
 import {parseOptionalNumber, restrictLegacyLoss} from './quality-policy';
+import {HONGRO_DEDICATED_REASON,isHongroVariety} from './cultivar';
 export class InputError extends Error{rows?:string[];constructor(message:string,rows?:string[]){super(message);this.rows=rows;}}
 export function numberOrNull(v:unknown,min:number,max:number,label:string){const p=parseOptionalNumber(v);if(p.status==='missing')return null;if(p.status==='invalid')throw new InputError(`${label}: ${p.reason}`);if(p.value<min||p.value>max)throw new InputError(`${label}: 단위와 소수점을 확인해 주세요. 기존 시스템의 저장 허용 범위는 ${min}~${max}이며 정상 품질이나 모델 적용 범위를 뜻하지 않습니다.`);return p.value;}
 export function validDate(v:unknown,label='날짜'){if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v)||!Number.isFinite(Date.parse(v+'T00:00:00Z'))||new Date(v+'T00:00:00Z').toISOString().slice(0,10)!==v)throw new InputError(`${label}를 확인해 주세요.`);return v;}
@@ -50,7 +51,15 @@ export function demoPrediction(lot:Lot,stats:Stats,observations:Observation[],as
  const latest=[...observations].reverse().find(x=>x.firmness!==null);const initial=latest?.firmness??lot.firmness;
  const temp=stats.meanTemperature??0,humidity=stats.meanHumidity??92;
  const base={asOf,horizonDays:7,assumedTemperature:temp,assumedHumidity:humidity,errorRange:null,modelVersion:'연결 확인용 예시 v2',sampleOnly:true as const,limitations:['학습·검증된 예측 모델 미연결','신뢰구간과 예측 오차 미검증','사진으로 경도·당도를 추정하지 않음','표본값은 전체 물량의 확정 상태가 아님']};
+ if(isHongroVariety(lot.variety))return {...base,mode:'unavailable',firmness:null,weightLoss:null,reason:HONGRO_DEDICATED_REASON};
  if(initial===null||!stats.count||lot.storage!=='일반 저온'||lot.mcp!=='미처리')return {...base,mode:'unavailable',firmness:null,weightLoss:null,reason:initial===null?'초기 또는 최근 경도 측정이 필요합니다.':!stats.count?'분석 시점까지의 환경 기록이 필요합니다.':'CA·기타 저장, 1-MCP 처리 또는 미확인 조건은 예시 모델의 적용 범위 밖입니다.'};
  const days=Math.max(0,(Date.parse(asOf)-Date.parse(latest?.date??lot.intake_date))/86400000)+7;const heat=Math.pow(2,temp/10),loss=7*0.012*heat*(1+Math.max(0,90-humidity)*0.08);
  return restrictLegacyLoss({...base,mode:'demo_only' as const,firmness:Math.max(0,initial-days*0.18*heat),weightLoss:loss});
+}
+
+/** Keep stored rows intact while preventing legacy results from being presented as Hongro predictions. */
+export function restrictPredictionForVariety(lot:Pick<Lot,'variety'>,prediction:Prediction):Prediction{
+ if(!isHongroVariety(lot.variety))return prediction;
+ // Whitelist metadata rather than spreading possibly old/unknown calculated fields.
+ return {mode:'unavailable',reason:HONGRO_DEDICATED_REASON,asOf:prediction.asOf,horizonDays:prediction.horizonDays,firmness:null,weightLoss:null,assumedTemperature:prediction.assumedTemperature,assumedHumidity:prediction.assumedHumidity,errorRange:null,modelVersion:'legacy-model-unavailable-for-hongro',sampleOnly:true,limitations:[HONGRO_DEDICATED_REASON,'과거 저장 원본은 유지하며 이 경로에서 부적합한 계산값을 표시하지 않습니다.']};
 }

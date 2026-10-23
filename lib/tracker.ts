@@ -2,6 +2,7 @@
 // 저장 중 변화식은 data/storage-quality-model.xlsx(lib/initial-quality.ts의 storageValue)를 그대로 씁니다.
 // 수식·계수를 임의로 보정하지 않으며, 검증 자료가 확인되지 않아 모든 계산은 "시연용 계산"으로 표시합니다.
 import {storageValue, type StorageId} from './initial-quality';
+import {isHongroVariety, HONGRO_DEDICATED_NOTICE} from './cultivar';
 import {allowModelMetric, isCalendarDate, trackedLoss} from './quality-policy';
 
 // ─────────────────────────────── 날짜 ───────────────────────────────
@@ -42,9 +43,10 @@ export const MODEL_VERSION = 'storage-model-xlsx@2026-10 (data/storage-quality-m
 export const MODEL_RANGE = {displayDays: 300, validatedDays: null as number | null};
 export const modelLabel: Record<StorageId, string> = {cold: '저온저장', mcp: '1-MCP 처리 + 저온저장', ca: 'CA 저장'};
 
-export type StorageCondition = {storage: '일반 저온' | 'CA' | '기타'; mcp: '미처리' | '처리' | '미확인'};
+export type StorageCondition = {variety?: string; storage: '일반 저온' | 'CA' | '기타'; mcp: '미처리' | '처리' | '미확인'};
 /** 기록된 저장 환경(CA 여부)과 처리 이력(1-MCP)을 모델에 대응시킵니다. 모델이 없는 조합은 계산하지 않습니다. */
 export function resolveModel(c: StorageCondition): {id: StorageId | null; reason: string} {
+  if (isHongroVariety(c.variety)) return {id: null, reason: HONGRO_DEDICATED_NOTICE};
   if (c.mcp === '미확인') return {id: null, reason: '1-MCP 처리 여부가 미확인이라 적용할 모델을 고를 수 없습니다.'};
   if (c.storage === '기타') return {id: null, reason: '‘기타’ 저장 조건에 대한 모델이 없습니다.'};
   if (c.storage === 'CA' && c.mcp === '처리') return {id: null, reason: 'CA 저장 + 1-MCP 처리 조합 모델이 없습니다(검증 후 확장 항목).'};
@@ -71,7 +73,8 @@ export type Series = {ok: true; startDay: number; endDay: number; points: Series
  * 분석 기준일 이전(과거)은 기록된 저장 조건의 모델, 이후(미래)는 선택한 조건의 모델을 씁니다.
  * 계산 시작점 이전 날짜는 채우지 않습니다.
  */
-export function computeSeries(o: {metric: MetricId; anchor: Anchor | null; recorded: StorageId | null; recordedReason?: string; future: StorageId | null; futureReason?: string; asOfDay: number; horizon?: number}): Series {
+export function computeSeries(o: {variety?: string; metric: MetricId; anchor: Anchor | null; recorded: StorageId | null; recordedReason?: string; future: StorageId | null; futureReason?: string; asOfDay: number; horizon?: number}): Series {
+  if (isHongroVariety(o.variety)) return {ok: false, reason: HONGRO_DEDICATED_NOTICE};
   const {metric, anchor} = o, horizon = o.horizon ?? MODEL_RANGE.displayDays;
   if (!anchor) return {ok: false, reason: `초기 ${metricMeta[metric].label}${metric === 'loss' ? ' 계산에 필요한 추적 표본 초기 중량' : ''}이 없습니다.`};
   const policy = allowModelMetric(metric, anchor.kind); if (!policy.ok) return policy;

@@ -1,0 +1,127 @@
+.hongro-model-switch { display: flex; flex-wrap: wrap; gap: 4px; width: fit-content; max-width: 100%; margin: 0 0 20px; padding: 4px; border: 1px solid #dce5dd; background: #edf2ed; border-radius: 10px; }
+.hongro-model-switch button { min-height: 44px; padding: 9px 20px; border: 0; border-radius: 7px; background: transparent; color: #617565; font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; }
+.hongro-model-switch button[aria-pressed=true] { background: #23543b; color: #fff; }
+.hongro-model-switch button:focus-visible { outline: 3px solid #91b6a2; outline-offset: 2px; }
+.hongro-predictor { display: grid; gap: 18px; color: var(--ink); }
+.hongro-predictor *, .hongro-predictor *::before, .hongro-predictor *::after { box-sizing: border-box; }
+.hongro-predictor button, .hongro-predictor input, .hongro-predictor summary { touch-action: manipulation; }
+.hongro-predictor button:focus-visible, .hongro-predictor input:focus-visible, .hongro-predictor summary:focus-visible { outline: 3px solid #91b6a2; outline-offset: 3px; }
+.hongro-heading, .hongro-result-heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; align-items: center; }
+.hongro-heading h2 { margin: 5px 0 0; color: #173f2b; font-size: 23px; }
+.hongro-disclaimer { margin: 0; padding: 12px 15px; border: 1px solid #eadfc5; border-radius: 9px; background: #fcf9f1; color: #705b35; font-size: 13px; line-height: 1.75; }
+.hongro-layout { display: grid; grid-template-columns: minmax(265px, 310px) minmax(0, 1fr); gap: 26px; align-items: start; }
+.hongro-input, .hongro-output, .hongro-results { display: grid; min-width: 0; gap: 16px; }
+.hongro-panel { border: 1px solid var(--line); background: #fff; border-radius: 12px; padding: 18px; display: grid; gap: 14px; }
+.hongro-panel h3 { margin: 0; font-size: 17px; color: #294a35; }
+.hongro-panel .qt-help { margin: 0; }
+.hongro-predictor .seg { display: flex; width: 100%; }
+.hongro-predictor .seg button { min-height: 44px; flex: 1; min-width: 0; padding: 8px 6px; font-size: 13px; }
+.hongro-fields { display: grid; gap: 14px; }
+.hongro-predictor .qf input { min-height: 44px; }
+.hongro-predictor .qf-label { line-height: 1.5; }
+.hongro-unit-note { display: flex; gap: 7px; color: #7b633c; padding-top: 12px; border-top: 1px solid #eee6d5; }
+.hongro-unit-note svg { flex: none; margin-top: 2px; }
+.hongro-unit-note p { font-size: 12px; line-height: 1.6; margin: 0; }
+.hongro-slider-label { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #617566; }
+.hongro-slider-label strong { color: #254d35; }
+.hongro-predictor .qt-slider { width: 100%; padding: 0; margin: -9px 0 -10px; min-height: 36px; accent-color: #23543b; }
+.hongro-input > .btn { min-height: 46px; justify-content: center; }
+.hongro-draft { display: flex; gap: 5px; font-size: 12px; line-height: 1.6; }
+.hongro-draft svg { flex: none; margin-top: 2px; }
+.hongro-reset { justify-self: start; margin-top: -8px; }
+.hongro-empty { min-height: 290px; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 32px; text-align: center; border: 1px dashed #cddccd; background: #f4f8f3; border-radius: 12px; color: #58715d; }
+.hongro-empty h3 { color: #294c35; font-size: 20px; margin: 16px 0 8px; }
+.hongro-empty p { font-size: 14px; line-height: 1.8; max-width: 390px; margin: 3px 0; }
+.hongro-empty .qt-help { font-size: 12px; margin-top: 10px; }
+.hongro-error { background: #fff9f2; border-color: #e6d2b6; color: #836442; }
+.hongro-error h3 { color: #79542e; }
+.hongro-results { scroll-margin-top: 95px; }
+.hongro-result-heading h3 { margin: 5px 0 0; color: #173f2b; font-size: 21px; }
+.hongro-metric-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.hongro-metric { min-width: 0; background: #fff; border: 1px solid var(--line); border-radius: 11px; padding: 17px 15px; }
+.hongro-metric h4 { min-height: 40px; margin: 0; font-size: 13px; line-height: 1.6; color: #4a6552; }
+.hongro-predicted { margin: 6px 0 18px; display: flex; flex-wrap: wrap; gap: 5px; align-items: baseline; font-variant-numeric: tabular-nums; }
+.hongro-predicted strong { font-size: 30px; font-weight: 750; color: #1b4930; letter-spacing: -.8px; }
+.hongro-predicted small { color: #728173; font-size: 11px; }
+.hongro-metric dl { display: grid; gap: 10px; margin: 0; }
+.hongro-metric dl div { display: grid; gap: 3px; }
+.hongro-metric dt { font-size: 11px; color: #7b877d; }
+.hongro-metric dd { margin: 0; font-size: 12px; font-weight: 600; color: #3b5944; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.hongro-initial-only { display: flex; flex-wrap: wrap; gap: 14px 28px; padding: 13px 16px; background: #f0f5f0; border-radius: 9px; }
+.hongro-initial-only > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; font-size: 13px; }
+.hongro-initial-only span { color: #667b6b; }
+.hongro-initial-only strong { color: #2d5139; font-variant-numeric: tabular-nums; }
+.hongro-initial-only small { color: #788679; font-size: 11px; }
+.hongro-sugar-note { margin: -4px 0 0; }
+.hongro-result-warnings { padding: 11px 13px; border-left: 3px solid #c6b17c; background: #fcf9f1; }
+.hongro-result-warnings .qt-help:last-child { margin-bottom: 0; }
+.hongro-compare-control { padding: 7px 0 0; line-height: 1.55; }
+.hongro-compare-control input { flex: none; }
+.hongro-predictor .qt-table { width: 100%; table-layout: fixed; font-size: 12px; }
+.hongro-predictor .qt-table th, .hongro-predictor .qt-table td { white-space: normal; overflow-wrap: anywhere; padding: 10px 8px; }
+.hongro-chart-list { display: grid; gap: 14px; }
+.hongro-chart { min-width: 0; padding: 18px 20px 12px; background: #fff; border: 1px solid var(--line); border-radius: 11px; }
+.hongro-chart-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.hongro-chart-heading h4 { margin: 0; color: #294e35; font-size: 15px; }
+.hongro-chart-heading span { color: #728174; font-size: 12px; }
+.hongro-svg { width: 100%; display: block; overflow: visible; cursor: crosshair; touch-action: pan-y; }
+.hongro-svg text { font-size: 11px; fill: #728176; font-variant-numeric: tabular-nums; }
+.hongro-gridline { stroke: #e7ede6; stroke-width: 1; }
+.hongro-line { fill: none; stroke-width: 2.4; stroke-linejoin: round; }
+.hongro-line.cold0 { stroke: #2b6745; }
+.hongro-line.cold4 { stroke: #ae6e27; stroke-dasharray: 6 3; }
+.hongro-selected-line { stroke: #99aa9a; stroke-width: 1; stroke-dasharray: 3 3; }
+.hongro-selected { fill: #2b6745; stroke: white; stroke-width: 2; }
+.hongro-selected.cold4 { fill: #ae6e27; }
+.hongro-legend { display: flex; flex-wrap: wrap; gap: 7px 16px; color: #738075; font-size: 11px; }
+.hongro-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.hongro-legend i { display: inline-block; width: 20px; border-top: 2px solid #2b6745; }
+.hongro-legend i.cold4 { border-color: #ae6e27; border-top-style: dashed; }
+.hongro-export { justify-self: start; min-height: 44px; }
+.hongro-sources { margin-top: 2px; }
+.hongro-sources summary svg:last-child { margin-left: auto; }
+.hongro-model-metadata { margin: 0; display: grid; gap: 8px; }
+.hongro-model-metadata > div { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 14px; }
+.hongro-model-metadata dt { color: #6c7c70; }
+.hongro-model-metadata dd { margin: 0; color: #36533e; overflow-wrap: anywhere; }
+.hongro-coefficients { max-width: 100%; overflow-x: auto; }
+.hongro-predictor .hongro-coefficients .qt-table { min-width: 740px; table-layout: auto; font-size: 12px; }
+.hongro-predictor .hongro-coefficients .qt-table td { white-space: nowrap; }
+.hongro-predictor .hongro-equations .qt-table th:first-child { width: 20%; }
+@media (max-width: 1000px) {
+  .hongro-layout { grid-template-columns: minmax(250px, 280px) minmax(0, 1fr); gap: 20px; }
+  .hongro-metric-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .hongro-metric { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; }
+  .hongro-metric h4 { min-height: 0; }
+  .hongro-predicted { grid-column: 1; margin: 0; }
+  .hongro-metric dl { grid-column: 2; grid-row: 1 / 3; align-self: center; }
+}
+@media (max-width: 800px) {
+  .hongro-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .hongro-panel { padding: 17px; }
+  .hongro-fields { grid-template-columns: 1fr 1fr; gap: 14px 12px; }
+  .hongro-source, .hongro-storage { max-width: 460px; }
+  .hongro-metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hongro-metric { display: block; padding: 16px 12px; }
+  .hongro-metric h4 { min-height: 42px; }
+  .hongro-predicted { margin: 5px 0 15px; }
+  .hongro-disclaimer { font-size: 12px; }
+  .hongro-empty { min-height: 220px; padding: 25px; }
+  .hongro-chart { padding: 16px 14px 12px; }
+}
+@media (max-width: 520px) {
+  .hongro-model-switch { width: 100%; }
+  .hongro-model-switch button { flex: 1 1 130px; padding: 9px 12px; }
+  .hongro-heading h2 { font-size: 21px; }
+  .hongro-fields { grid-template-columns: minmax(0, 1fr); }
+  .hongro-metric-grid { grid-template-columns: minmax(0, 1fr); }
+  .hongro-metric { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px 18px; padding: 16px; }
+  .hongro-metric h4 { min-height: 0; }
+  .hongro-predicted { margin: 0; }
+  .hongro-predicted strong { font-size: 28px; }
+  .hongro-predicted small { font-size: 10px; }
+  .hongro-chart { padding: 16px 10px 12px; }
+  .hongro-initial-only { display: grid; gap: 12px; }
+  .hongro-result-heading h3 { font-size: 20px; }
+  .hongro-model-metadata > div { grid-template-columns: 80px minmax(0, 1fr); gap: 8px; }
+}
