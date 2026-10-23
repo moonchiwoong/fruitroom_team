@@ -3,6 +3,7 @@ import {InputError,numberOrNull,validDate,parseCsv,summarizeEnvironment,demoPred
 import {today,type Lot,type EnvRow,type Observation,type Photo} from './lot-types';
 import {restrictLegacyLoss} from './quality-policy';
 import {HONGRO_DEDICATED_REASON,isHongroVariety} from './cultivar';
+import {HONGRO_MODEL_VERSION,HONGRO_UNITS} from './hongro';
 async function client(){const c=await serverClient();const {data,error}=await c.auth.getUser();if(error||!data.user)throw new InputError('로그인이 필요합니다.');return c;}
 function checked<T>(r:{data:T;error:unknown}):T{if(r.error)throw r.error;return r.data;}
 async function storage(){return (await client()).storage.from(process.env.SUPABASE_STORAGE_BUCKET||'fruitroom_files');}
@@ -14,8 +15,10 @@ async function payload(req:Request){const text=await req.text();if(text.length>3
 function short(v:unknown,label:string,optional=false,max=120){if(typeof v!=='string'||(!optional&&!v.trim())||v.length>max)throw new InputError(`${label}를 확인해 주세요.`);return v.trim();}
 export async function listLots(){const c=await client();const lots=checked(await c.from('lots').select('*').order('created_at',{ascending:false}).limit(100))||[];const result=await Promise.all(lots.map(async(l:any)=>{const [e,o,f]=await Promise.all([c.from('environment').select('timestamp',{count:'exact'}).eq('lot_id',l.id).order('timestamp',{ascending:false}).limit(1),c.from('observations').select('defects',{count:'exact'}).eq('lot_id',l.id).order('date',{ascending:false}).order('id',{ascending:false}).limit(1),c.from('files').select('id',{count:'exact',head:true}).eq('lot_id',l.id).eq('kind','photo')]);if(e.error||o.error||f.error)throw e.error||o.error||f.error;return {...l,environment_count:e.count||0,observation_count:o.count||0,photo_count:f.count||0,latest_defects:o.data?.[0]?.defects,last_environment:e.data?.[0]?.timestamp};}));return json({lots:result});}
 // ── 물량 기록: 이름·품종·입고일만 필수, 나머지는 측정·확인한 항목만 저장 ──
-function lotFields(p:any,partial:boolean){
+function lotFields(p:any,partial:boolean,variety:unknown=p.variety){
  const out:Record<string,unknown>={};const has=(k:string)=>Object.prototype.hasOwnProperty.call(p,k);
+ if(p.mode==='example'||p.sampleOnly===true||(has('record_mode')&&p.record_mode!=='real'))throw new InputError('예시 데이터는 실제 물량 기록으로 저장할 수 없습니다.');
+ const hongro=isHongroVariety(variety);
  const optText=(k:string,label:string,max=120)=>{if(!has(k))return;const v=p[k];out[k]=v===null||v===undefined||v===''?null:short(v,label,true,max)||null;};
  const optDate=(k:string,label:string)=>{if(!has(k))return;out[k]=p[k]===null||p[k]===''?null:validDate(p[k],label);};
  if(!partial||has('name'))out.name=short(p.name,'물량 이름');
@@ -25,10 +28,10 @@ function lotFields(p:any,partial:boolean){
  optText('location','저장고 위치');optText('sensor_id','센서 번호',60);optText('packaging','포장 형태');
  if(has('quantity'))out.quantity=numberOrNull(p.quantity,0.1,1000000,'입고 중량');
  if(has('initial_sample_count')){const n=numberOrNull(p.initial_sample_count,1,10000,'표본 수');if(n!==null&&!Number.isInteger(n))throw new InputError('표본 수는 정수로 입력해 주세요.');out.initial_sample_count=n;}
- if(has('firmness'))out.firmness=numberOrNull(p.firmness,0,300,'초기 경도 N');
- if(has('brix'))out.brix=numberOrNull(p.brix,0,40,'초기 당도 °Brix');
- if(has('acidity'))out.acidity=numberOrNull(p.acidity,0,10,'초기 산도 %');
- if(has('weight'))out.weight=numberOrNull(p.weight,1,2000,'평균 중량 g');
+ if(has('firmness'))out.firmness=numberOrNull(p.firmness,0,hongro?Number.MAX_VALUE:300,'초기 경도 N');
+ if(has('brix'))out.brix=numberOrNull(p.brix,0,hongro?Number.MAX_VALUE:40,'초기 당도 °Brix');
+ if(has('acidity'))out.acidity=numberOrNull(p.acidity,0,hongro?Number.MAX_VALUE:10,'초기 산도 %');
+ if(has('weight'))out.weight=numberOrNull(p.weight,hongro?0:1,hongro?Number.MAX_VALUE:2000,'평균 중량 g');
  if(!partial||has('storage')){const v=p.storage??'일반 저온';if(!['일반 저온','CA','기타'].includes(v))throw new InputError('저장 방식을 확인해 주세요.');out.storage=v;}
  if(!partial||has('mcp')){const v=p.mcp??'미확인';if(!['미처리','처리','미확인'].includes(v))throw new InputError('1-MCP 처리 여부를 확인해 주세요.');out.mcp=v;}
  if(has('notes'))out.notes=short(p.notes??'','메모',true,1000);
@@ -50,17 +53,41 @@ export function cleanDetails(v:unknown){
  if(s.mcp){const m=s.mcp;o.mcp={treated_on:date(m.treated_on,'1-MCP 처리일'),product:txt(m.product,'제품명'),concentration:txt(m.concentration,'농도',40),hours:num(m.hours,0,500,'처리 시간 h'),temp:num(m.temp,-5,40,'처리 온도 °C')};}
  if(s.ca){const m=s.ca;o.ca={from:date(m.from,'CA 시작일'),to:date(m.to,'CA 종료일'),o2:num(m.o2,0,21,'산소 농도 %'),co2:num(m.co2,0,30,'이산화탄소 농도 %')};}
  if(s.tracked){const m=s.tracked;const c=num(m.count,1,10000,'추적 표본 수');if(c!==null&&!Number.isInteger(c))throw new InputError('추적 표본 수는 정수로 입력해 주세요.');o.tracked={sample_id:txt(m.sample_id,'추적 표본 ID',80),count:c,initial_weight:num(m.initial_weight,1,2000,'추적 표본 초기 평균 중량 g')};}
+ if(s.hongro!==undefined&&s.hongro!==null){
+  const h=s.hongro;
+  if(typeof h!=='object'||Array.isArray(h)||h.schemaVersion!==1||h.cultivar!=='hongro'||h.region!=='geochang'||h.modelVersion!==HONGRO_MODEL_VERSION)throw new InputError('거창 홍로 모델 정보를 확인해 주세요.');
+  if(h.mode!=='real')throw new InputError('예시 데이터는 실제 물량 기록으로 저장할 수 없습니다.');
+  if(!['measured','weather'].includes(h.source))throw new InputError('홍로 초기품질 출처를 확인해 주세요.');
+  if(!['cold0','cold4'].includes(h.storage))throw new InputError('홍로는 0℃ 또는 4℃ 저온저장만 지원합니다.');
+  for(const key of ['initial','weather'])if(!h[key]||typeof h[key]!=='object'||Array.isArray(h[key]))throw new InputError('홍로 초기품질·기상자료 형식을 확인해 주세요.');
+  if(!h.units||typeof h.units!=='object'||Object.entries(HONGRO_UNITS).some(([key,unit])=>h.units[key]!==unit))throw new InputError('홍로 초기품질 단위를 확인해 주세요.');
+  const initial={firmness:num(h.initial.firmness,0,Number.MAX_VALUE,'홍로 초기 경도'),brix:num(h.initial.brix,0,Number.MAX_VALUE,'홍로 초기 당도'),acidity:num(h.initial.acidity,0,Number.MAX_VALUE,'홍로 초기 산도'),weight:num(h.initial.weight,0,Number.MAX_VALUE,'홍로 초기 중량'),diameter:num(h.initial.diameter,0,Number.MAX_VALUE,'홍로 초기 횡경')};
+  const weather={chang_min4:num(h.weather.chang_min4,-Number.MAX_VALUE,Number.MAX_VALUE,'4월 일최저기온 평균'),chang_LC56:num(h.weather.chang_LC56,-Number.MAX_VALUE,Number.MAX_VALUE,'5~6월 누적 생장도일'),chang_LC78:num(h.weather.chang_LC78,-Number.MAX_VALUE,Number.MAX_VALUE,'7~8월 누적 생장도일'),chang_9rain:num(h.weather.chang_9rain,-Number.MAX_VALUE,Number.MAX_VALUE,'9월 누적 강수량')};
+  o.hongro={schemaVersion:1,modelVersion:HONGRO_MODEL_VERSION,cultivar:'hongro',region:'geochang',mode:'real',source:h.source,storage:h.storage,initial,weather,units:{...HONGRO_UNITS}};
+ }
  return o;
+}
+function checkLotModel(l:Record<string,unknown>){
+ const h=(l.details as {hongro?:any}|null|undefined)?.hongro;
+ if(!isHongroVariety(l.variety)){if(h)throw new InputError('후지 물량에 홍로 모델 입력을 저장할 수 없습니다.');return;}
+ // Legacy observational records have no prediction provenance. Keep them editable;
+ // the tracker restores empty Hongro inputs and never infers a model from these fields.
+ if(!h)return;
+ if(l.storage!=='일반 저온'||l.mcp!=='미처리')throw new InputError('홍로 예측은 0℃·4℃ 저온저장만 지원하며 CA·1-MCP 조건을 사용할 수 없습니다.');
+ for(const metric of ['firmness','brix','acidity','weight']){
+  const expected=h.source==='measured'?h.initial[metric]:null;
+  if((l[metric]??null)!==(expected??null))throw new InputError('홍로 초기품질은 선택한 출처의 입력값과 함께 저장해 주세요. 기상 추정값은 실측값으로 저장할 수 없습니다.');
+ }
 }
 function checkLotDates(l:Record<string,unknown>){const start=l.storage_start_date||l.intake_date;if(typeof start==='string'&&typeof l.initial_measured_on==='string'&&l.initial_measured_on<start)throw new InputError('초기 측정일이 저장 시작일보다 빠릅니다.');if(typeof l.harvest_date==='string'&&typeof l.intake_date==='string'&&l.harvest_date>l.intake_date)throw new InputError('수확일은 입고일보다 늦을 수 없습니다.');}
 export async function createLot(req:Request){checkOrigin(req);const p=await payload(req);
- const f=lotFields(p,false);checkLotDates(f);const id=crypto.randomUUID();
+ const f=lotFields(p,false);checkLotDates(f);checkLotModel(f);const id=crypto.randomUUID();
  const lot={id,...f,created_at:new Date().toISOString(),team_shared:p.team_shared===true||p.team_shared==='on'||p.team_shared==='true'};
  const c=await client();const count=await c.from('lots').select('id',{count:'exact',head:true});if(count.error)throw count.error;if((count.count||0)>=100)throw new InputError('최대 100개 물량까지 등록할 수 있습니다.');
  checked(await c.from('lots').insert(lot));return json({lot:checked(await c.from('lots').select('*').eq('id',id).single())},201);}
 export async function updateLot(id:string,req:Request){checkOrigin(req);const existing=await getLot(id);const p=await payload(req);
- const f=lotFields(p,true);if(!Object.keys(f).length)throw new InputError('바꿀 항목이 없습니다.');
- checkLotDates({...existing,...f});
+ const f=lotFields(p,true,p.variety??existing.variety);if(!Object.keys(f).length)throw new InputError('바꿀 항목이 없습니다.');
+ checkLotDates({...existing,...f});checkLotModel({...existing,...f});
  const c=await client();checked(await c.from('lots').update(f).eq('id',id));return json({lot:await getLot(id)});}
 export async function getAnalysis(id:string,req:Request){const lot=await getLot(id);const asOf=validDate(new URL(req.url).searchParams.get('asOf')??today());if(asOf<lot.intake_date||asOf>today())throw new InputError('분석 기준일은 입고일부터 오늘 사이여야 합니다.');const c=await client();let er:EnvRow[]=[];for(let offset=0;offset<20000;offset+=1000){const rows=checked(await c.from('environment').select('timestamp,sensor_id,temperature,humidity').eq('lot_id',id).eq('sensor_id',lot.sensor_id).order('timestamp').range(offset,offset+999)) as EnvRow[];er.push(...rows);if(rows.length<1000)break;}const [o,f,p]=await Promise.all([c.from('observations').select('*').eq('lot_id',id).lte('date',asOf).order('date').order('id'),c.from('files').select('id,date,name,notes').eq('lot_id',id).eq('kind','photo').lte('date',asOf).order('date').order('created_at'),c.from('predictions').select('result').eq('lot_id',id).eq('as_of',asOf).order('created_at',{ascending:false}).limit(1)]);const obs=checked(o),photos=checked(f),pred=checked(p);return {lot,asOf,stats:summarizeEnvironment(er,lot,asOf),observations:obs as Observation[],photos:photos as Photo[],prediction:pred?.[0]?restrictPredictionForVariety(lot,restrictLegacyLoss(JSON.parse(pred[0].result))):null};}
 export async function uploadEnvironment(id:string,req:Request){checkOrigin(req);const lot=await getLot(id);const form=await req.formData();const file=form.get('file');if(!(file instanceof File)||file.size>1024*1024)throw new InputError('1MB 이하의 UTF-8 CSV를 선택해 주세요.');if(!lot.sensor_id)throw new InputError('물량 기본 정보에 센서 번호를 먼저 입력해 주세요. CSV의 sensor_id와 같은 값이어야 합니다.');const raw=await file.text();const parsed=parseCsv(raw,lot.sensor_id);const c=await client();const count=await c.from('environment').select('id',{count:'exact',head:true}).eq('lot_id',id);if(count.error)throw count.error;if((count.count||0)+parsed.rows.length>20000)throw new InputError('물량별 기록은 최대 20,000개까지 저장할 수 있습니다.');const fileId=crypto.randomUUID(),key=`lots/${id}/csv/${fileId}.csv`;const store=await storage();checked(await store.upload(key,raw,{contentType:'text/csv; charset=utf-8'}));let inserted=0;try{for(let i=0;i<parsed.rows.length;i+=500){const rows=parsed.rows.slice(i,i+500).map(row=>({...row,lot_id:id}));const result=checked(await c.from('environment').upsert(rows,{onConflict:'lot_id,sensor_id,timestamp',ignoreDuplicates:true}).select('id'));inserted+=result?.length||0;}checked(await c.from('files').insert({id:fileId,lot_id:id,kind:'csv',key,name:file.name.slice(0,180),mime:'text/csv',date:today(),notes:'원본 환경 기록',created_at:new Date().toISOString()}));return json({inserted,duplicates:parsed.duplicates+parsed.rows.length-inserted,mismatched:parsed.mismatched,originalSaved:true});}catch(e){await store.remove([key]);throw e;}}
