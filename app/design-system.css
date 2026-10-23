@@ -190,3 +190,68 @@ a.btn{text-decoration:none}
 .lv-preview.lv-anim.is-play .lv-dot{opacity:1;transform:none;transition:opacity .3s ease 1.25s,transform .45s cubic-bezier(.3,1.6,.5,1) 1.25s}
 .lv-preview-values dd{font-variant-numeric:tabular-nums}
 @media (prefers-reduced-motion:reduce){.lv-motion [data-reveal]{opacity:1!important;transform:none!important;transition:none!important}}
+
+/* ── 사과가 갈라지며 데이터가 되는 스크롤 장면 ── */
+.landing-v2{overflow-x:clip}
+.as-story,.as-loading{position:relative;width:100vw;margin-left:calc(50% - 50vw)}
+.as-story{height:560vh;background:linear-gradient(180deg,#fff 0%,var(--ds-bg-2) 18%,var(--ds-bg-2) 82%,#fff 100%)}
+.as-loading{height:calc(100svh - 64px)}
+.as-stage{position:sticky;top:64px;height:calc(100svh - 64px);min-height:520px;overflow:hidden;--gut:max(24px,calc((100% - 1180px) / 2 + 24px))}
+.as-canvas,.as-canvas canvas,.as-lines{position:absolute;inset:0;width:100%;height:100%;display:block}
+.as-lines{pointer-events:none;overflow:visible}
+.as-lines path{fill:none;stroke:var(--ds-brand);stroke-width:1.6;stroke-dasharray:1;stroke-dashoffset:1}
+.as-lines circle{fill:#fff;stroke:var(--ds-brand);stroke-width:2.4}
+.as-intro{position:absolute;left:var(--gut);top:50%;width:min(520px,44%);margin-top:-170px;will-change:opacity,transform}
+.as-intro-copy h1{font-size:clamp(34px,4.2vw,54px);line-height:1.22;font-weight:700;letter-spacing:-1.4px;color:var(--ds-text);margin:0}
+.as-intro .lv-hero-copy>*{animation:as-in .9s cubic-bezier(.2,.7,.2,1) both}
+.as-intro .lv-hero-copy>:nth-child(2){animation-delay:.08s}.as-intro .lv-hero-copy>:nth-child(3){animation-delay:.16s}
+.as-intro .lv-hero-copy>:nth-child(4){animation-delay:.24s}.as-intro .lv-hero-copy>:nth-child(5){animation-delay:.32s}
+.as-canvas canvas{animation:as-fade 1.2s ease .15s both}
+.as-intro-copy h1 .lv-line{display:block;color:inherit;background:none;-webkit-text-fill-color:currentColor}
+@keyframes as-in{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+@keyframes as-fade{from{opacity:0}to{opacity:1}}
+.as-hint{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;font-size:13px;color:var(--ds-text-3);pointer-events:none}
+.as-hint i{width:22px;height:34px;border:2px solid var(--ds-line-2);border-radius:12px;position:relative}
+.as-hint i::after{content:"";position:absolute;left:50%;top:6px;width:4px;height:8px;margin-left:-2px;border-radius:2px;background:var(--ds-text-3);animation:as-wheel 1.6s ease-in-out infinite}
+@keyframes as-wheel{0%{opacity:0;transform:translateY(0)}30%{opacity:1}100%{opacity:0;transform:translateY(10px)}}
+.as-cap{position:absolute;left:var(--gut);top:50%;width:min(400px,36%);transform:translateY(-50%);margin-top:-60px;opacity:0;visibility:hidden}
+.as-cap h2{font-size:clamp(28px,3vw,40px);line-height:1.25;font-weight:700;letter-spacing:-1px;color:var(--ds-text);margin:0 0 14px}
+.as-cap p{font-size:17px;line-height:1.65;color:var(--ds-text-2);margin:0}
+.as-cap .as-step{font-size:15px;font-weight:700;color:var(--ds-brand);margin:0 0 12px;letter-spacing:.2px}
+.as-final .lv-actions{margin-top:24px}
+.as-card{position:absolute;right:var(--gut);top:50%;width:min(460px,46%);margin-top:-200px;opacity:0;visibility:hidden;box-shadow:0 20px 60px rgba(25,31,40,.08);background:#fff!important;border:1px solid var(--ds-line)}
+.as-card .lv-preview-head{margin-bottom:2px}
+.as-slots{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.as-slot{height:68px;border-radius:12px;background:var(--ds-bg-2)}
+.as-card-title{margin:6px 0 0;font-size:15px;font-weight:600;color:var(--ds-text)}
+.as-card svg{background:var(--ds-bg-2)!important}
+.as-label{position:absolute;left:0;top:0;z-index:3;display:flex;flex-direction:column;justify-content:center;gap:2px;padding:10px 14px;border-radius:12px;background:#fff;
+  box-shadow:0 10px 30px rgba(25,31,40,calc(.12 * var(--shadow,1))),0 0 0 1px rgba(25,31,40,calc(.06 * var(--shadow,1)));opacity:0;will-change:transform,opacity;box-sizing:border-box;overflow:hidden}
+.as-label-name{font-size:14px;color:var(--ds-text-2);display:flex;align-items:center;gap:6px;white-space:nowrap}
+.as-label-name em{font-style:normal;font-size:11px;font-weight:700;color:#9a5b00;background:#fff4e0;border-radius:4px;padding:1px 5px}
+.as-label-value{white-space:nowrap}
+.as-label-value b{font-size:24px;font-weight:700;color:var(--ds-text);font-variant-numeric:tabular-nums;letter-spacing:-.4px}
+.as-label-value small{font-size:13px;color:var(--ds-text-2);margin-left:3px}
+@media(max-width:819px){
+  .as-story{height:480vh}
+  .as-stage{--gut:16px}
+  .as-intro{left:16px;right:16px;width:auto;top:28px;margin-top:0}
+  .as-intro-copy h1{font-size:32px;letter-spacing:-1px}
+  .as-intro .lv-lead{font-size:16px;margin-top:12px}
+  .as-intro .lv-actions{margin-top:18px}
+  .as-intro .lv-actions .btn{flex:1 1 auto;justify-content:center}
+  .as-intro .lv-note{display:none}
+  .as-hint{display:none}
+  .as-cap{left:16px;right:16px;width:auto;top:auto;bottom:22px;transform:none;margin-top:0}
+  .as-cap h2{font-size:24px;margin-bottom:8px}
+  .as-cap p{font-size:15px}
+  .as-cap .as-step{font-size:14px;margin-bottom:6px}
+  .as-final .lv-actions{margin-top:14px}.as-final .lv-actions .btn{flex:1 1 100%;justify-content:center}
+  .as-card{left:16px;right:16px;width:auto;top:16px;margin-top:0;padding:14px}
+  .as-slot{height:58px}
+  .as-label{padding:8px 10px}
+  .as-label-value b{font-size:19px}
+  .as-label-value small{font-size:12px}
+  .as-label-name{font-size:13px}
+}
+@media(max-width:819px) and (max-height:700px){.as-card svg{max-height:120px}.as-final .lv-actions .btn{min-height:44px}}
