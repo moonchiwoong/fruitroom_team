@@ -1,5 +1,6 @@
 'use client';
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import dynamic from 'next/dynamic';
 import {Apple, ArrowRight, Loader2, MailCheck} from 'lucide-react';
 import {authMessage, supabaseBrowser} from '@/lib/supabase-browser';
 import {regions, type RegionId} from '@/lib/initial-quality';
@@ -7,6 +8,10 @@ import {addDays, computeSeries, fmtDate, fmtNum, summarySentence, todayKST, valu
 import {HANDOFF_KEY} from '@/lib/tracker-form';
 
 type Mode = 'signup' | 'login' | 'reset' | 'recovery';
+
+// 사과가 갈라지며 데이터가 되는 스크롤 장면 (3D). 불러오는 동안은 같은 소개 문구만 보여 줍니다.
+const AppleSplitStory = dynamic(() => import('@/components/apple-split-story'), {ssr: false, loading: () => <div className="as-loading" />});
+const webglOK = () => { try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch { return false; } };
 
 /** 움직임 줄이기를 켠 사용자에게는 애니메이션 없이 바로 보여 줍니다. */
 const motionOK = () => typeof window !== 'undefined' && !!window.matchMedia && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -41,6 +46,9 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
   const [mode, setMode] = useState<Mode>(recovery ? 'recovery' : 'signup');
   const [handoff, setHandoff] = useState(false);
   const [motion] = useState(motionOK);
+  // 움직임 줄이기 설정이거나 3D를 쓸 수 없으면 기존 첫 화면(정지 화면)을 보여 줍니다.
+  const [story, setStory] = useState(() => motionOK() && webglOK());
+  const storyFail = useCallback(() => setStory(false), []);
   const rootRef = useRef<HTMLDivElement>(null);
   // 스크롤해서 화면에 들어온 요소(data-reveal)를 차례로 떠오르게 합니다.
   useEffect(() => {
@@ -75,6 +83,16 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
     </header>
 
     <main>
+      {story ? <AppleSplitStory onFail={storyFail} intro={<div className="lv-hero-copy as-intro-copy">
+          <p className="lv-kicker">사과 품질 예측·저장 관리</p>
+          <h1 id="lv-title"><span className="lv-line">초기 품질부터</span><span className="lv-line">저장 중 변화까지</span></h1>
+          <p className="lv-lead">초기 품질을 입력하고, 저장 기간에 따른 변화를 예측해 실제 측정값과 비교하세요.</p>
+          <div className="lv-actions">
+            <a className="btn btn-primary btn-lg" href="/try">예시로 체험하기<ArrowRight size={18} /></a>
+            <a className="btn btn-soft btn-lg" href="/try?mode=real">내 측정값 입력하기</a>
+          </div>
+          <p className="lv-note">가입하지 않아도 바로 볼 수 있어요. 기록으로 저장할 때만 로그인합니다.</p>
+        </div>} /> :
       <section className="lv-hero" aria-labelledby="lv-title">
         <div className="lv-hero-copy">
           <p className="lv-kicker" {...d(0)}>사과 품질 예측·저장 관리</p>
@@ -87,7 +105,7 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
           <p className="lv-note" {...d(5)}>가입하지 않아도 바로 볼 수 있어요. 기록으로 저장할 때만 로그인합니다.</p>
         </div>
         <div className="lv-preview-wrap" {...d(4)}><ServicePreview animate={motion} /></div>
-      </section>
+      </section>}
 
       <section className="lv-section" aria-labelledby="lv-how">
         <h2 id="lv-how" {...d(0)}>세 단계면 충분해요</h2>

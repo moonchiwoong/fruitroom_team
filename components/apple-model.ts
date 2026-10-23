@@ -14,17 +14,7 @@ export function buildApple(opts: {seed?: number; leaf?: boolean} = {}) {
   // ── 과실 모양: 어깨가 넓고 아래로 갈수록 좁아지며, 꼭지·꽃받침 자리가 움푹하고 아래쪽에 다섯 개의 굴곡 ──
   const geo = keep(new THREE.SphereGeometry(1, 192, 144)), pos = geo.attributes.position;
   const tilt = rand() * Math.PI * 2;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), th = Math.atan2(z, x), r = Math.hypot(x, z);
-    let w = 1 + 0.07 * y - 0.13 * Math.max(0, -y) ** 2;                         // 위는 넓고 아래는 좁게
-    w *= 1 + 0.028 * Math.cos(th * 5 + 0.4) * Math.max(0, -y) ** 2.2;           // 아래쪽 다섯 굴곡
-    w *= 1 + 0.01 * Math.cos(th * 5 + 1.1) * Math.max(0, y) ** 3;              // 어깨의 약한 굴곡
-    w *= 1 + 0.015 * Math.cos(th - tilt) * (0.6 + 0.4 * y);                      // 약간 비대칭
-    let yy = y * 0.93;
-    if (y > 0) yy -= 0.3 * Math.exp(-(r * r) / 0.075);                          // 꼭지 자리
-    else yy += 0.16 * Math.exp(-(r * r) / 0.05);                                // 꽃받침 자리
-    pos.setXYZ(i, x * w, yy, z * w);
-  }
+  for (let i = 0; i < pos.count; i++) { const [a, b, c] = shapeAt(pos.getX(i), pos.getY(i), pos.getZ(i), tilt); pos.setXYZ(i, a, b, c); }
   geo.computeVertexNormals();
   const skin = keep(new THREE.MeshPhysicalMaterial({
     color: 0xb3262a, roughness: 0.5, metalness: 0,
@@ -66,7 +56,22 @@ export function buildApple(opts: {seed?: number; leaf?: boolean} = {}) {
   // ── 잎: 끝이 뾰족한 타원형, 가운데 맥을 따라 살짝 접히고 휘어짐 ──
   if (opts.leaf !== false) group.add(buildLeaf(keep));
 
-  return {group, dispose: () => disposables.forEach(d => d.dispose())};
+  /** 꼭지-꽃받침을 지나는 세로 단면(x=0)의 윤곽. (z, y) 점 목록 */
+  const cutProfile = (n = 192) => Array.from({length: n}, (_, k) => { const a = k / n * Math.PI * 2, [, y, z] = shapeAt(0, Math.cos(a), Math.sin(a), tilt); return new THREE.Vector2(z, y); });
+  return {group, cutProfile, dispose: () => disposables.forEach(d => d.dispose())};
+}
+
+/** 구 위의 점을 사과 모양으로 옮깁니다. */
+function shapeAt(x: number, y: number, z: number, tilt: number): [number, number, number] {
+  const th = Math.atan2(z, x), r = Math.hypot(x, z);
+  let w = 1 + 0.07 * y - 0.13 * Math.max(0, -y) ** 2;                         // 위는 넓고 아래는 좁게
+  w *= 1 + 0.028 * Math.cos(th * 5 + 0.4) * Math.max(0, -y) ** 2.2;           // 아래쪽 다섯 굴곡
+  w *= 1 + 0.01 * Math.cos(th * 5 + 1.1) * Math.max(0, y) ** 3;              // 어깨의 약한 굴곡
+  w *= 1 + 0.015 * Math.cos(th - tilt) * (0.6 + 0.4 * y);                      // 약간 비대칭
+  let yy = y * 0.93;
+  if (y > 0) yy -= 0.3 * Math.exp(-(r * r) / 0.075);                          // 꼭지 자리
+  else yy += 0.16 * Math.exp(-(r * r) / 0.05);                                // 꽃받침 자리
+  return [x * w, yy, z * w];
 }
 
 function buildLeaf(keep: <T extends {dispose: () => void}>(x: T) => T) {
