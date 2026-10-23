@@ -43,17 +43,17 @@ export function HardnessConvert({valueN, probeMm, label = '단위 변환'}: {val
 }
 
 /** 품질 변화 그래프: 실측은 점, 모델 계산은 선, 분석 기준일 이후(미래 가정)는 점선. */
-export function TrackerChart({metric, series, baseline, measured, startDate, asOfDay, selectedDay, onSelect, exampleMode}: {
+export function TrackerChart({metric, series, baseline, measured, startDate, asOfDay, selectedDay, onSelect, exampleMode, maxDays = MODEL_RANGE.displayDays, unit, sourceLabel}: {
   metric: MetricId; series: Series; baseline: {series: Series; label: string} | null; measured: MeasuredPoint[]; startDate: string;
-  asOfDay: number; selectedDay: number; onSelect: (d: number) => void; exampleMode: boolean;
+  asOfDay: number; selectedDay: number; onSelect: (d: number) => void; exampleMode: boolean; maxDays?: number; unit?: string; sourceLabel?: string;
 }) {
   const svg = useRef<SVGSVGElement>(null), dragging = useRef(false);
   // 화면 폭에 맞춰 좌표계를 정해 글자가 작은 화면에서도 읽히게 합니다(1단위 ≈ 1px).
   const [box, setBox] = useState(760);
   useEffect(() => { const el = svg.current?.parentElement; if (!el) return; const ro = new ResizeObserver(([e]) => setBox(Math.round(e.contentRect.width))); ro.observe(el); return () => ro.disconnect(); }, []);
   const compact = box < 560;
-  const H_DAYS = MODEL_RANGE.displayDays, W = Math.max(300, Math.min(box, 900)), H = compact ? 280 : 330, L = compact ? 46 : 58, R = compact ? 10 : 18, T = 26, B = compact ? 52 : 58;
-  const meta = metricMeta[metric];
+  const H_DAYS = maxDays, W = Math.max(300, Math.min(box, 900)), H = compact ? 280 : 330, L = compact ? 46 : 58, R = compact ? 10 : 18, T = 26, B = compact ? 52 : 58;
+  const meta = {...metricMeta[metric], unit: unit ?? metricMeta[metric].unit};
   const {lo, hi} = useMemo(() => {
     const vals: number[] = [...measured.map(m => m.value)];
     if (series.ok) vals.push(...series.points.map(p => p.value));
@@ -71,11 +71,12 @@ export function TrackerChart({metric, series, baseline, measured, startDate, asO
     return list.map((p, i) => `${i ? 'L' : 'M'}${x(p.day).toFixed(1)},${y(p.value).toFixed(1)}`).join('');
   };
   const pick = (clientX: number) => { const r = svg.current!.getBoundingClientRect(); const d = Math.round(((clientX - r.left) / r.width * W - L) / (W - L - R) * H_DAYS); onSelect(Math.max(0, Math.min(H_DAYS, d))); };
-  const ticks = compact ? [0, 100, 200, 300] : [0, 50, 100, 150, 200, 250, 300];
+  const ticks = Array.from({length: compact ? 4 : 7}, (_, i) => i * H_DAYS / (compact ? 3 : 6));
   const yt = [0, 0.25, 0.5, 0.75, 1].map(f => lo + (hi - lo) * f);
-  const sel = series.ok && selectedDay >= series.startDay && selectedDay <= series.endDay ? series.points[selectedDay - series.startDay] : null;
+  const selectedInRange = Number.isInteger(selectedDay) && selectedDay >= 0 && selectedDay <= H_DAYS;
+  const sel = selectedInRange && series.ok && selectedDay >= series.startDay && selectedDay <= series.endDay ? series.points[selectedDay - series.startDay] : null;
   return <svg ref={svg} viewBox={`0 0 ${W} ${H}`} className="tchart" role="img"
-    aria-label={`${meta.label} 변화 그래프. 실측 ${measured.length}개 점, 모델 계산 선, 분석 기준일 저장 ${asOfDay}일차`}
+    aria-label={`${meta.label} 변화 그래프 (${meta.unit}). ${sourceLabel ? `초기품질 출처: ${sourceLabel}. ` : ''}${exampleMode ? '예시 측정' : '실측'} ${measured.length}개 점, 모델 계산 선, 저장 0~${H_DAYS}일, 분석 기준일 저장 ${asOfDay}일차`}
     onPointerDown={e => { dragging.current = true; (e.target as Element).setPointerCapture?.(e.pointerId); pick(e.clientX); }}
     onPointerMove={e => { if (dragging.current) pick(e.clientX); }} onPointerUp={() => { dragging.current = false; }}>
     {yt.map((v, i) => <g key={i}><line x1={L} x2={W - R} y1={y(v)} y2={y(v)} className="g" /><text x={L - 8} y={y(v) + 4} textAnchor="end" className="tk">{fmtNum(v, meta.digits === 3 ? 2 : meta.digits)}</text></g>)}
@@ -87,15 +88,16 @@ export function TrackerChart({metric, series, baseline, measured, startDate, asO
     {baseline?.series.ok && <><path d={path(baseline.series, 'past')} className="base-line" /><path d={path(baseline.series, 'future')} className="base-line fut" /></>}
     {series.ok && <><path d={path(series, 'past')} className="calc-line" /><path d={path(series, 'future')} className="calc-line fut" /></>}
     {measured.map(m => m.day >= 0 && m.day <= H_DAYS && <circle key={m.id} cx={x(m.day)} cy={y(m.value)} r={5} className={exampleMode ? 'pt ex' : 'pt'}><title>{`${fmtDate(m.date)} (저장 ${m.day}일차) ${exampleMode ? '예시 측정' : '실측'} ${fmtNum(m.value, meta.digits)} ${meta.unit}`}</title></circle>)}
-    <line x1={x(selectedDay)} x2={x(selectedDay)} y1={T} y2={H - B} className="selline" />
+    {selectedInRange && <line x1={x(selectedDay)} x2={x(selectedDay)} y1={T} y2={H - B} className="selline" />}
     {sel && <circle cx={x(selectedDay)} cy={y(sel.value)} r={5.5} className="selpt" />}
-    <text x={Math.min(x(selectedDay) + 6, W - R - 80)} y={T + 26} className="sel-t">선택 {selectedDay}일차</text>
+    {selectedInRange && <text x={Math.min(x(selectedDay) + 6, W - R - 80)} y={T + 26} className="sel-t">선택 {selectedDay}일차</text>}
   </svg>;
 }
 
-export function ChartLegend({exampleMode, hasBaseline, baselineLabel}: {exampleMode: boolean; hasBaseline: boolean; baselineLabel: string}) {
+export function ChartLegend({exampleMode, hasBaseline, baselineLabel, initialSource, hasMeasured = true}: {exampleMode: boolean; hasBaseline: boolean; baselineLabel: string; initialSource?: string; hasMeasured?: boolean}) {
   return <div className="tlegend">
-    <span><svg width="14" height="14"><circle cx="7" cy="7" r="4.5" className={exampleMode ? 'pt ex' : 'pt'} /></svg>{exampleMode ? '예시 측정(점)' : '실측(점)'}</span>
+    {initialSource && <span>초기품질 출처: {initialSource}</span>}
+    {hasMeasured && <span><svg width="14" height="14"><circle cx="7" cy="7" r="4.5" className={exampleMode ? 'pt ex' : 'pt'} /></svg>{exampleMode ? '예시 측정(점)' : '실측(점)'}</span>}
     <span><svg width="26" height="10"><line x1="0" x2="26" y1="5" y2="5" className="calc-line" /></svg>모델 계산 · 과거 구간(실선)</span>
     <span><svg width="26" height="10"><line x1="0" x2="26" y1="5" y2="5" className="calc-line fut" /></svg>미래 가정(점선)</span>
     {hasBaseline && <span><svg width="26" height="10"><line x1="0" x2="26" y1="5" y2="5" className="base-line fut" /></svg>{baselineLabel}</span>}
