@@ -1,6 +1,7 @@
 import {z} from 'zod';
 import type {Lot, Observation, Stats} from '../lot-types';
 import type {TrackerForm} from '../tracker-form';
+import {emptyHongroForm} from '../hongro-tracker';
 import {isDate, MODEL_VERSION, type MetricId} from '../tracker';
 import type {StorageId} from '../initial-quality';
 
@@ -13,6 +14,11 @@ const form = z.object({
   mcpd:z.object({treated_on:text,product:text,concentration:text,hours:text,temp:text}).strict(),
   ca:z.object({from:text,to:text,o2:text,co2:text}).strict(),
   tracked:z.object({count:text,initial_weight:text,sample_id:text}).strict(),
+  hongro:z.object({
+    source:z.enum(['measured','weather']),storage:z.enum(['cold0','cold4']),
+    initial:z.object({firmness:text,brix:text,acidity:text,weight:text,diameter:text}).strict(),
+    weather:z.object({chang_min4:text,chang_LC56:text,chang_LC78:text,chang_9rain:text}).strict(),
+  }).strict().default(emptyHongroForm),
 }).strict();
 const storage = z.enum(['cold','mcp','ca']);
 const lotId = z.string().min(1).max(100);
