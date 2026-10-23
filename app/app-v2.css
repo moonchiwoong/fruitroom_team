@@ -244,3 +244,19 @@
 .qt2-chart-head .qt-tabs{display:flex!important;width:auto!important;grid-template-columns:none!important}.qt2-chart-head .qt-tabs button{flex:none!important}
 @media(max-width:1000px){.qt2-result{order:-1;border-bottom:1px solid var(--app-line)}.qt2-grid{display:flex!important;flex-direction:column}.qt2-chart{border-bottom:0}}
 .lv2-filter button{white-space:nowrap}@media(max-width:640px){.lv2-filter button{font-size:15px;padding:0 4px}.lv2-search input{font-size:16px}}
+
+/* ═══ 글꼴 통일 (모든 화면) ═══
+   본문·버튼·입력: 프리텐다드 / 제목·큰 숫자: 노토 세리프(명조)
+   글꼴을 바꾸려면 아래 두 변수만 고치면 됩니다. */
+:root{
+  --font-sans:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif;
+  --font-head:var(--app-serif);
+}
+html body,button,input,select,textarea,.btn{font-family:var(--font-sans)}
+h1,h2,.app-title,.app-subtitle,
+.lv-hero h1,.as-intro-copy h1,.as-cap h2,.lv-section h2,.lv-join h2,.l-auth h3,
+.site .page-hero h1,.page-hero h1,.guest .page-hero h1,
+.lv-preview-values dd,.as-label-value b,.lv-preview-day,
+.record-dialog h2,[role=dialog] h2{font-family:var(--font-head);font-weight:700}
+.lv-hero h1,.as-intro-copy h1{letter-spacing:-1.2px}
+.as-cap h2{letter-spacing:-.6px}
