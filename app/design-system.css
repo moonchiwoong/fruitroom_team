@@ -212,8 +212,7 @@ a.btn{text-decoration:none}
 @keyframes as-fade{from{opacity:0}to{opacity:1}}
 .as-hint{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;font-size:13px;color:var(--ds-text-3);pointer-events:none}
 .as-hint i{width:22px;height:34px;border:2px solid var(--ds-line-2);border-radius:12px;position:relative}
-.as-hint i::after{content:"";position:absolute;left:50%;top:6px;width:4px;height:8px;margin-left:-2px;border-radius:2px;background:var(--ds-text-3);animation:as-wheel 1.6s ease-in-out infinite}
-@keyframes as-wheel{0%{opacity:0;transform:translateY(0)}30%{opacity:1}100%{opacity:0;transform:translateY(10px)}}
+.as-hint i::after{content:"";position:absolute;left:50%;top:6px;width:4px;height:8px;margin-left:-2px;border-radius:2px;background:var(--ds-text-3);}
 .as-cap{position:absolute;left:var(--gut);top:50%;width:min(400px,36%);transform:translateY(-50%);margin-top:-60px;opacity:0;visibility:hidden}
 .as-cap h2{font-size:clamp(28px,3vw,40px);line-height:1.25;font-weight:700;letter-spacing:-1px;color:var(--ds-text);margin:0 0 14px}
 .as-cap p{font-size:17px;line-height:1.65;color:var(--ds-text-2);margin:0}

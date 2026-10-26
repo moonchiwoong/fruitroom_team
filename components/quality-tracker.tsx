@@ -289,6 +289,23 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const whenLabel = !Number.isFinite(selDay) ? '선택한 날' : selDay === asOfDay ? '오늘' : selDay > asOfDay ? `${selDay - asOfDay}일 후` : `${asOfDay - selDay}일 전`;
   const firstValue = metric === 'loss' ? null : hongro ? (hongroResult ? hongroResult.initial[metric] : null) : num(form[metric]);
   const latestBrix = hongro ? null : measured.brix.at(-1) ?? null;
+  /** 결과값 아래에 나누어 보여 줄 해석 줄 (실제 선택 상태와 계산 결과에서 만듭니다) */
+  const resultLines: string[] = (() => {
+    const v = selectedValue; if (v.status !== 'ok') return [];
+    const meta = metricMeta[metric], unit = displayUnit(metric), out: string[] = [];
+    if (metric === 'loss' && !exampleMode) return ['같은 추적 표본의 초기 중량과 비교한 값이에요.'];
+    if (baseline && compatible && !sameAsBaseline) {
+      const b = valueAt(baseline.series[metric], selDay);
+      if (b.status === 'ok') { const c = describeChange(metric, v.value, b.value); out.push(c.diff === 0 ? `비교 기준(${baseline.label})과 같습니다.` : `비교 기준(${baseline.label})보다 ${c.text}.`); }
+      else out.push('비교 기준의 값이 없어 차이를 계산하지 않았어요.');
+    } else {
+      const an = anchors[metric];
+      if (an) { const c = describeChange(metric, v.value, an.value); const from = an.source === 'latest' ? `계산 시작점(${fmtDate(an.date)} 측정값)` : '초기값'; out.push(c.diff === 0 ? `${from}과 같습니다.` : `${from}보다 ${c.text}.`); }
+    }
+    const today = measured[metric].find(p => p.day === selDay);
+    if (today) out.push(`같은 날 ${exampleMode ? '예시 측정' : '실제 측정'}값은 ${fmtNum(today.value, meta.digits)} ${unit}이에요.`);
+    return out;
+  })();
   const firstBrix = hongro ? (hongroResult ? hongroResult.initial.brix : null) : num(form.brix);
   function viewResults() {
     if (hongro) {
@@ -313,7 +330,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
       baseline: baseline && compatible ? {label: baseline.label, conditionLabel: baseline.conditionLabel, createdAt: baseline.createdAt, asOf: baseline.asOf, modelVersion: baseline.modelVersion, future: baseline.future, form: baseline.form, useLatest: baseline.useLatest, observationsFingerprint: baseline.observationsFingerprint} : null});
   }
 
-  if (!formReady) return <section className="qt-context-loading" role="status" aria-live="polite"><Loader2 className="spin" size={22} /><h2>선택한 물량을 준비하고 있어요</h2><p>입력값과 데이터 종류를 함께 불러오는 중입니다.</p></section>;
+  if (!formReady) return <section className="qt-context-loading" role="status" aria-live="polite"><Loader2 className="spin" size={22} /><h2>사과 기록을 불러오는 중이에요</h2><p>저장된 입력값과 측정 기록을 가져오고 있어요.</p></section>;
 
   return <div className={'qt qt-refresh qt-v2' + (editing ? ' is-editing' : '') + (exampleMode ? ' is-example' : '') + (firstInput && !showResults ? ' is-first-input' : '')}>
 
@@ -331,11 +348,11 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
       <span className="qt2-days">{startOk ? `저장 ${asOfDay}일째` : '저장 시작일 미입력'}</span>
       <div className="qt2-bar-actions">
         <button className="ah-textlink" aria-expanded={editing} aria-controls="qt-input-editor" onClick={() => setEditing(v => !v)}>{editing ? '입력 접기' : '입력 정보 수정'}<ArrowUpRight size={16} /></button>
-        <button className="ah-textlink qt2-mode" onClick={() => changeMode(exampleMode ? 'real' : 'example')}>{exampleMode ? '내 측정값으로' : '예시 보기'}</button>
+        <button className="ah-textlink qt2-mode" onClick={() => changeMode(exampleMode ? 'real' : 'example')}>{exampleMode ? '내 측정값 입력하기' : '예시로 체험하기'}</button>
       </div>
     </section>
     {exampleMode && <div className="qt-banner ex" role="note"><FlaskConical size={16} /><span><b>예시 데이터 · 실제 측정 기록이 아닙니다</b></span></div>}
-    {loadError && <div className="qt-banner warn" role="alert"><AlertTriangle size={16} /><span>{loadError}</span><button className="btn btn-ghost" onClick={() => { void onLotsChanged(); setReload(r => r + 1); }}>다시 불러오기</button></div>}
+    {loadError && <div className="qt-banner warn" role="alert"><AlertTriangle size={16} /><span>사과 기록을 불러오지 못했어요. {loadError}</span><button className="btn btn-ghost" onClick={() => { void onLotsChanged(); setReload(r => r + 1); }}>다시 불러오기</button></div>}
 
     {initialMeasuredAfterAsOf && <div className="qt-banner warn" role="alert"><AlertTriangle size={16} /><span>{initialDateReason}</span></div>}
 
@@ -515,12 +532,15 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
 
           </div>
           <aside id="qt-metric-result" role="tabpanel" aria-labelledby={'qt-tab-' + metric} className="qt2-result">
-            <p className="qt2-result-label">{whenLabel}{metric === 'loss' && !exampleMode ? '의 실측 감모율' : '의 계산값'}</p>
-            {selectedValue.status === 'ok' ? <p className="qt2-result-value">{fmtNum(selectedValue.value, metricMeta[metric].digits)}<span>{displayUnit(metric)}</span></p>
-              : <div className="qt2-result-na"><b>값을 표시할 수 없어요</b><p>{selectedValue.reason}</p><button className="linkbtn" onClick={() => focus(hongro ? `tf-hongro-initial-${metric}` : 'tf-' + (metric === 'loss' ? 'tracked_sample_id' : metric))}>필요한 입력 확인</button></div>}
-            <p className="qt2-result-sub">{metricMeta[metric].label} · {plainMeaning[metric]}</p>
-            <p className="qt2-result-sentence" aria-live="polite">{summary}</p>
-            <div className="qt2-result-note"><b>{exampleMode ? '예시 데이터 · 시연용 계산' : metric === 'loss' && !exampleMode ? '실측 중량 기반 · 품질 판정 아님' : '시연용 계산 · 검증 미확인'}</b><span>실제 측정값과 다를 수 있어요.</span></div>
+            <p className="qt2-result-when">{whenLabel}{Number.isFinite(selDay) ? ` · 저장 ${selDay}일차` : ''}{isDate(selDate) ? ` · ${fmtDate(selDate)}` : ''}</p>
+            <div className="qt2-result-main" aria-live="polite">
+              <p className="qt2-result-label">{metricMeta[metric].label} {metric === 'loss' && !exampleMode ? '실측 감모율' : '계산값'}<span>{plainMeaning[metric]}</span></p>
+              {selectedValue.status === 'ok' ? <>
+                <p className="qt2-result-value">{fmtNum(selectedValue.value, metricMeta[metric].digits)}<span>{displayUnit(metric)}</span></p>
+                {resultLines.map(t => <p key={t} className="qt2-result-change">{t}</p>)}
+              </> : <div className="qt2-result-na"><b>이 날짜의 값을 표시할 수 없어요</b><p>{selectedValue.reason}</p><button className="linkbtn" onClick={() => focus(hongro ? `tf-hongro-initial-${metric}` : 'tf-' + (metric === 'loss' ? 'tracked_sample_id' : metric))}>필요한 입력 확인하기</button></div>}
+            </div>
+            <p className="qt2-result-note">{exampleMode ? '예시 데이터로 계산한 시연 결과이며, 실제 측정값과 다를 수 있어요.' : metric === 'loss' ? '같은 추적 표본의 실측 중량으로 계산했어요. 품질 판정이 아닙니다.' : '시연용 계산 · 검증 미확인 — 실제 측정값과 다를 수 있으며, 출하·안전 판정이 아닙니다.'}</p>
           </aside>
         </div>
         <dl className="qt2-strip">
@@ -533,7 +553,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           {!exampleMode && activeLot && !guest ? <ObservationForm lot={activeLot} label="오늘 측정값 기록" className="btn btn-primary btn-lg" onSaved={() => setReload(r => r + 1)} disabled={false} />
             : guest && !exampleMode ? <button className="btn btn-primary btn-lg" onClick={handoffToLogin}><Save size={16} />로그인하고 저장하기</button>
             : exampleMode ? <button className="btn btn-primary btn-lg" onClick={() => changeMode('real')}>내 측정값 입력하기</button>
-            : <button className="btn btn-primary btn-lg" onClick={() => { setEditing(true); requestAnimationFrame(() => document.getElementById('qt-input-editor')?.scrollIntoView({behavior: 'smooth', block: 'start'})); }}>입력 정보 열기</button>}
+            : <button className="btn btn-primary btn-lg" onClick={() => { setEditing(true); requestAnimationFrame(() => document.getElementById('qt-input-editor')?.scrollIntoView({behavior: 'smooth', block: 'start'})); }}>입력 정보 수정</button>}
         </div>
         <div className="qt2-more">
         {!hongro && <details className="qt2-fold"><summary>측정값과 비교 보기<Plus size={16} /></summary><section className="qt-latest" aria-label="최근 실측 비교"><div className="qt-latest-head"><h3>최근 {exampleMode ? '예시 측정' : '실측'}과 비교</h3>{!exampleMode && activeLot && <ObservationForm lot={activeLot} onSaved={() => setReload(r => r + 1)} disabled={false} />}</div>

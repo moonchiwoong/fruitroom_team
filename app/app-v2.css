@@ -18,7 +18,7 @@
 .app-header .nav-link.active{color:var(--app-ink);font-weight:700}
 .app-header .nav-link.active::after{content:"";position:absolute;left:14px;right:14px;bottom:12px;height:2px;background:var(--ds-brand)}
 .app-header .nav-link:hover{color:var(--app-ink)}
-.app-logout span{display:none}
+/* 로그아웃은 아이콘만으로 의미가 불분명해 글자를 함께 표시 */
 
 /* ── 화면 제목 ── */
 .app-head{border-bottom:1px solid var(--app-line)}
@@ -245,18 +245,103 @@
 @media(max-width:1000px){.qt2-result{order:-1;border-bottom:1px solid var(--app-line)}.qt2-grid{display:flex!important;flex-direction:column}.qt2-chart{border-bottom:0}}
 .lv2-filter button{white-space:nowrap}@media(max-width:640px){.lv2-filter button{font-size:15px;padding:0 4px}.lv2-search input{font-size:16px}}
 
-/* ═══ 글꼴 통일 (모든 화면) ═══
-   본문·버튼·입력: 프리텐다드 / 제목·큰 숫자: 노토 세리프(명조)
-   글꼴을 바꾸려면 아래 두 변수만 고치면 됩니다. */
+/* ═══ 글꼴 기준 (모든 화면) ═══
+   Pretendard: 본문·버튼·입력·기능 소제목·수치·단위·날짜·그래프·결과 설명
+   나눔스퀘어 네오: 메인 슬로건과 대표 제목만 (굵기 하나만 불러와 부담을 줄임)
+   글꼴을 바꾸려면 아래 변수만 고치면 됩니다. */
+@font-face{font-family:'NanumSquareNeo';font-weight:800;font-style:normal;font-display:swap;
+  src:url(https://cdn.jsdelivr.net/npm/nanumsquareneo@0.0.5/woff2/NanumSquareNeoTTF-eHv.woff2) format('woff2')}
 :root{
   --font-sans:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif;
-  --font-head:var(--app-serif);
+  --font-head:'NanumSquareNeo','Pretendard Variable',Pretendard,'Apple SD Gothic Neo',sans-serif;
+  --app-serif:var(--font-sans);
 }
 html body,button,input,select,textarea,.btn{font-family:var(--font-sans)}
-h1,h2,.app-title,.app-subtitle,
-.lv-hero h1,.as-intro-copy h1,.as-cap h2,.lv-section h2,.lv-join h2,.l-auth h3,
-.site .page-hero h1,.page-hero h1,.guest .page-hero h1,
-.lv-preview-values dd,.as-label-value b,.lv-preview-day,
-.record-dialog h2,[role=dialog] h2{font-family:var(--font-head);font-weight:700}
-.lv-hero h1,.as-intro-copy h1{letter-spacing:-1.2px}
-.as-cap h2{letter-spacing:-.6px}
+/* 메인 슬로건·대표 제목 */
+.lv-hero h1,.as-intro-copy h1,.as-cap h2,.lv-section h2,.lv-join h2,
+.app-title,.app-subtitle,.guest .page-hero h1,.site .page-hero h1{font-family:var(--font-head);font-weight:800;letter-spacing:-.6px}
+.lv-hero h1,.as-intro-copy h1,.app-title{letter-spacing:-1px}
+/* 기능 소제목·수치는 Pretendard */
+.qt2-chart-head h2,.qt2-cta h3,.qt2-editor-head h2,.lv2-recent h3,.lv2-records h3,.record-dialog h2,[role=dialog] h2,
+.lv-preview-values dd,.as-label-value b,.lv-preview-day,.qt2-result-value,.qt2-strip dd,.ah-lot-meta dd,.lv2-recent dd,.lv2-table td,
+.ah-lot-name b,.lv2-item-copy b,.qt2-pick select,.qt2-static,.qt2-result-sentence{font-family:var(--font-sans)}
+.qt2-result-value,.qt2-strip dd,.lv2-recent dd,.lv-preview-values dd,.as-label-value b{font-variant-numeric:tabular-nums}
+
+/* ── 첫 화면: 값의 출처 섹션 — 측정 → 기록 → 비교 도식 ── */
+.lv-split{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:32px 48px!important;align-items:start!important}
+.lv-flow{margin:0;background:var(--ds-bg-2);border-radius:16px;padding:24px}
+.lv-flow ol{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.lv-flow li{display:grid;grid-template-columns:44px minmax(0,1fr);column-gap:14px;row-gap:2px;align-items:center;background:#fff;border-radius:12px;padding:14px 16px;position:relative}
+.lv-flow li+li::before{content:"";position:absolute;left:37px;top:-12px;width:2px;height:12px;background:var(--ds-line-2)}
+.lv-flow-icon{grid-row:span 2;width:44px;height:44px;border-radius:12px;background:var(--ds-brand-soft);color:var(--ds-brand);display:grid;place-items:center}
+.lv-flow b{font-size:16px;font-weight:700;color:var(--ds-text)}
+.lv-flow p{margin:0;font-size:14px;line-height:1.55;color:var(--ds-text-2)}
+.lv-flow figcaption{margin-top:12px;font-size:13px;color:var(--ds-text-3)}
+@media(max-width:900px){.lv-split{grid-template-columns:1fr!important}}
+.ah-hero-photo{margin:0;position:relative}
+.ah-hero-photo figcaption{position:absolute;right:10px;bottom:10px;font-size:12px;color:#fff;background:rgba(20,16,12,.55);border-radius:6px;padding:3px 8px}
+/* 머리글 아이콘 버튼에는 글자 라벨을 함께. 좁은 화면에서는 로그아웃을 메뉴 안(글자 포함)으로 옮김 */
+.app-header .nav-util span{display:inline!important}
+@media(max-width:1020px){.app-header .app-logout{display:none!important}}
+.guest-nav,.app-header .site-utils{white-space:nowrap}
+
+/* ── 품질 예측 결과: 날짜 → 지표 → 값 → 해석을 줄로 나눔 ── */
+.qt2-result{gap:0}
+.qt2-result-when{margin:0;font-size:15px;font-weight:600;color:var(--ds-brand);font-variant-numeric:tabular-nums}
+.qt2-result-main{margin-top:20px}
+.qt2-result-label{margin:0;font-size:17px;font-weight:600;color:var(--app-ink);display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px}
+.qt2-result-label span{font-size:14px;font-weight:500;color:var(--app-sub)}
+.qt2-result-main .qt2-result-value{margin:8px 0 0;font-size:clamp(44px,4.6vw,60px);font-weight:700;letter-spacing:-1.2px;line-height:1.05;white-space:nowrap}
+.qt2-result-main .qt2-result-value span{font-size:.5em;font-weight:600;margin-left:6px;letter-spacing:0;color:var(--app-ink)}
+.qt2-result-change{margin:14px 0 0;font-size:18px;line-height:1.55;color:var(--app-ink)}
+.qt2-result-change+.qt2-result-change{margin-top:4px;font-size:16px;color:var(--app-sub)}
+.qt2-result-note{margin:28px 0 0;padding-top:16px;border-top:1px solid var(--app-line);font-size:14px;line-height:1.6;color:var(--app-sub)}
+
+/* ── 체험·예측 화면 상단을 촘촘하게: 조건 → 결과가 첫 화면 안에 ── */
+.guest .page-hero .page-hero-inner{padding-top:32px;padding-bottom:20px}
+.qt2-bar{padding:20px 0}
+.qt-v2 .qt-banner.ex{margin:16px 0 0}
+.qt2-when{padding:14px 0}
+.qt2-chart{padding-top:20px}
+.qt2-result{padding-top:24px}
+@media(max-width:640px){
+  .guest .page-hero .page-hero-inner{padding:20px 16px 8px}
+  .guest .page-hero h1{font-size:24px}
+  .guest .page-hero p{font-size:15px;margin-top:6px}
+  .qt2-bar{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px 12px;padding:12px 0}
+  .qt2-pick{min-width:0;gap:4px}
+  .qt2-pick label{font-size:14px}
+  .qt2-static{min-height:40px;font-size:17px}
+  .qt2-pick select{min-height:48px;font-size:17px}
+  .qt2-days{padding:0 0 10px;min-height:0;font-size:16px;border-left:0}
+  .qt2-bar-actions{grid-column:1/-1;margin:0;padding:0;gap:0 12px}
+  .qt2-bar-actions .ah-textlink{min-height:40px;font-size:15px}
+  .qt-v2 .qt-banner.ex{margin:8px 0 0;padding:8px 12px;font-size:14px}
+  .qt2-when{gap:4px 12px;padding:8px 0}
+  .qt2-when-q{font-size:15px;flex-basis:100%}
+  .qt2-chips>button{min-height:44px;padding:0 10px}
+  .qt2-datepick{border-left:0;padding-left:4px;min-height:44px;font-size:15px}
+  .qt2-result{padding:16px 0 20px}
+  .qt2-result-main{margin-top:12px}
+  .qt2-result-change{font-size:17px}
+  .qt2-result-note{margin-top:20px}
+  .qt2-chart-head{gap:4px 16px}
+  .qt2-chart-head .qt-tabs button{padding:0 10px;font-size:16px}
+}
+
+/* ── 조작 반응: 전환할 속성만 명시 (150–200ms) ── */
+.btn,.ah-textlink,.linkbtn,.nav-link,.qt2-chips>button,.qt2-chart-head .qt-tabs button,.lv2-filter button,.lv2-tabs button,.lv2-item,.qt2-fold>summary,.landing-link{
+  transition:background-color .18s ease,border-color .18s ease,color .18s ease,box-shadow .18s ease}
+.btn:active:not(:disabled),.qt2-chips>button:active:not(:disabled),.lv2-item:active{background-image:linear-gradient(rgba(0,0,0,.06),rgba(0,0,0,.06))}
+.qt2-chips>button:hover:not(:disabled):not(.active),.qt2-chart-head .qt-tabs button:hover:not(.active){color:var(--app-ink)}
+.qt2-chips>button:focus-visible,.qt2-chart-head .qt-tabs button:focus-visible,.lv2-filter button:focus-visible,.lv2-tabs button:focus-visible,.qt2-fold>summary:focus-visible,.ah-textlink:focus-visible{outline:2px solid var(--ds-brand);outline-offset:2px;border-radius:4px}
+@media(prefers-reduced-motion:reduce){.btn,.ah-textlink,.linkbtn,.nav-link,.qt2-chips>button,.qt2-chart-head .qt-tabs button,.lv2-filter button,.lv2-tabs button,.lv2-item,.qt2-fold>summary,.landing-link{transition:none}}
+/* 겹겹이 쌓인 바깥 여백 정리 (내용 영역 하나만 좌우 여백을 가짐) */
+.guest .page-hero{padding-top:0;padding-bottom:0}
+.site-main:has(.qt-v2),.site-main:has(.app-home),.site-main:has(.lots-v2){padding-top:0}
+@media(max-width:640px){
+  .site-main:has(.qt-v2),.site-main:has(.app-home),.site-main:has(.lots-v2){padding-left:0;padding-right:0}
+  .site-main:has(.qt-v2) .page-body,.site-main:has(.lots-v2) .page-body{padding-left:0;padding-right:0;padding-top:0}
+  .guest .page-hero{padding-left:0;padding-right:0}
+}
+.lv-split .lv-kinds{grid-template-columns:1fr!important}

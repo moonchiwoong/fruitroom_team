@@ -122,9 +122,9 @@ export default function AppleSplitStory({intro, onFail}: {intro: ReactNode; onFa
       const split = ease(seg(p, 0.12, 0.33)), away = ease(seg(p, 0.57, 0.67));
       const baseX = narrow ? 0 : halfW * 0.3, baseY = narrow ? lerp(-halfH * 0.42, halfH * 0.3, ease(seg(p, 0.04, 0.2))) : 0;
       const size = (narrow ? Math.min(0.62, halfW * 0.5) : Math.min(1.15, halfW * 0.28)) * lerp(1, 0.55, away);
-      root.position.set(lerp(baseX, narrow ? 0 : halfW * 0.28, away), lerp(baseY, baseY + halfH * (narrow ? 0.15 : 0.1), away) + Math.sin(now / 1300) * 0.03 * (1 - split), 0);
+      root.position.set(lerp(baseX, narrow ? 0 : halfW * 0.28, away), lerp(baseY, baseY + halfH * (narrow ? 0.15 : 0.1), away), 0);
       root.scale.setScalar(size);
-      root.rotation.set(0.1 * (1 - split), (0.16 - Math.min(p, 0.16)) * 9 + 0.35 * (1 - seg(p, 0, 0.16)) * Math.sin(now / 2400), -0.1 * (1 - split));
+      root.rotation.set(0.1 * (1 - split), (0.16 - Math.min(p, 0.16)) * 9, -0.1 * (1 - split));
       const gap = split * 0.72, turn = split * 1.05;
       halves.forEach(h => { h.half.position.x = h.sign * gap; h.half.rotation.y = h.sign * turn; h.half.rotation.x = split * 0.1; });
       el.style.opacity = (1 - seg(p, 0.61, 0.67)).toFixed(3);
@@ -162,7 +162,7 @@ export default function AppleSplitStory({intro, onFail}: {intro: ReactNode; onFa
         lab.style.transform = `translate(${tx.toFixed(1)}px,${(ty + (1 - te) * 14).toFixed(1)}px)`; lab.style.width = `${w.toFixed(1)}px`; lab.style.height = `${h.toFixed(1)}px`;
         lab.style.opacity = String(Math.max(te, fly > 0 ? 1 : 0) * (p < 0.3 ? 0 : 1)); lab.style.visibility = te > 0.01 ? 'visible' : 'hidden';
         lab.style.setProperty('--shadow', String(1 - fly));
-        const v = valueRefs.current[i]; if (v) { const txt = fmtNum(m.value * ease(seg(p, 0.37 + i * 0.045, 0.5 + i * 0.045)), m.digits); if (v.textContent !== txt) v.textContent = txt; }
+        const v = valueRefs.current[i]; if (v) { const txt = fmtNum(m.value, m.digits); if (v.textContent !== txt) v.textContent = txt; }
         // 선: 단면의 점 → 라벨 가장자리
         const ex = narrow ? tx + w / 2 : (tx + w / 2 < a.x ? tx + w : tx), ey = narrow ? ty : ty + h / 2;
         line.setAttribute('d', `M${a.x.toFixed(1)},${a.y.toFixed(1)} L${ex.toFixed(1)},${ey.toFixed(1)}`);
