@@ -467,7 +467,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         </div>}
         {!exampleMode && !guest && <div className="qt-savebox">
           <button className="btn btn-primary" onClick={saveRecord} disabled={saving || !!loadError || (!dirty && !!activeLot)}>{saving ? <Loader2 className="spin" size={16} /> : <Save size={16} />}{activeLot ? '변경 내용을 기록에 저장' : '물량 기록으로 저장'}</button>
-          {activeLot && <ObservationForm lot={activeLot} onSaved={() => { setReload(r => r + 1); }} disabled={false} />}
+          {activeLot && <ObservationForm lot={activeLot} onSaved={() => { setReload(r => r + 1); void onLotsChanged(); }} disabled={false} />}
           {saveMsg && <p className={saveMsg.ok ? 'qt-ok' : 'auth-error'} role="status">{saveMsg.text}</p>}
           {loaded.lot && !activeLot && <p className="qt-help">품종이 달라 별도의 새 물량으로 저장합니다. 기존 물량 기록은 변경하지 않습니다.</p>}
           <p className="qt-help">임시 저장(초안)은 이 브라우저에만 남습니다. ‘저장’을 눌러야 정식 기록이 됩니다.</p>
@@ -530,13 +530,13 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         </dl>
         <div className="qt2-cta">
           <div><h3>직접 측정한 값이 있나요?</h3><p>오늘의 기록을 더하면 실제 변화와 비교할 수 있어요.</p></div>
-          {!exampleMode && activeLot && !guest ? <ObservationForm lot={activeLot} label="오늘 측정값 기록" className="btn btn-primary btn-lg" onSaved={() => setReload(r => r + 1)} disabled={false} />
+          {!exampleMode && activeLot && !guest ? <ObservationForm lot={activeLot} label="오늘 측정값 기록" className="btn btn-primary btn-lg" onSaved={() => { setReload(r => r + 1); void onLotsChanged(); }} disabled={false} />
             : guest && !exampleMode ? <button className="btn btn-primary btn-lg" onClick={handoffToLogin}><Save size={16} />로그인하고 저장하기</button>
             : exampleMode ? <button className="btn btn-primary btn-lg" onClick={() => changeMode('real')}>내 측정값 입력하기</button>
             : <button className="btn btn-primary btn-lg" onClick={() => { setEditing(true); requestAnimationFrame(() => document.getElementById('qt-input-editor')?.scrollIntoView({behavior: 'smooth', block: 'start'})); }}>입력 정보 열기</button>}
         </div>
         <div className="qt2-more">
-        {!hongro && <details className="qt2-fold"><summary>측정값과 비교 보기<Plus size={16} /></summary><section className="qt-latest" aria-label="최근 실측 비교"><div className="qt-latest-head"><h3>최근 {exampleMode ? '예시 측정' : '실측'}과 비교</h3>{!exampleMode && activeLot && <ObservationForm lot={activeLot} onSaved={() => setReload(r => r + 1)} disabled={false} />}</div>
+        {!hongro && <details className="qt2-fold"><summary>측정값과 비교 보기<Plus size={16} /></summary><section className="qt-latest" aria-label="최근 실측 비교"><div className="qt-latest-head"><h3>최근 {exampleMode ? '예시 측정' : '실측'}과 비교</h3>{!exampleMode && activeLot && <ObservationForm lot={activeLot} onSaved={() => { setReload(r => r + 1); void onLotsChanged(); }} disabled={false} />}</div>
           {latestPoint ? <><button className="linkbtn qt-latest-date" disabled={latestPoint.day < 0 || latestPoint.day > MODEL_RANGE.displayDays} onClick={() => setSelectedDay(latestPoint.day)}>최근 측정 날짜 선택</button><p className="qt-help">{fmtDate(latestPoint.date)} · 저장 {latestPoint.day}일차 · 표본 {latestPoint.sampleCount ?? '미기록'}{latestPoint.sampleCount ? '개' : ''}</p>
             <dl className="qt-latest-values"><div><dt>{exampleMode ? '예시 측정' : metric === 'loss' ? '실측 중량 기반 감모율' : '실측'}</dt><dd>{fmtNum(latestPoint.value, metricMeta[metric].digits)} <small>{metricMeta[metric].unit}</small></dd></div><div><dt>같은 날짜 시연용 계산</dt><dd>{latestCalculation?.status === 'ok' ? <>{fmtNum(latestCalculation.value, metricMeta[metric].digits)} <small>{metricMeta[metric].unit}</small></> : '제공 안 함'}</dd></div><div><dt>측정 − 계산</dt><dd>{latestCalculation?.status === 'ok' ? describeChange(metric, latestPoint.value, latestCalculation.value).short : '비교 불가'}</dd></div></dl>
             {latestConditions?.reason && <p className="qt-help qt-measure-compatibility"><strong>{latestConditions.status === 'mismatch' ? '측정 조건 불일치' : '측정 조건 확인 필요'}</strong> · {latestConditions.reason}</p>}
