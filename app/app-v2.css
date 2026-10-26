@@ -346,3 +346,26 @@ html body,button,input,select,textarea,.btn{font-family:var(--font-sans)}
 }
 .lv-split .lv-kinds{grid-template-columns:1fr!important}
 .qt-v2 .qt-loss-sources{margin:24px 0 0}
+
+/* ── 홍로: 날씨로 고르는 초기 품질 추정 ── */
+.qt-weather{display:grid;gap:20px;margin-top:8px}
+.qt-weather-q{border:0;margin:0;padding:0;min-width:0}
+.qt-weather-q legend{padding:0;margin-bottom:10px;font-size:16px;font-weight:700;color:var(--ds-text)}
+.qt-weather-opts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.qt-weather-opts button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-height:64px;padding:10px 12px;text-align:left;border:1px solid var(--ds-line-2);border-radius:10px;background:#fff;cursor:pointer;
+  transition:background-color .18s ease,border-color .18s ease,color .18s ease}
+.qt-weather-opts button b{font-size:15px;font-weight:700;color:var(--ds-text)}
+.qt-weather-opts button span{font-size:13px;line-height:1.4;color:var(--ds-text-2)}
+.qt-weather-opts button:hover{border-color:var(--ds-brand)}
+.qt-weather-opts button.active{border-color:var(--ds-brand);background:var(--ds-brand-soft);box-shadow:inset 0 0 0 1px var(--ds-brand)}
+.qt-weather-opts button.active b{color:var(--ds-brand)}
+.qt-weather-opts button:focus-visible{outline:2px solid var(--ds-brand);outline-offset:2px}
+.qt-weather-manual{border-style:dashed!important}
+.qt-weather-val{margin:8px 0 0;font-size:14px;color:var(--ds-text-2)}
+.qt-weather-val b{color:var(--ds-text);font-variant-numeric:tabular-nums}
+.qt-weather-input{display:flex;flex-direction:column;gap:6px;margin-top:10px;font-size:14px;font-weight:600;color:var(--ds-text)}
+.qt-weather-input input{max-width:240px}
+.qt-weather-input small{font-weight:400;color:var(--ds-text-2)}
+.qt-weather-q.has-err .qt-weather-opts button{border-color:var(--ds-danger)}
+@media(max-width:640px){.qt-weather-opts{grid-template-columns:1fr 1fr}}
+@media(prefers-reduced-motion:reduce){.qt-weather-opts button{transition:none}}

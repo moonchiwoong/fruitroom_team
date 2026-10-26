@@ -17,7 +17,7 @@ import type {StorageId} from '@/lib/initial-quality';
 import {measurementCompatibility, observationFingerprint} from '@/lib/ai/context';
 import {isHongroVariety} from '@/lib/cultivar';
 import {calculateHongroForm, emptyHongroForm, exampleHongroForm} from '@/lib/hongro-tracker';
-import {HONGRO_STORAGE_LABELS, HONGRO_UNITS, HONGRO_WEATHER_FIELDS, HONGRO_UNITS_CONFLICT} from '@/lib/hongro';
+import {HONGRO_WEATHER_PRESETS, HONGRO_STORAGE_LABELS, HONGRO_UNITS, HONGRO_WEATHER_FIELDS, HONGRO_UNITS_CONFLICT} from '@/lib/hongro';
 import {buildQualityExportCsv, type QualityExportInput} from '@/lib/quality-export';
 import {predictQuality, getQualitySeries} from '@/lib/quality-models';
 type ModelResult = ReturnType<typeof predictQuality>;
@@ -706,12 +706,43 @@ function HongroInputs({form, setForm, errors}: {form: TrackerForm; setForm: (upd
   const labels = {firmness: '초기 경도', acidity: '초기 산도', brix: '초기 당도', weight: '초기 중량 (선택)', diameter: '초기 횡경 (선택)'};
   return <>
     <p className="qt-help"><b>자료 출처 지역: 거창</b> · 산지 입력만으로 저장 모델 계수는 달라지지 않습니다. 후지의 입력값과 저장조건은 별도 초안으로 보관합니다.</p>
-    <div className="qt-fields"><F id="hongro-source" label="초기품질 입력 방식"><select id="tf-hongro-source" value={h.source} onChange={e => setForm(f => ({...f, hongro: {...f.hongro, source: e.target.value as TrackerForm['hongro']['source']}}))}><option value="measured">직접 입력</option><option value="weather">기상자료 기반 추정</option></select></F></div>
-    {h.source === 'weather' ? <div className="qt-fields two">{HONGRO_WEATHER_FIELDS.map(field => <F key={field.key} id={`hongro-weather-${field.key}`} label={field.label} unit={field.unit} err={errors[`hongro.weather.${field.key}`]}><input id={`tf-hongro-weather-${field.key}`} type="number" step="any" value={h.weather[field.key]} placeholder="필수 입력" onChange={e => setForm(f => ({...f, hongro: {...f.hongro, weather: {...f.hongro.weather, [field.key]: e.target.value}}}))} /></F>)}</div>
+    <div className="qt-fields"><F id="hongro-source" label="초기품질 입력 방식"><select id="tf-hongro-source" value={h.source} onChange={e => { const src = e.target.value as TrackerForm['hongro']['source']; setForm(f => { const w = {...f.hongro.weather}; if (src === 'weather') for (const fl of HONGRO_WEATHER_FIELDS) if (String(w[fl.key] ?? '').trim() === '') w[fl.key] = String(HONGRO_WEATHER_PRESETS[fl.key].options[1].value); return {...f, hongro: {...f.hongro, source: src, weather: w}}; }); }}><option value="measured">직접 입력 (측정한 초기 품질)</option><option value="weather">올해 날씨로 추정</option></select></F></div>
+    {h.source === 'weather' ? <WeatherChoices form={form} setForm={setForm} errors={errors} />
       : <div className="qt-fields two">{(['firmness', 'acidity', 'brix', 'weight', 'diameter'] as const).map(m => <F key={m} id={`hongro-initial-${m}`} label={labels[m]} unit={HONGRO_UNITS[m]} err={errors[`hongro.initial.${m}`]}><input id={`tf-hongro-initial-${m}`} type="number" min={0} step="any" value={h.initial[m]} placeholder={m === 'weight' || m === 'diameter' ? '선택 입력' : '필수 입력'} onChange={e => setForm(f => ({...f, hongro: {...f.hongro, initial: {...f.hongro.initial, [m]: e.target.value}}}))} /></F>)}</div>}
     <p className="qt-help">직접 입력값은 입력한 초기 측정일의 품질입니다. 저장 시작일 기준 시간축을 유지합니다. 경도 기준은 N (Ø11 mm 탐침)입니다. 입력값이 없으면 계산하지 않습니다. 기상자료 추정값은 실측값이 아닙니다.</p>
     {h.source === 'weather' && <p className="qt-help">{HONGRO_UNITS_CONFLICT}</p>}
   </>;
+}
+
+/** 기상 항목마다 ‘쌀쌀한/보통/따뜻한’처럼 고르고, 필요하면 숫자를 직접 넣습니다. */
+function WeatherChoices({form, setForm, errors}: {form: TrackerForm; setForm: (update: (f: TrackerForm) => TrackerForm) => void; errors: Partial<Record<string, string>>}) {
+  const h = form.hongro;
+  const [manual, setManual] = useState<Record<string, boolean>>({});
+  const setW = (key: string, v: string) => setForm(f => ({...f, hongro: {...f.hongro, weather: {...f.hongro.weather, [key]: v}}}));
+  return <div className="qt-weather">
+    <p className="qt-help">올해 거창 날씨와 가장 가까운 것을 골라 주세요. 정확한 기상 값을 알면 ‘직접 입력’을 누르세요.</p>
+    {HONGRO_WEATHER_FIELDS.map(field => {
+      const preset = HONGRO_WEATHER_PRESETS[field.key], cur = String(h.weather[field.key] ?? '').trim();
+      const picked = preset.options.find(o => cur !== '' && Number(cur) === o.value);
+      const isManual = manual[field.key] || (cur !== '' && !picked);
+      const err = errors[`hongro.weather.${field.key}`];
+      return <fieldset key={field.key} className={'qt-weather-q' + (err ? ' has-err' : '')}>
+        <legend>{preset.question}</legend>
+        <div className="qt-weather-opts" role="radiogroup" aria-label={preset.question}>
+          {preset.options.map(o => <button key={o.id} type="button" role="radio" aria-checked={!isManual && picked?.id === o.id} className={!isManual && picked?.id === o.id ? 'active' : ''}
+            onClick={() => { setManual(m => ({...m, [field.key]: false})); setW(field.key, String(o.value)); }}>
+            <b>{o.label}</b><span>{o.hint}</span></button>)}
+          <button type="button" role="radio" aria-checked={isManual} className={'qt-weather-manual' + (isManual ? ' active' : '')} onClick={() => setManual(m => ({...m, [field.key]: true}))}><b>직접 입력</b><span>숫자를 알고 있어요</span></button>
+        </div>
+        {isManual ? <label className="qt-weather-input" htmlFor={`tf-hongro-weather-${field.key}`}>{field.label} <small>({field.unit})</small>
+          <input id={`tf-hongro-weather-${field.key}`} type="number" step="any" value={h.weather[field.key]} placeholder="숫자 입력" onChange={e => setW(field.key, e.target.value)} />
+          <small>모델 참고 범위 {field.reference.min.toLocaleString('ko-KR', {maximumFractionDigits: 1})}~{field.reference.max.toLocaleString('ko-KR', {maximumFractionDigits: 1})} {field.unit}</small></label>
+          : <p className="qt-weather-val">계산에 쓰는 값 · {field.label} <b>{cur === '' ? '미선택' : `${Number(cur).toLocaleString('ko-KR')} ${field.unit}`}</b></p>}
+        {err && <span className="qf-err" role="alert">{err}</span>}
+      </fieldset>;
+    })}
+    <p className="qt-help">선택지의 값은 모델 참고 범위의 아래·가운데·위 지점이며, 거창의 실제 평년값이 아닙니다. 이렇게 낸 초기 품질은 ‘기상자료 기반 추정’으로 표시되고 실측값과 구분됩니다.</p>
+  </div>;
 }
 
 /** Adapter for the existing SVG chart; every point retains the engine result. */
