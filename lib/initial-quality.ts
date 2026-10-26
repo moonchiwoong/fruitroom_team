@@ -1,7 +1,8 @@
 // 사과 초기 품질 회귀식과 저장 중 품질 변화식.
-// 출처: data/initial-quality-regression.hwpx, data/storage-quality-model.xlsx
+// 초기 회귀 출처: data/initial-quality-regression.hwpx. 저장식 출처·변경 이력: lib/quality-models.ts
 // 계수는 data/initial-quality/*.csv 200건을 다시 적합해 동일함을 확인했습니다.
 import {initialQualityRows} from './initial-quality-data';
+import {fujiStorageValue, FUJI_FORMULAS} from './quality-models';
 
 export type RegionId = 'cheongsong' | 'jangsu' | 'yeongju';
 export type InputKey = 'rain9' | 'lc56' | 'lc78' | 'min4';
@@ -147,33 +148,10 @@ export const storageMetricInfo: Record<StorageMetric, {label: string; unit: stri
   acidity: {label: '산도', unit: '%', digits: 3, note: '지수감소 / 100일 후 유지'},
 };
 
-const pos = (v: number) => Math.max(v, 0);
 export type Initial = {firmness: number; brix: number; acidity: number};
 
+/** Compatibility wrapper; formulas and provenance are owned by quality-models.ts. */
 export function storageValue(method: StorageId, metric: StorageMetric, t: number, init: Initial): number {
-  switch (metric) {
-    case 'loss':
-      return method === 'cold' ? 0.007807 * t + 0.0000475 * t * t : method === 'mcp' ? 0.017524 * t : 0.012591 * t;
-    case 'firmness':
-      return method === 'cold' ? init.firmness - 0.013733 * t
-        : method === 'mcp' ? init.firmness - 0.002288 * t + 0.00002365 * t * t
-        : init.firmness - 0.004178 * t;
-    case 'brix':
-      return method === 'cold' ? init.brix - 0.001 * t + 0.001 * pos(t - 100) - 0.006 * pos(t - 200)
-        : method === 'mcp' ? init.brix + 0.002 * t + 0.004 * pos(t - 100) - 0.022 * pos(t - 200)
-        : init.brix - 0.003 * t + 0.013 * pos(t - 100) - 0.016 * pos(t - 200);
-    case 'acidity':
-      return method === 'cold' ? init.acidity * Math.exp(-0.004377 * t) : init.acidity * (1 - (1 / 3) * Math.min(t / 100, 1));
-  }
+  return fujiStorageValue(method, metric, t, init);
 }
-
-export const storageFormula: Record<StorageMetric, Record<StorageId, string>> = {
-  loss: {cold: 'y = 0.007807t + 0.0000475t²', mcp: 'y = 0.017524t', ca: 'y = 0.012591t'},
-  firmness: {cold: 'y = y₀ − 0.013733t', mcp: 'y = y₀ − 0.002288t + 0.00002365t²', ca: 'y = y₀ − 0.004178t'},
-  brix: {
-    cold: 'S = S₀ − 0.001t + 0.001·max(t−100,0) − 0.006·max(t−200,0)',
-    mcp: 'S = S₀ + 0.002t + 0.004·max(t−100,0) − 0.022·max(t−200,0)',
-    ca: 'S = S₀ − 0.003t + 0.013·max(t−100,0) − 0.016·max(t−200,0)',
-  },
-  acidity: {cold: 'y = y₀·e^(−0.004377t)', mcp: 'y = y₀·(1 − ⅓·min(t/100, 1))', ca: 'y = y₀·(1 − ⅓·min(t/100, 1))'},
-};
+export const storageFormula: Record<StorageMetric, Record<StorageId, string>> = FUJI_FORMULAS;

@@ -1,18 +1,16 @@
 import {z} from 'zod';
+import {predictQuality, HONGRO_FORMULAS, HONGRO_STORAGE_MODEL_VERSION, HONGRO_SOURCE, HONGRO_PAPER} from './quality-models';
 
 /** Separate Hongro model: none of the Fuji coefficients or storage models are used. */
-export const HONGRO_MODEL_VERSION = 'hongro-geochang-provided-2026-10-23';
+export const HONGRO_MODEL_VERSION = HONGRO_STORAGE_MODEL_VERSION;
 export const HONGRO_DISCLAIMER = '본 결과는 합성자료 기반 초기품질 회귀식과 문헌을 참고해 구성한 저장 변화식을 연결한 참고용 시뮬레이션입니다. 실제 농가·과실에 대한 독립적인 예측 성능 검증은 완료되지 않았습니다. 실제 품질은 수확 숙도, 과실 개체차, 저장고 환경 등에 따라 달라질 수 있습니다.';
 export const HONGRO_UNITS_CONFLICT = '초기 회귀 계수 이미지에는 경도가 N/mm로, 저장식과 참고 논문에는 N(직경 11 mm 탐침)으로 표기되어 있습니다. 원자료 단위의 동일성은 확인되지 않았습니다. 요청에 따라 회귀 수치를 변환하지 않고 N (Ø11 mm)로 이어 계산하므로 해석에 이 불확실성이 남습니다.';
 export const HONGRO_SUGAR_EQUATION_CONFLICT = '저장식 파일의 당도 비고에는 감소량이 적혀 있지만 명시 수식은 S(t)=S0입니다. 수식을 우선하여 두 저장 조건 모두 초기 당도를 유지합니다.';
 export const HONGRO_STORAGE_LABELS = {cold0:'0℃ 저온저장',cold4:'4℃ 저온저장'} as const;
-export const HONGRO_STORAGE_EQUATIONS = {
-  cold0:{firmness:'F(t) = MAX(0, F0 - MIN(t, 60) × (7.0/60) - MAX(t-60, 0) × (7.4/60))',acidity:'A(t) = MAX(0, A0 - MAX(t-60, 0) × (0.05/60))',brix:'S(t) = S0'},
-  cold4:{firmness:'F(t) = MAX(0, F0 - MIN(t, 60) × (7.0/60) - MAX(t-60, 0) × (8.6/60))',acidity:'A(t) = MAX(0, A0 - MAX(t-60, 0) × (0.03/60))',brix:'S(t) = S0'},
-} as const;
+export const HONGRO_STORAGE_EQUATIONS = HONGRO_FORMULAS;
 export const HONGRO_UNITS = {firmness:'N (Ø11 mm)',brix:'°Brix',acidity:'%',weight:'g',diameter:'mm'} as const;
 export const HONGRO_DELTA_UNITS = {firmness:'N (Ø11 mm)',brix:'°Brix',acidity:'%p'} as const;
-export const HONGRO_SOURCE_FILES = ['Screenshot_20261023_135647_Hancom Office Viewer (1).jpg','거창_품질예측식.xlsx','chang_200.xlsx','거창사과_저온저장.pdf'] as const;
+export const HONGRO_SOURCE_FILES = ['Screenshot_20261023_135647_Hancom Office Viewer (1).jpg',HONGRO_SOURCE,'chang_200.xlsx',HONGRO_PAPER] as const;
 
 /** Ranges observed in the 200 supplied synthetic/reference rows; not validity limits. */
 export const HONGRO_REFERENCE_RANGES = {
@@ -80,12 +78,11 @@ export function estimateHongroInitial(value:unknown):Required<HongroInitial>{
 }
 
 function qualityAt(initial:HongroInitial,storage:HongroStorage,days:number):HongroQuality{
-  const early=Math.min(days,60),late=Math.max(days-60,0);
-  return {
-    firmness:Math.max(0,initial.firmness-early*(7/60)-late*((storage==='cold0'?7.4:8.6)/60)),
-    acidity:Math.max(0,initial.acidity-late*((storage==='cold0'?0.05:0.03)/60)),
-    brix:initial.brix,
-  };
+  return Object.fromEntries((['firmness','brix','acidity'] as const).map(metric=>{
+    const result=predictQuality({cultivar:'hongro',storage:'cold',temperature:storage==='cold0'?0:4,mcp:'untreated',metric,day:days,anchor:{day:0,value:initial[metric]}});
+    if(!result.ok||result.value===null)throw new Error(result.reason??'홍로 계산값 없음');
+    return [metric,result.value];
+  })) as HongroQuality;
 }
 function scenario(initial:HongroInitial,storage:HongroStorage,days:number):HongroScenario{
   const predicted=qualityAt(initial,storage,days);
@@ -111,7 +108,7 @@ export function calculateHongro(value:unknown){
   const metadata={
     modelVersion:HONGRO_MODEL_VERSION,cultivar:input.cultivar,region:input.region,initialSource:input.source,
     initialKind:input.source==='measured'?'실측 입력' as const:'기상 회귀 추정' as const,
-    storageModel:'사용자 제공 구간 선형식',validation:'독립 예측 성능 검증 미완료 · 0~120일은 구현 범위이며 독립적으로 검증된 적용 기간이 아님',displayDays:{min:0,max:120},
+    storageModel:'제공 엑셀 근사 모델 · 논문 직접 회귀식으로 확인되지 않음',validation:'독립 예측 성능 검증 미완료 · 0~120일은 구현 범위이며 독립적으로 검증된 적용 기간이 아님',displayDays:{min:0,max:120},
     sourceFiles:HONGRO_SOURCE_FILES,initialRegressionR2:input.source==='weather'?Object.fromEntries((Object.keys(HONGRO_REGRESSION) as HongroMetric[]).map(key=>[key,HONGRO_REGRESSION[key].r2])) as Record<HongroMetric,number>:null,
     referenceData:{file:'chang_200.xlsx',rows:200,kind:'synthetic' as const,isValidatedDomain:false as const},
     disclaimer:HONGRO_DISCLAIMER,unitsConflict:HONGRO_UNITS_CONFLICT,sugarEquationConflict:HONGRO_SUGAR_EQUATION_CONFLICT,

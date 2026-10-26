@@ -1,0 +1,9 @@
+hongro-apple.glb
+Source: user-provided Hongro_Apple_Blender_Package.zip / Hongro_Apple/hongro_apple.glb.
+Unmodified GLB, embedded textures. Hongro_Apple_Body and Hongro_Stem meshes.
+Photo-guided approximation from one 255 x 246 front photograph, not a 3D scan.
+Rear surface, depth, underside and nominal 80 mm size are estimates.
+Cultivar was supplied by the user and was not verified from the photograph.
+No quality-change morph targets are present. The web viewer applies reversible
+vertex displacement to the body and scales the whole model for illustration.
+This model is not a measured Fuji shape, a quality assessment, or validation data.

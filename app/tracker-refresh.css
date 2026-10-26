@@ -165,3 +165,18 @@
   .qt-refresh .qt-3d > summary .kind { font-size: 11px; }
   .qt-refresh .conv-pop { max-width: calc(100vw - 40px); }
 }
+
+/* Model provenance and loss sources stay readable alongside the existing tracker. */
+.qt-loss-sources { margin: 16px 0; padding: 18px; border: 1px solid #dfe6d9; border-radius: 16px; background: #f7f9f4; }
+.qt-loss-sources h3 { margin: 0 0 12px; font-size: 16px; }
+.qt-loss-sources .qt-latest-values { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.qt-loss-sources .qt-latest-values > div { display: block; min-width: 0; }
+.qt-loss-sources .qt-latest-values small { display: block; margin-top: 6px; color: #5e6d5a; line-height: 1.6; overflow-wrap: anywhere; }
+.qt-loss-sources .qt-check { margin-top: 14px; align-items: flex-start; }
+.qt-basis code, .qt-basis dd { overflow-wrap: anywhere; }
+@media(max-width:600px) {
+  .qt-loss-sources { padding: 14px; }
+  .qt-loss-sources .qt-latest-values { grid-template-columns: 1fr; }
+  .qt-loss-sources .qt-latest-values dt { max-width: none; }
+  .qt-loss-sources .qt-latest-values dd { text-align: left; margin-top: 4px; }
+}

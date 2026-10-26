@@ -4,6 +4,7 @@ import {cleanDetails, createLot} from '../lib/lot-server';
 import {InputError} from '../lib/lot-analysis';
 import {emptyForm, payloadFromForm} from '../lib/tracker-form';
 import {HONGRO_MODEL_VERSION, HONGRO_UNITS} from '../lib/hongro';
+import {predictQuality} from '../lib/quality-models';
 
 function record() {
   const form=emptyForm();form.variety='홍로';form.name='홍로 검증';form.intake_date='2020-09-01';
@@ -36,13 +37,26 @@ test('server rejects altered Hongro origin, units, source, model, storage and no
   for(const hongro of variants)assert.throws(()=>cleanDetails({...base,hongro}),InputError);
 });
 
-test('create-record rejects examples and cultivar/condition mismatches before database access',async()=>{
+test('create-record rejects examples, cultivar mismatches and inconsistent measured values before database access',async()=>{
   const p=record();
   for(const patch of [{record_mode:'example'},{mode:'example'},{sampleOnly:true},{record_mode:'unknown'}]){
     await assert.rejects(()=>createLot(request({...p,...patch})),e=>e instanceof InputError&&/예시/.test(e.message));
   }
-  for(const patch of [{variety:'후지',weight:250},{storage:'CA'},{mcp:'처리'},{firmness:72}]){
+  for(const patch of [{variety:'후지',weight:250},{firmness:72}]){
     await assert.rejects(()=>createLot(request({...p,...patch})),e=>e instanceof InputError&&/홍로/.test(e.message));
+  }
+});
+
+test('recorded Hongro CA and MCP conditions remain recorded while unsupported models return null',()=>{
+  for(const condition of [{storage:'CA' as const,mcp:'미처리' as const},{storage:'일반 저온' as const,mcp:'처리' as const}]){
+    const form=emptyForm();form.variety='홍로';form.name='조건 기록';form.intake_date='2020-09-01';
+    form.hongro.initial={firmness:'68',brix:'14.2',acidity:'0.18',weight:'',diameter:''};
+    Object.assign(form,condition);
+    const payload=payloadFromForm(form);
+    assert.equal(payload.storage,condition.storage);assert.equal(payload.mcp,condition.mcp);
+    assert.ok((cleanDetails(payload.details) as Record<string,unknown>).hongro);
+    const prediction=predictQuality({cultivar:'홍로',storage:condition.storage==='CA'?'ca':'cold',mcp:condition.mcp==='처리'?'treated':'untreated',temperature:0,metric:'firmness',day:30,anchor:{day:0,value:68}});
+    assert.equal(prediction.ok,false);assert.equal(prediction.value,null);assert.ok(prediction.reason);
   }
 });
 

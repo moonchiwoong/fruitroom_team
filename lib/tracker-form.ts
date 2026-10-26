@@ -12,6 +12,7 @@ export type TrackerForm = {
   firmness: string; brix: string; acidity: string; weight: string;
   packaging: string; location: string; sensor_id: string;
   storage: '일반 저온' | 'CA' | '기타'; mcp: '미처리' | '처리' | '미확인';
+  temperature: string; loss_reference: boolean;
   measure: {probe_mm: string; peeled: '' | '껍질 제거' | '껍질 포함'; position: string; fruit_temp: string; instrument: string};
   mcpd: {treated_on: string; product: string; concentration: string; hours: string; temp: string};
   ca: {from: string; to: string; o2: string; co2: string};
@@ -25,7 +26,7 @@ const s = (v: unknown) => v === null || v === undefined ? '' : String(v);
 export function emptyForm(): TrackerForm {
   return {
     name: '', variety: '후지', harvest_date: '', intake_date: '', sameStart: true, storage_start_date: '', initial_measured_on: '', initial_sample_count: '',
-    firmness: '', brix: '', acidity: '', weight: '', packaging: '', location: '', sensor_id: '', storage: '일반 저온', mcp: '미확인',
+    firmness: '', brix: '', acidity: '', weight: '', packaging: '', location: '', sensor_id: '', storage: '일반 저온', mcp: '미확인', temperature: '', loss_reference: false,
     measure: {probe_mm: '', peeled: '', position: '', fruit_temp: '', instrument: ''},
     mcpd: {treated_on: '', product: '', concentration: '', hours: '', temp: ''},
     ca: {from: '', to: '', o2: '', co2: ''}, tracked: {sample_id: '', count: '', initial_weight: ''}, hongro: emptyHongroForm(), team_shared: false,
@@ -52,6 +53,7 @@ export function formFromLot(l: Lot): TrackerForm {
     mcpd: {treated_on: s(d.mcp?.treated_on), product: s(d.mcp?.product), concentration: s(d.mcp?.concentration), hours: s(d.mcp?.hours), temp: s(d.mcp?.temp)},
     ca: {from: s(d.ca?.from), to: s(d.ca?.to), o2: s(d.ca?.o2), co2: s(d.ca?.co2)},
     tracked: {sample_id: s(d.tracked?.sample_id), count: s(d.tracked?.count), initial_weight: s(d.tracked?.initial_weight)},
+    temperature: s(d.storage_temperature ?? (h ? h.storage === 'cold0' ? 0 : 4 : null)), loss_reference: d.loss_reference === true,
     hongro, team_shared: !!l.team_shared,
   };
 }
@@ -87,12 +89,13 @@ export function payloadFromForm(f: TrackerForm, mode: 'real' | 'example' = 'real
     initial_measured_on: f.initial_measured_on || null, initial_sample_count: num(f.initial_sample_count),
     firmness: num(quality.firmness), brix: num(quality.brix), acidity: num(quality.acidity), weight: num(quality.weight),
     packaging: txt(f.packaging), location: txt(f.location), sensor_id: txt(f.sensor_id),
-    storage: isHongro ? '일반 저온' : f.storage, mcp: isHongro ? '미처리' : f.mcp, team_shared: f.team_shared,
+    storage: f.storage, mcp: f.mcp, team_shared: f.team_shared,
     details: {
+      storage_temperature: num(f.temperature), loss_reference: f.loss_reference === true,
       measure: {probe_mm: num(f.measure.probe_mm), peeled: f.measure.peeled || null, position: txt(f.measure.position), fruit_temp: num(f.measure.fruit_temp), instrument: txt(f.measure.instrument)},
-      mcp: {treated_on:isHongro?null:(f.mcpd.treated_on||null),product:isHongro?null:txt(f.mcpd.product),concentration:isHongro?null:txt(f.mcpd.concentration),hours:isHongro?null:num(f.mcpd.hours),temp:isHongro?null:num(f.mcpd.temp)},
-      ca: {from:isHongro?null:(f.ca.from||null),to:isHongro?null:(f.ca.to||null),o2:isHongro?null:num(f.ca.o2),co2:isHongro?null:num(f.ca.co2)},
-      tracked: {sample_id:isHongro?null:txt(f.tracked.sample_id),count:isHongro?null:num(f.tracked.count),initial_weight:isHongro?null:num(f.tracked.initial_weight)},
+      mcp: {treated_on:f.mcpd.treated_on||null,product:txt(f.mcpd.product),concentration:txt(f.mcpd.concentration),hours:num(f.mcpd.hours),temp:num(f.mcpd.temp)},
+      ca: {from:f.ca.from||null,to:f.ca.to||null,o2:num(f.ca.o2),co2:num(f.ca.co2)},
+      tracked: {sample_id:txt(f.tracked.sample_id),count:num(f.tracked.count),initial_weight:num(f.tracked.initial_weight)},
       ...(isHongro ? {hongro: {
         schemaVersion: 1, modelVersion: HONGRO_MODEL_VERSION, cultivar:'hongro', region:'geochang', mode:'real', source:h.source, storage:h.storage,
         initial: {firmness:num(h.initial.firmness),brix:num(h.initial.brix),acidity:num(h.initial.acidity),weight:num(h.initial.weight),diameter:num(h.initial.diameter)},
@@ -113,7 +116,8 @@ export function validateForm(f: TrackerForm, forSave: boolean): Partial<Record<s
   numCheck('initial_sample_count', f.initial_sample_count, 1, 10000, '표본 수');
   if (f.initial_sample_count.trim() && !Number.isInteger(Number(f.initial_sample_count))) e.initial_sample_count = '표본 수는 정수로 입력해 주세요.';
   numCheck('probe_mm', f.measure.probe_mm, 0.5, 50, '탐침 직경'); numCheck('fruit_temp', f.measure.fruit_temp, -5, 40, '과실 온도');
-  if(!isHongro){
+  numCheck('temperature', f.temperature, -50, 50, '저장 온도');
+  {
   numCheck('tracked_weight', f.tracked.initial_weight, 1, 2000, '추적 표본 초기 중량');
   numCheck('tracked_count', f.tracked.count, 1, 10000, '추적 표본 수');
   if (f.tracked.count.trim() && !Number.isInteger(Number(f.tracked.count))) e.tracked_count = '추적 표본 수는 정수로 입력해 주세요.';

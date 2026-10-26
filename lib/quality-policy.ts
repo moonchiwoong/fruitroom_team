@@ -1,6 +1,6 @@
 /** 화면·서버 도구·내보내기에서 공유하는 입력/출력 정책. 모델 식과 계수는 변경하지 않습니다. */
-export const QUALITY_POLICY_VERSION = 'quality-policy@2026-10-23';
-export const TRACKED_LOSS_REASON = '감모율은 동일한 추적 표본 ID의 초기·후속 중량과 측정일이 확인된 날짜에만 제공합니다. 기록이 없으면 계산값으로 대신하지 않습니다.';
+export const QUALITY_POLICY_VERSION = 'quality-policy@2026-10-26';
+export const TRACKED_LOSS_REASON = '실측 감모율은 동일한 추적 표본 ID의 초기·후속 중량과 측정일이 확인된 날짜에만 제공합니다. 모델 예측 감모율과 구분하며 기록이 없으면 실측값을 만들지 않습니다.';
 export const PRESSURE_REASON = '탐침 직경만으로 압력으로 환산하지 않습니다. 유효 접촉 면적과 해당 측정법의 환산 타당성·확인 근거가 필요합니다.';
 
 export type ParsedNumber = {status: 'missing'} | {status: 'invalid'; reason: string} | {status: 'valid'; value: number};
@@ -31,9 +31,9 @@ export function trackedLoss(initial: TrackedWeight, later: TrackedWeight): Allow
   return {ok: true, value: (initial.weight - later.weight) / initial.weight * 100};
 }
 
-/** 실제 물량의 감모율 모델 곡선은 제공하지 않습니다. 실측 기반 trackedLoss 결과만 별도로 표시합니다. */
-export function allowModelMetric(metric: string, dataKind: string): {ok: true} | {ok: false; reason: string} {
-  return metric === 'loss' && dataKind !== '예시' ? {ok: false, reason: TRACKED_LOSS_REASON} : {ok: true};
+/** Model loss depends on time, not on an initial weighing. Model selection owns availability. */
+export function allowModelMetric(_metric: string, _dataKind: string): {ok: true} | {ok: false; reason: string} {
+  return {ok: true};
 }
 
 export type PressureEvidence = {diameterMm?: number | null; effectiveAreaCm2?: number | null; methodConfirmed?: boolean; assumption?: string | null; evidence?: string | null};

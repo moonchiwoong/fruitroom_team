@@ -1,39 +1,32 @@
 'use client';
 import {useMemo, useState} from 'react';
 import dynamic from 'next/dynamic';
-import {AlertTriangle, BookOpen, CheckCircle2, ChevronDown, CircleHelp, Database} from 'lucide-react';
+import {AlertTriangle, BookOpen, CheckCircle2, ChevronDown, Database} from 'lucide-react';
 import {KindBadge} from '@/components/tracker-parts';
-import {inputInfo, inputKeys, metricInfo, metricKeys, regionIds, regions, regionSummary, samples, storageFormula, storageIds, storageMetricInfo, type StorageMetric} from '@/lib/initial-quality';
-import {MODEL_RANGE, MODEL_VERSION, modelLabel, metricMeta, STORAGE_MODEL_VERIFIED, type MetricId} from '@/lib/tracker';
+import {inputInfo, inputKeys, metricInfo, metricKeys, regionIds, regions, regionSummary, samples} from '@/lib/initial-quality';
+import {MODEL_RANGE, modelLabel, metricMeta, type MetricId} from '@/lib/tracker';
+import {MODEL_REGISTRY} from '@/lib/quality-models';
 import type {StorageId} from '@/lib/initial-quality';
 
 const InitialQuality = dynamic(() => import('@/components/initial-quality'), {ssr: false, loading: () => <div className="loading-strip">계산 도구를 불러오는 중…</div>});
 
-/** 저장 모델의 거동을 수식에서 직접 계산해 보여 줍니다(보정 없음). */
-function storageChecks() {
-  const a = 0.002288, b = 0.00002365, tMin = a / (2 * b), tBack = a / b;
-  const f = (t: number) => -a * t + b * t * t;
-  return {tMin, minChange: f(tMin), tBack, at300: f(MODEL_RANGE.displayDays)};
-}
-
 export default function ModelInfo({modelId, metric}: {modelId?: StorageId | null; metric?: MetricId}) {
   const [openCalc, setOpenCalc] = useState(false);
-  const chk = storageChecks();
   const dataCheck = useMemo(() => regionIds.map(r => {
     const s = samples(r), years = [...new Set(s.map(x => x.year))];
     const perYear = years.map(y => { const rows = s.filter(x => x.year === y); return {y, n: rows.length, uniq: new Set(rows.map(x => inputKeys.map(k => x.inputs[k]).join('|'))).size}; });
     return {r, n: s.length, years, allUnique: perYear.every(p => p.n === p.uniq), perYear};
   }), []);
-  const metrics: StorageMetric[] = ['firmness', 'brix', 'acidity', 'loss'];
+  const mcpFirmness = MODEL_REGISTRY.find(m => m.cultivar === 'fuji' && m.mcp === 'treated' && m.metric === 'firmness');
   function jumpTo(id: string) { const section = document.getElementById(id); if (section instanceof HTMLDetailsElement) section.open = true; section?.scrollIntoView({block: 'start'}); }
 
   return <div className="mi mi-refresh">
     <section className="mi-intro" aria-labelledby="model-intro-title">
       <span className="section-label">계산 근거·적용 범위</span>
       <h2 id="model-intro-title">초기 측정값에서 저장 중 변화를 계산합니다.</h2>
-      <p>기존 저장 수식에 초기 품질과 저장 경과일을 넣어 변화를 보여 줍니다. 측정 기록을 이해하기 위한 시연용 계산이며, 출하 시점·보관 가능일·안전성을 판정하지 않습니다.</p>
+      <p>품종·저장 조건에 맞는 모델을 선택하고 초기 품질과 저장 경과일을 넣어 변화를 보여 줍니다. 측정 기록을 이해하기 위한 시연용 계산이며, 출하 시점·보관 가능일·안전성을 판정하지 않습니다.</p>
       {(modelId || metric) && <p className="mi-current-model">현재 결과: {modelId ? modelLabel[modelId] : '저장 조건 확인 필요'}{metric ? ` · ${metricMeta[metric].label}` : ''}</p>}
-      <div className="mi-status"><span>시연용 계산</span><span>검증 미확인</span><span>적용 기간 미확인</span><span>오차 범위 미검증</span></div>
+      <div className="mi-status"><span>시연용 계산</span><span>검증 미확인</span><span>표시 기간 ≠ 보관 보장 기간</span><span>오차 범위 미검증</span></div>
     </section>
     <nav className="mi-toc" aria-label="모델 정보 목차">
       <button type="button" onClick={() => jumpTo('mi-storage')}>적용 범위·반영 정보</button><button type="button" onClick={() => jumpTo('mi-formulas')}>수식·출처</button><button type="button" onClick={() => jumpTo('mi-units')}>단위·측정법</button><button type="button" onClick={() => jumpTo('mi-regression')}>기상 회귀식 상세</button>
@@ -43,32 +36,42 @@ export default function ModelInfo({modelId, metric}: {modelId?: StorageId | null
     <section className="mi-card" id="mi-storage">
       <h2>계산에 반영되는 정보</h2>
       <div className="mi-input-grid">
-        <section><h3>사용하는 정보</h3><ul><li>초기 경도·당도·산도와 측정일</li><li>저장 시작일과 저장 경과일</li><li>기록된 저장 방식·1-MCP 처리 여부</li><li>분석 기준일 이후 선택한 조건</li><li>선택한 경우 최근 측정값을 계산 시작점으로 사용</li></ul></section>
-        <section><h3>현재 계산에 반영하지 않는 정보</h3><ul><li>입력한 품종·산지별 차이</li><li>센서의 실제 온습도 이력</li><li>사진·외관 관찰·포장 조건</li><li>처리 농도·시간, CA 산소·이산화탄소 농도</li></ul></section>
+        <section><h3>사용하는 정보</h3><ul><li>초기 경도·당도·산도와 측정일</li><li>저장 시작일과 저장 경과일</li><li>품종·저장 방식·저장 온도·1-MCP 처리 여부에 따른 모델 선택</li><li>분석 기준일 이후 선택한 조건</li><li>선택한 경우 최근 측정값을 계산 시작점으로 사용</li></ul></section>
+        <section><h3>현재 계산에 반영하지 않는 정보</h3><ul><li>산지별 계수(자료 미확보)</li><li>센서의 실제 온습도 이력</li><li>사진·외관 관찰·포장 조건</li><li>처리 농도·시간, CA 산소·이산화탄소 농도</li></ul></section>
       </div>
       <h2>적용 조건과 검증 상태 <KindBadge kind="모델 계산" verified={false} /></h2>
       <dl className="mi-dl">
-        <div><dt>출처</dt><dd>첨부 자료 <code>data/storage-quality-model.xlsx</code> (변수·저장방법·모형 유형·초기값 변수·동적 예측 수식·비고) · 모델 식별: <code>{MODEL_VERSION}</code></dd></div>
-        <div><dt>검증 상태</dt><dd><b>{STORAGE_MODEL_VERIFIED}</b> → 화면에서는 ‘시연용 계산’으로 표시 · 오차 범위 미검증</dd></div>
-        <div><dt>적용 기간</dt><dd>원자료에 관측·검증 기간이 없어 <b>미확인</b>. 화면 표시 범위는 0~{MODEL_RANGE.displayDays}일이며 검증된 적용 범위가 아닙니다.</dd></div>
-        <div><dt>품종 · 온습도 · 처리 조건</dt><dd className="mi-missing"><CircleHelp size={14} />원자료에 기재 없음 — 확인 필요 (1-MCP 농도·처리 시간, CA 산소·이산화탄소 농도 포함)</dd></div>
-        <div><dt>경도 지표</dt><dd>원자료 표기 ‘경도 (N)’ — 힘(N). 측정 기기·탐침·껍질 제거 여부는 기재 없음.</dd></div>
-        <div><dt>조건 → 모델</dt><dd>일반 저온 + 1-MCP 미처리 → {modelLabel.cold} · 일반 저온 + 1-MCP 처리 → {modelLabel.mcp} · CA + 미처리 → {modelLabel.ca} · <b>CA + 1-MCP 처리, 기타 저장, 1-MCP 미확인 → 모델 없음(수치 예측 제한)</b></dd></div>
-        <div><dt>온습도</dt><dd>식에 온습도 입력이 없어, 센서 이력은 화면에 보여 주기만 하고 계산에 반영하지 않습니다(고정 조건 가정).</dd></div>
-        <div><dt>조건 비교</dt><dd>저장 방식 간 효과를 검증한 모델이 없어 ‘체험용 비교’로만 제공합니다. 분석 기준일까지는 기록된 조건의 식, 이후는 선택한 조건의 식의 일별 변화를 이어 붙입니다.</dd></div>
-        <div><dt>감모율</dt><dd>실제 물량은 동일한 추적 표본의 초기·후속 중량과 측정 시점이 확인될 때만 감모율을 제공합니다. 자료가 없으면 수치를 제공하지 않습니다. 예시 모드의 가상 중량·시연용 곡선은 실제 기록과 분리합니다.</dd></div>
+        <div><dt>같은 모델 사용</dt><dd>숫자·그래프·CSV·3D 표시·이 계산 근거는 <code>lib/quality-models.ts</code>의 같은 모델 정의와 계산 결과를 사용합니다. 모델이 없거나 입력이 부족하면 값은 <code>null</code>이며 0으로 대체하지 않습니다.</dd></div>
+        <div><dt>후지</dt><dd>일반 저온, 1-MCP 처리 후 저온, CA 저장의 제공 엑셀 모델을 구분합니다. 원자료에 없는 온도별 보정·CA+1-MCP 복합 효과는 적용하지 않습니다. 정확한 연구 조건과 독립 예측 정확도는 미확인입니다.</dd></div>
+        <div><dt>홍로</dt><dd>일반 저온 0℃ 또는 4℃·1-MCP 미처리의 경도·당도·산도만 제공합니다. CA·1-MCP 처리·다른 온도는 <b>적용 모델 없음</b>입니다. 0℃와 4℃ 사이를 보간하지 않습니다.</dd></div>
+        <div><dt>적용 기간</dt><dd>홍로는 저장 시작 후 <b>0~120일</b>의 근사 모델 표시 범위이며 121일부터 계산하지 않습니다. 후지의 표시 범위는 0~{MODEL_RANGE.displayDays}일입니다. 모두 상품성·안전한 보관 기간을 보장하지 않으며, 독립 검증된 기간과 구분합니다.</dd></div>
+        <div><dt>측정일과 시간축</dt><dd>수확일·저장 시작일·초기 측정일·최근 측정일을 구분합니다. 저장 시작 후 t₀일의 측정값으로 연결할 때 변화량 모델은 g(t)−g(t₀)를 더하고 비율 모델은 g(t)/g(t₀)를 곱합니다. 최근 측정일에 저장일수를 0으로 되돌리지 않습니다.</dd></div>
+        <div><dt>산지·센서</dt><dd>산지 입력만으로 예측값이 달라지지 않습니다. 센서 온습도 이력, 처리 농도·시간, CA 기체 농도는 검증된 보정식이 없어 계산에 반영하지 않습니다.</dd></div>
+        <div><dt>조건 변경 시나리오</dt><dd>저장 방식 전환의 효과가 검증된 모델은 없습니다. 분석 기준일 전후 다른 식을 이어 붙이는 기능은 ‘조건 변경 시나리오’이며 실제 전환 처리의 효과를 예측·보장하지 않습니다.</dd></div>
+        <div><dt>실측 감모율</dt><dd><code>L = 100 × (초기 중량 − 후속 중량) / 초기 중량</code>. 동일 추적 표본 ID, 초기·후속 중량과 측정 시점이 확인된 경우에만 제공합니다. 측정이 없는 날짜의 값을 만들어 내지 않습니다.</dd></div>
+        <div><dt>모델 예측 감모율</dt><dd>저장일수로 계산하므로 초기 중량 입력은 필요하지 않습니다. 후지 일반 저온식의 결과 1.621은 <b>1.621%</b>입니다. 100을 다시 곱하지 않습니다.</dd></div>
+        <div><dt>홍로 참고 추정</dt><dd>홍로 감모율의 기본 상태는 <b>자료 부족</b>입니다. ‘후지 식으로 참고 추정 보기’를 명시적으로 선택한 경우에만 후지 일반 저온식을 0~120일에 표시하며, <b>홍로에 대해 검증되지 않은 후지 기반 참고 추정</b>으로 구분합니다. 범위 제한은 타당성 검증이 아닙니다.</dd></div>
+        <div><dt>설명용 외관 시각화</dt><dd>감모율이 있을 때 별도 외관 설정으로 수축·주름을 연속 변형합니다. 감모율을 길이 감소율로 그대로 쓰지 않으며 실제 외관 자료로 보정하지 않았습니다. 감모율이 없으면 기본 형태와 자료 부족 안내를 표시합니다. 경도·당도·산도로 색상·부패를 결정하지 않습니다.</dd></div>
       </dl>
-
     </section>
 
-    <details className="mi-card mi-disclosure" id="mi-formulas">
-      <summary>저장 방식별 수식과 출처</summary>
-      <p>원자료의 수식과 계수를 그대로 사용합니다. 아래 수식의 존재는 실서비스 예측 정확도가 검증되었다는 의미가 아닙니다.</p>
-      <div className="qt-table-wrap"><table className="qt-table mi-formula">
-        <thead><tr><th>지표</th>{storageIds.map(s => <th key={s}>{modelLabel[s]}</th>)}</tr></thead>
-        <tbody>{metrics.map(m => <tr key={m}><td>{storageMetricInfo[m].label} <small>({storageMetricInfo[m].unit})</small></td>{storageIds.map(s => <td key={s}><code>{storageFormula[m][s]}</code></td>)}</tr>)}</tbody>
-      </table></div>
-      <p className="qt-help">t는 저장 경과일(저장 시작일 = 0), y₀·S₀는 계산 시작점의 값입니다. 초기 측정일이 저장 시작일보다 늦으면 그날부터 계산하고, 경도·당도·감모율은 차이를, 산도는 비율을 이어 붙입니다.</p>
+    <details className="mi-card mi-disclosure" id="mi-formulas" open>
+      <summary>품종·저장 조건별 수식과 출처</summary>
+      <p>아래 내용은 계산 엔진의 모델 목록에서 직접 읽습니다. 홍로식은 제공 엑셀의 근사 모델입니다. 관련 논문 kjfp-25-7-779.pdf(2018, DOI: 10.11002/kjfp.2018.25.7.779)는 0℃·4℃ 저장 실측과 통계 비교를 다루며 아래 동적 수식이나 예측 정확도 검증 수치를 직접 제시하지 않습니다.</p>
+      {(['fuji', 'hongro'] as const).map(cultivar => <section key={cultivar}>
+        <h3>{cultivar === 'fuji' ? '후지' : '홍로'} · 모델 계산</h3>
+        <div className="qt-table-wrap"><table className="qt-table mi-formula">
+          <thead><tr><th>조건·항목</th><th>수식·단위</th><th>출처·버전</th><th>기간·검증 상태</th></tr></thead>
+          <tbody>{MODEL_REGISTRY.filter(model => model.cultivar === cultivar).map(model => <tr key={model.id}>
+            <td><b>{model.label}</b><br />{model.storage === 'ca' ? 'CA 저장' : '일반 저온 저장'} · {model.temperature === null ? '온도별 조건 미확인' : `${model.temperature}℃`} · 1-MCP {model.mcp === 'treated' ? '처리' : '미처리'}<br />{metricMeta[model.metric].label}</td>
+            <td><code>{model.formula}</code><br />단위: {model.unit}<br /><small>{model.connection === 'ratio' ? '비율 변화로 연결' : '변화량으로 연결'}</small></td>
+            <td>{model.source.map(source => <div key={source}>{source}</div>)}<small>{model.id}<br />{model.version}</small></td>
+            <td>{model.range.min}~{model.range.max}일<br /><small>{model.validation}</small>{model.warnings.map((warning, index) => <p className="qt-help" key={index}>{warning}</p>)}</td>
+          </tr>)}</tbody>
+        </table></div>
+      </section>)}
+      <p className="qt-help">t는 저장 시작일부터의 경과일입니다. F₀·S₀·A₀는 저장 시작 시 값이며, 늦게 측정한 값은 원래 시간축의 변화량 또는 비율로 연결합니다. A₀=0.18은 0.18%입니다. 홍로 당도는 S(t)=S₀로 고정하며 ‘완만한 감소’ 비고로 임의 계수를 만들지 않습니다.</p>
+      <p className="qt-help">홍로 감모율은 등록된 모델이 없습니다. 선택적으로 빌리는 후지식 <code>L_F(t)=0.007807t+0.0000475t²</code>은 참고 추정이며, 홍로 검증 모델·실측값과 구분합니다.</p>
     </details>
 
     <section className="mi-card" id="mi-units">
@@ -86,7 +89,8 @@ export default function ModelInfo({modelId, metric}: {modelId?: StorageId | null
         <div><KindBadge kind="실측" /><p>사용자가 직접 측정해 입력·저장한 값</p></div>
         <div><KindBadge kind="모델 계산" verified={false} /><p>수식으로 계산한 값. 검증 여부를 따로 표시합니다. 지금은 모두 <b>시연용 계산</b>입니다.</p></div>
         <div><KindBadge kind="예시" /><p>기능 확인용으로 넣은 가상의 값. 실제 측정이 아닙니다.</p></div>
-        <div><KindBadge kind="미측정" /><p>측정하지 않은 항목. 0이나 예시값으로 바꾸지 않습니다.</p></div>
+        <div><span className="kind k-example">참고 추정</span><p>다른 품종의 식을 명시적으로 빌린 계산. 해당 품종에 대해 검증되지 않았습니다.</p></div>
+        <div><KindBadge kind="미측정" /><p>측정하지 않은 항목 또는 자료 부족. 0이나 예시값으로 바꾸지 않습니다.</p></div>
       </div>
       <p className="qt-help">그래프에서 실측은 점, 모델 계산은 선, 분석 기준일 이후 미래 가정은 점선입니다. 오차 범위는 검증한 경우에만 표시하며, 지금은 ‘오차 범위 미검증’입니다.</p>
     </section>
@@ -95,9 +99,9 @@ export default function ModelInfo({modelId, metric}: {modelId?: StorageId | null
       <summary>수식 점검과 미확인 사항</summary>
       <p className="qt-help">수학적 거동에 대한 점검이며 실측 자료를 이용한 정확도 검증과 다릅니다.</p>
       <ul className="mi-checks">
-        <li className="ok"><CheckCircle2 size={16} /><div><b>시작값 일치</b> — 모든 저장 방식·지표에서 0일차 계산값이 입력한 초기값과 같도록 정의되어 있습니다.</div></li>
-        <li className="ok"><CheckCircle2 size={16} /><div><b>구간 경계 연속</b> — 당도 구간선형식은 100·200일 경계에서 이어지도록 정의되어 있습니다.</div></li>
-        <li className="warn"><AlertTriangle size={16} /><div><b>1-MCP 경도식의 장기 증가</b> — <code>y₀ − 0.002288t + 0.00002365t²</code>는 {chk.tMin.toFixed(1)}일에 최저(초기값 {chk.minChange.toFixed(3)} N)가 된 뒤 다시 올라가 {chk.tBack.toFixed(1)}일에 초기값으로 돌아오고, {MODEL_RANGE.displayDays}일에는 초기값보다 {chk.at300.toFixed(2)} N 높습니다. 실제 자료 특성인지 관측 기간을 넘어선 외삽인지 <b>원자료 확인이 필요</b>합니다. 증가 구간을 자르거나 보정하지 않았습니다.</div></li>
+        <li className="ok"><CheckCircle2 size={16} /><div><b>시작값 일치</b> — 적용 모델과 필요한 초기값이 있는 조건에서 0일차 경도·당도·산도는 초기값, 모델 감모율은 0%입니다. 모델이 없는 항목은 0이 아닙니다.</div></li>
+        <li className="ok"><CheckCircle2 size={16} /><div><b>구간 경계 연속</b> — 홍로 경도·산도는 60일 경계에서 연속이고, 후지 당도 구간선형식은 100·200일 경계에서 이어집니다.</div></li>
+        <li className="warn"><AlertTriangle size={16} /><div><b>후지 1-MCP 경도식의 출처 변경</b> — 이전 소스는 <code>y₀ − 0.002288t + 0.00002365t²</code>를 표시했습니다. 최신 제공 파일 사과_품질예측_회귀식.xlsx의 Sheet1!E6은 초기값 유지식이고 C6 모형 유형은 이차 회귀로 남아 있어 문서 내부 표기가 불일치합니다. 이전 번들 엑셀 E6은 이차식입니다. 최신 명시 수식을 기준으로 버전을 분리했으며 활성식은 <code>{mcpFirmness?.formula ?? '출처 확인 중'}</code>입니다. {mcpFirmness?.warnings.map((warning, index) => <p key={index}>{warning}</p>)} 출처 차이를 보정계수로 섞지 않습니다.</div></li>
         <li className="warn"><AlertTriangle size={16} /><div><b>1-MCP·CA 산도식의 100일 이후 정체</b> — <code>y₀·(1 − ⅓·min(t/100, 1))</code>는 식의 구조상 100일 이후 초기값의 2/3로 고정됩니다(원자료 비고: ‘호흡억제’). 관측 자료에서 확인된 특성인지는 미확인입니다.</div></li>
         <li className="warn"><AlertTriangle size={16} /><div><b>검증 자료 없음</b> — 별도 평가 자료와 오차가 없어 예측구간·신뢰구간을 표시하지 않습니다.</div></li>
       </ul>

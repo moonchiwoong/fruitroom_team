@@ -62,11 +62,17 @@ test('old observations without sample identity are not reinterpreted as measured
   assert.equal(measuredPoints('firmness',[row],'2026-09-01','실측',null)[0].value,0);
 });
 
-test('real loss never uses a model curve while explicit examples may', () => {
+test('model loss needs no measured weight and remains separate from tracked observations', () => {
   const options={metric:'loss' as const,anchor:{day:0,date:'2026-09-01',value:0,kind:'실측' as const,source:'initial' as const},recorded:'cold' as const,future:'cold' as const,asOfDay:10};
-  assert.equal(computeSeries(options).ok,false);
-  assert.equal(computeSeries({...options,anchor:{...options.anchor,kind:'예시'}}).ok,true);
-  assert.equal(allowModelMetric('loss','모델 계산').ok,false);
+  for(const anchor of [null,options.anchor,{...options.anchor,kind:'예시' as const}]) {
+    const curve=computeSeries({...options,anchor});
+    assert.equal(curve.ok,true);
+    const day0=valueAt(curve,0),day120=valueAt(curve,120);
+    assert.equal(day0.status,'ok');if(day0.status==='ok')assert.equal(day0.value,0);
+    assert.equal(day120.status,'ok');if(day120.status==='ok')assert.ok(Math.abs(day120.value-1.62084)<1e-12);
+  }
+  assert.equal(allowModelMetric('loss','모델 계산').ok,true);
+  assert.equal(trackedLoss({sampleId:'a',date:'2026-09-01',weight:null},{sampleId:'a',date:'2026-09-02',weight:280}).ok,false);
 });
 
 test('diameter alone never authorizes pressure conversion', () => {
@@ -118,13 +124,14 @@ test('CSV names cannot become formulas while signed numeric measurements remain 
   assert.equal(rowsToCsv([['이름','측정값'],['=1+1',-0.3]]),"이름,측정값\n'=1+1,-0.3");
 });
 
-// Expected values captured from the provided GitHub source commit before policy changes.
+// Cold/CA parity comes from the uploaded source. MCP firmness now follows the
+// verified latest workbook's E6 (y=y0), with provenance retained in model metadata.
 const parity: [MetricId,'cold'|'mcp'|'ca',number,number][]=[
-  ['firmness','cold',71.848937,71.731953],['firmness','mcp',71.97925455,71.86227054999999],['firmness','ca',71.954042,71.837058],
+  ['firmness','cold',71.848937,71.731953],['firmness','mcp',72,71.883016],['firmness','ca',71.954042,71.837058],
   ['brix','cold',14.189,14.105],['brix','mcp',14.222,14.138],['brix','ca',14.167,14.083],
   ['acidity','cold',0.36213760094920483,0.3266835700870449],['acidity','mcp',0.36592592592592593,0.3301010101010101],['acidity','ca',0.36592592592592593,0.3301010101010101],
 ];
-test('all three model conditions retain original calculation outputs across the analysis cutoff', () => {
+test('verified workbook models preserve the original time axis across a condition-change scenario', () => {
   for(const [metric,recorded,v14,v42] of parity){
     const initialValue=metric==='firmness'?72:metric==='brix'?14.2:0.38;
     const s=computeSeries({metric,anchor:{day:3,date:'2026-09-04',value:initialValue,kind:'실측',source:'initial'},recorded,future:'ca',asOfDay:14});

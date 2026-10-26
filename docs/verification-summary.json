@@ -1,0 +1,33 @@
+{
+  "verified_on": "2026-10-26",
+  "timezone": "Asia/Seoul",
+  "typecheck": "passed",
+  "unit_and_integration_tests": {
+    "passed": 94,
+    "failed": 0,
+    "skipped": 0
+  },
+  "production_build": "passed",
+  "browser_checks": {
+    "surface": "actual GuestTry and QualityAppleViewer components in isolated static QA bundle",
+    "mobile_viewport_width": 360,
+    "document_client_width": 345,
+    "document_scroll_width": 345,
+    "checked": [
+      "Hongro120day0C53.6N",
+      "Hongro120day4C52.4N",
+      "referenceLoss120day1.62084percent",
+      "unsupportedCA",
+      "unsupported2C",
+      "day121Unavailable",
+      "lateAnchorDay10Day90_58.5N",
+      "beforeAnchorUnavailable",
+      "HongroExampleNoFujiObservations",
+      "WebGLUnavailableMessage"
+    ]
+  },
+  "actual_glb_vertices_tested": 18191,
+  "gpu_rendering_verified": false,
+  "gpu_limit": "Cloud QA browser did not support WebGL initialization. Actual GLB vertex deformation/reset passed CPU tests.",
+  "production_deployed": false
+}

@@ -1,0 +1,36 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> site-creator-vinext-starter@0.1.0 build
+> next build
+
+▲ Next.js 16.3.8 (Turbopack)
+✓ Running next.config.ts took 22ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 706ms
+  Running TypeScript ...
+  Finished TypeScript in 4.5s ...
+  Collecting page data using 8 workers ...
+  Generating static pages using 8 workers (0/9) ...
+  Generating static pages using 8 workers (2/9) 
+  Generating static pages using 8 workers (4/9) 
+  Generating static pages using 8 workers (6/9) 
+✓ Generating static pages using 8 workers (9/9) in 201ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/ai/chat
+├ ƒ /api/ai/mcp
+├ ƒ /api/ai/status
+├ ƒ /api/lots
+├ ƒ /api/lots/[id]/[action]
+├ ƒ /api/media/[id]
+├ ƒ /api/predictions/hongro
+└ ○ /try
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

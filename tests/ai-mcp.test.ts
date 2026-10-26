@@ -90,11 +90,27 @@ test('prediction reuses unchanged engine and compares on the measurement date',(
   assert.equal(r.latestComparison?.date,'2026-09-12');assert.equal(r.latestComparison?.calculated,measured.status==='ok'?measured.value:null);
   assert.notEqual(r.latestComparison?.calculated,r.value);
 });
-test('real loss exists only at confirmed tracked measurement dates',()=>{
+test('predicted and measured loss retain distinct values, dates and provenance',()=>{
   const options={form:formFromLot(base),mode:'real' as const,observations,asOf:'2026-09-15',metric:'loss' as const,future:'same' as const,useLatest:false};
-  assert.equal(evaluatePrediction({...options,selectedDate:'2026-09-12'}).value,5);
-  assert.equal(evaluatePrediction({...options,selectedDate:'2026-09-13'}).value,null);
-  assert.equal(evaluatePrediction({...options,selectedDate:'2026-09-12',observations:observations.map(o=>({...o,details:null}))}).value,null);
+  const atMeasurement=evaluatePrediction({...options,selectedDate:'2026-09-12'});
+  assert.ok(Math.abs(atMeasurement.value!-(0.007807*10+0.0000475*10**2))<1e-12);
+  assert.equal(atMeasurement.dataKind,'모델 계산');
+  assert.equal(atMeasurement.measuredLoss.value,5);assert.equal(atMeasurement.measuredLoss.kind,'실측');
+  assert.equal(atMeasurement.measuredLoss.date,'2026-09-12');assert.equal(atMeasurement.measuredLoss.unit,'%');
+  assert.equal(atMeasurement.model.selectedPrediction.value,atMeasurement.value);
+  const followingDay=evaluatePrediction({...options,selectedDate:'2026-09-13'});
+  assert.notEqual(followingDay.value,null);assert.equal(followingDay.measuredLoss.value,null);
+  const noIdentity=evaluatePrediction({...options,selectedDate:'2026-09-12',observations:observations.map(o=>({...o,details:null}))});
+  assert.equal(noIdentity.value,atMeasurement.value);assert.equal(noIdentity.measuredLoss.value,null);
+  const noWeight={...options.form,tracked:{sample_id:'',count:'',initial_weight:''}};
+  assert.equal(evaluatePrediction({...options,form:noWeight,selectedDate:'2026-09-12'}).value,atMeasurement.value);
+});
+test('measured loss from a later initial measurement is not compared with storage-start cumulative loss',()=>{
+  const form=formFromLot({...base,initial_measured_on:'2026-09-05'});
+  const r=evaluatePrediction({form,mode:'real',observations,asOf:'2026-09-15',selectedDate:'2026-09-12',metric:'loss',future:'same',useLatest:true});
+  assert.equal(r.measuredLoss.value,5);assert.notEqual(r.value,null);
+  assert.equal(r.latestComparison?.calculated,null);
+  assert.ok(r.latestComparison?.reason);
 });
 test('initial measurement after analysis date is rejected',()=>{
   assert.throws(()=>evaluatePrediction({form:formFromLot({...base,initial_measured_on:'2026-09-20'}),mode:'real',observations:[],asOf:'2026-09-15',selectedDate:'2026-09-22',metric:'firmness',future:'same',useLatest:false}),/분석 기준일 이후/);
