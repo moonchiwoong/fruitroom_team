@@ -41,20 +41,32 @@ test('Hongro form rejects missing active inputs and dates outside the 120-day mo
   assert.equal(hongroStorageStart({...f,sameStart:false,storage_start_date:'2026-09-03'}),'2026-09-03');
 });
 
-test('Hongro serialization uses dedicated measured values and preserves model provenance',()=>{
+test('Hongro serialization preserves measured values, actual conditions and model provenance',()=>{
   const f=measuredForm();f.hongro.storage='cold4';f.hongro.initial.weight='250';f.hongro.initial.diameter='80';
   f.firmness='999';f.brix='999';f.acidity='999';f.weight='999';f.storage='CA';f.mcp='처리';
   const p=payloadFromForm(f);
   const h=p.details.hongro;assert.ok(h);
   assert.equal(p.record_mode,'real');assert.equal(p.variety,'거창 홍로');
   assert.deepEqual([p.firmness,p.brix,p.acidity,p.weight],[68,14.2,0.18,250]);
-  assert.equal(p.storage,'일반 저온');assert.equal(p.mcp,'미처리');
+  assert.equal(p.storage,'CA');assert.equal(p.mcp,'처리');
   assert.equal(h.schemaVersion,1);assert.equal(h.modelVersion,HONGRO_MODEL_VERSION);assert.equal(h.mode,'real');
   assert.equal(h.cultivar,'hongro');assert.equal(h.region,'geochang');assert.equal(h.source,'measured');assert.equal(h.storage,'cold4');
   assert.deepEqual(h.units,HONGRO_UNITS);assert.equal(h.initial.diameter,80);
   for(const section of [p.details.mcp,p.details.ca,p.details.tracked])assert.ok(Object.values(section).every(value=>value===null));
   const restored=formFromLot(asLot(p));
   assert.deepEqual(restored.hongro,f.hongro);assert.equal(restored.variety,f.variety);
+});
+
+test('Hongro condition and reference settings survive a record round trip without discarding measured-loss evidence',()=>{
+  const f=measuredForm();f.temperature='4';f.loss_reference=true;f.storage='CA';f.mcp='처리';
+  f.tracked={sample_id:'hongro-sample',count:'10',initial_weight:'300'};
+  f.ca={from:'2026-09-01',to:'2026-09-15',o2:'2',co2:'1'};
+  f.mcpd={treated_on:'2026-09-01',product:'기록된 제품',concentration:'기록된 농도',hours:'12',temp:'4'};
+  const payload=payloadFromForm(f),restored=formFromLot(asLot(payload));
+  assert.equal(payload.details.storage_temperature,4);assert.equal(payload.details.loss_reference,true);
+  assert.deepEqual(restored.tracked,f.tracked);assert.deepEqual(restored.ca,f.ca);assert.deepEqual(restored.mcpd,f.mcpd);
+  assert.equal(restored.temperature,'4');assert.equal(restored.loss_reference,true);
+  assert.equal(restored.storage,'CA');assert.equal(restored.mcp,'처리');
 });
 
 test('weather-derived Hongro data is not saved as measured quality and survives a round trip',()=>{

@@ -345,3 +345,4 @@ html body,button,input,select,textarea,.btn{font-family:var(--font-sans)}
   .guest .page-hero{padding-left:0;padding-right:0}
 }
 .lv-split .lv-kinds{grid-template-columns:1fr!important}
+.qt-v2 .qt-loss-sources{margin:24px 0 0}

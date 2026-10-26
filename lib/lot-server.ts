@@ -49,6 +49,8 @@ export function cleanDetails(v:unknown){
  const num=(x:unknown,min:number,max:number,label:string)=>numberOrNull(x,min,max,label);
  const txt=(x:unknown,label:string,max=80)=>x===undefined||x===null||x===''?null:short(x,label,true,max)||null;
  const date=(x:unknown,label:string)=>x===undefined||x===null||x===''?null:validDate(x,label);
+ if(Object.hasOwn(s,'storage_temperature'))o.storage_temperature=num(s.storage_temperature,-20,50,'설정 저장 온도 ℃');
+ if(Object.hasOwn(s,'loss_reference')){if(typeof s.loss_reference!=='boolean')throw new InputError('후지 기반 참고 추정 선택값을 확인해 주세요.');o.loss_reference=s.loss_reference;}
  if(s.measure){const m=s.measure;o.measure={probe_mm:num(m.probe_mm,0.5,50,'탐침 직경 mm'),peeled:m.peeled===undefined||m.peeled===null||m.peeled===''?null:(['껍질 제거','껍질 포함'].includes(m.peeled)?m.peeled:(()=>{throw new InputError('껍질 제거 여부를 확인해 주세요.');})()),position:txt(m.position,'측정 위치'),fruit_temp:num(m.fruit_temp,-5,40,'과실 온도 °C'),instrument:txt(m.instrument,'측정 기기')};}
  if(s.mcp){const m=s.mcp;o.mcp={treated_on:date(m.treated_on,'1-MCP 처리일'),product:txt(m.product,'제품명'),concentration:txt(m.concentration,'농도',40),hours:num(m.hours,0,500,'처리 시간 h'),temp:num(m.temp,-5,40,'처리 온도 °C')};}
  if(s.ca){const m=s.ca;o.ca={from:date(m.from,'CA 시작일'),to:date(m.to,'CA 종료일'),o2:num(m.o2,0,21,'산소 농도 %'),co2:num(m.co2,0,30,'이산화탄소 농도 %')};}
@@ -73,7 +75,8 @@ function checkLotModel(l:Record<string,unknown>){
  // Legacy observational records have no prediction provenance. Keep them editable;
  // the tracker restores empty Hongro inputs and never infers a model from these fields.
  if(!h)return;
- if(l.storage!=='일반 저온'||l.mcp!=='미처리')throw new InputError('홍로 예측은 0℃·4℃ 저온저장만 지원하며 CA·1-MCP 조건을 사용할 수 없습니다.');
+ // Unsupported storage conditions remain truthful records. The model selector
+ // returns unavailable instead of rewriting CA/MCP or applying a Fuji equation.
  for(const metric of ['firmness','brix','acidity','weight']){
   const expected=h.source==='measured'?h.initial[metric]:null;
   if((l[metric]??null)!==(expected??null))throw new InputError('홍로 초기품질은 선택한 출처의 입력값과 함께 저장해 주세요. 기상 추정값은 실측값으로 저장할 수 없습니다.');

@@ -9,11 +9,17 @@ import {evaluatePrediction} from '../lib/ai/prediction';
 import {baselineCore,observationFingerprint} from '../lib/ai/context';
 import {AIError,type Actor,type AIContext,type DataAccess,type Evidence} from '../lib/ai/contracts';
 import {withMcpClient} from '../lib/ai/mcp';
+import {predictQuality} from '../lib/quality-models';
+import {daysBetween} from '../lib/tracker';
 
 const asOf=todayKST(),actor:Actor={id:'isolation-test-user',isTeam:false};
 function fixture(variety='후지'){
   const lot={...demoLots()[0],owner_id:actor.id,variety};
   const analysis=demoAnalysis(lot,asOf),form=formFromLot(lot);
+  if(isHongroVariety(variety)){
+    form.temperature='0';form.storage='일반 저온';form.mcp='미처리';
+    form.hongro.initial={firmness:'72',brix:'14.2',acidity:'0.38',weight:'',diameter:''};
+  }
   const context:Extract<AIContext,{scope:'prediction'}>={mode:'real',scope:'prediction',lotId:lot.id,form,metric:'firmness',asOf,selectedDate:asOf,future:'same',useLatest:false,modelVersion:MODEL_VERSION,baseline:null};
   const data:DataAccess={authenticate:async()=>actor,listLots:async()=>[lot],getLot:async id=>id===lot.id?lot:null,getAnalysis:async()=>analysis};
   return {lot,analysis,context,data};
@@ -33,10 +39,14 @@ test('legacy storage engine rejects Hongro without changing Fuji calculation',()
   }
 });
 
-test('AI prediction rejects Hongro input with an explicit dedicated-calculator explanation',()=>{
+test('AI prediction uses the same Hongro model and retains cultivar-specific provenance',()=>{
   for(const variety of ['홍로','Hongro']){
     const f=fixture(variety);
-    assert.throws(()=>evaluatePrediction({...f.context,observations:f.analysis.observations}),e=>e instanceof AIError&&e.code==='unsupported_cultivar'&&e.status===422&&/전용 계산기/.test(e.message)&&/AI 설명은 아직 지원하지/.test(e.message));
+    const result=evaluatePrediction({...f.context,observations:f.analysis.observations});
+    const start=f.context.form.sameStart?f.context.form.intake_date:f.context.form.storage_start_date;
+    const expected=predictQuality({cultivar:variety,storage:'cold',temperature:0,mcp:'untreated',metric:'firmness',day:daysBetween(start,asOf),anchor:{day:daysBetween(start,f.context.form.initial_measured_on||start),value:72}});
+    assert.equal(result.value,expected.value);assert.ok(result.model.selectedPrediction.modelId?.includes('hongro'));
+    assert.deepEqual(result.model.selectedPrediction.source,expected.source);
   }
   const fuji=fixture();assert.notEqual(evaluatePrediction({...fuji.context,observations:fuji.analysis.observations}).value,null);
 });
@@ -45,7 +55,7 @@ test('MCP authoritative Hongro lot blocks a forged Fuji input while preserving m
   const f=fixture('거창 홍로');f.context.form={...f.context.form,variety:'후지'};
   await withMcpClient({data:f.data,actor,context:f.context},async client=>{
     for(const name of ['run_existing_quality_prediction','compare_measurement_with_prediction']){
-      const result=await client.callTool({name,arguments:{}});assert.equal(result.isError,true);assert.equal((result.structuredContent as {code:string}).code,'unsupported_cultivar');
+      const result=await client.callTool({name,arguments:{}});assert.equal(result.isError,true);assert.equal((result.structuredContent as {code:string}).code,'cultivar_mismatch');
     }
     const result=await client.callTool({name:'get_quality_measurements',arguments:{}});assert.equal(result.isError,undefined);
     const e=(result.structuredContent as {evidence:Evidence}).evidence;assert.ok(Array.isArray(e.data.records)&&e.data.records.length>0);assert.equal((e.data.initial as {firmness:string}).firmness,'72');
@@ -56,6 +66,8 @@ test('baseline signature includes cultivar and changing model conditions invalid
   const f=fixture(),c=f.context;
   assert.notEqual(baselineCore(c.form,false),baselineCore({...c.form,variety:'홍로'},false));
   assert.notEqual(baselineCore(c.form,false),baselineCore({...c.form,mcp:'처리'},false));
+  assert.notEqual(baselineCore(c.form,false),baselineCore({...c.form,temperature:'4'},false));
+  assert.notEqual(baselineCore(c.form,false),baselineCore({...c.form,loss_reference:true},false));
   for(const patch of [{variety:'홍로'},{storage:'CA' as const},{mcp:'처리' as const}]){
     c.baseline={label:'기준',conditionLabel:'기준',createdAt:new Date().toISOString(),asOf,modelVersion:MODEL_VERSION,future:'cold',form:{...c.form,...patch},useLatest:false,observationsFingerprint:observationFingerprint(f.analysis.observations)};
     await withMcpClient({data:f.data,actor,context:c},async client=>{

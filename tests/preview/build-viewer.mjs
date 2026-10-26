@@ -1,0 +1,27 @@
+import {build} from 'esbuild';
+import {mkdir,copyFile,writeFile,readFile,cp} from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
+import path from 'node:path';
+import postcss from 'postcss';
+import tailwind from '@tailwindcss/postcss';
+
+const projectRoot=fileURLToPath(new URL('../../',import.meta.url));
+const outdir=path.resolve(process.argv[2]??path.join(projectRoot,'.preview-quality-viewer'));
+await mkdir(path.join(outdir,'models'),{recursive:true});
+await build({entryPoints:[path.join(projectRoot,'tests/preview/quality-viewer.tsx'),path.join(projectRoot,'tests/preview/guest-try.tsx')],outdir,bundle:true,format:'esm',platform:'browser',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"','process.env':'{}'},tsconfig:path.join(projectRoot,'tsconfig.json')});
+await copyFile(path.join(projectRoot,'public/models/hongro-apple.glb'),path.join(outdir,'models/hongro-apple.glb'));
+await cp(path.join(projectRoot,'public/assets'),path.join(outdir,'assets'),{recursive:true});
+const globals=path.join(projectRoot,'app/globals.css');
+const processed=await postcss([tailwind({base:projectRoot})]).process(await readFile(globals,'utf8'),{from:globals});
+const additional=['refresh.css','tracker-refresh.css','lots-refresh.css','ai-assistant.css','hongro.css','design-system.css','app-v2.css'];
+const appCss=processed.css+'\n'+(await Promise.all(additional.map(name=>readFile(path.join(projectRoot,'app',name),'utf8')))).join('\n');
+await writeFile(path.join(outdir,'app.css'),appCss);
+await writeFile(path.join(outdir,'index.html'),'<!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>애플트랙 3D 검증</title><link rel="stylesheet" href="/quality-viewer.css"></head><body style="margin:0;background:#f4f6f0"><div id="root"></div><script type="module" src="/quality-viewer.js"></script></body></html>');
+const guestHtml='<!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>애플트랙 체험 검증</title><link rel="stylesheet" href="/app.css"><link rel="stylesheet" href="/guest-try.css"></head><body><div id="root"></div><script type="module" src="/guest-try.js"></script></body></html>';
+await writeFile(path.join(outdir,'guest.html'),guestHtml);
+await mkdir(path.join(outdir,'try'),{recursive:true});
+await writeFile(path.join(outdir,'try/index.html'),guestHtml);
+const mobileFrame = source => '<!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>애플트랙 360px 검증</title></head><body style="margin:16px;background:#e8ece4;font-family:system-ui"><p>실제 프레임 뷰포트 360px · 모바일 CSS 검증</p><iframe title="애플트랙 모바일 360px" src="'+source+'" style="display:block;width:360px;height:900px;border:1px solid #738264;background:white"></iframe></body></html>';
+await writeFile(path.join(outdir,'mobile.html'),mobileFrame('/guest.html'));
+await writeFile(path.join(outdir,'viewer-mobile.html'),mobileFrame('/index.html'));
+console.log(outdir);

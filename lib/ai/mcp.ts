@@ -11,7 +11,7 @@ import type {Lot} from '../lot-types';
 import {AIError,type AIContext,type Actor,type Analysis,type DataAccess,type Evidence,type EvidenceField} from './contracts';
 import {evaluatePrediction,modelInformation} from './prediction';
 import {baselineCore,observationFingerprint,measurementCompatibility} from './context';
-import {HONGRO_DEDICATED_REASON,isHongroVariety} from '../cultivar';
+import {normalizeCultivar} from '../quality-models';
 
 export const TOOL_NAMES=['list_accessible_lots','get_lot_details','get_quality_measurements','get_environment_history_summary','run_existing_quality_prediction','compare_measurement_with_prediction','get_model_information'] as const;
 export type ToolName=typeof TOOL_NAMES[number];
@@ -68,8 +68,8 @@ export function createQualityMcpServer(options:{data:DataAccess;actor:Actor;cont
   async function predictionFor(args:{lot_id?:string},current:Actor){
     if(context.scope!=='prediction')throw new AIError('prediction_context_required','품질 예측 화면에서 지표와 날짜를 선택한 뒤 질문해 주세요.');
     const loaded=await load(args,current),c=context.scope==='prediction'?context:null;
-    if(isHongroVariety(loaded.analysis.lot.variety))throw new AIError('unsupported_cultivar',HONGRO_DEDICATED_REASON,422);
     const f=c?c.form:formFromLot(loaded.analysis.lot);
+    if(!loaded.draft && normalizeCultivar(f.variety)!==normalizeCultivar(loaded.analysis.lot.variety))throw new AIError('cultivar_mismatch','기록된 물량의 품종과 입력 품종이 다릅니다. 품종을 확인한 뒤 계산해 주세요.',422);
     const draft=loaded.draft||(context.mode==='real'&&!!c&&signature(c.form)!==signature(formFromLot(loaded.analysis.lot)));
     const result=evaluatePrediction({form:f,mode:context.mode,observations:loaded.analysis.observations,asOf:c?.asOf??todayKST(),selectedDate:c?.selectedDate??todayKST(),metric:c?.metric??'firmness',future:c?.future??'same',useLatest:c?.useLatest??false});
     let baseline:ReturnType<typeof evaluatePrediction>|null=null;
@@ -133,7 +133,7 @@ export function createQualityMcpServer(options:{data:DataAccess;actor:Actor;cont
     const {result,id,draft}=await predictionFor(args,current),c=result.latestComparison;
     return {tool:'compare_measurement_with_prediction',title:'최근 실측과 같은 날짜 계산',summary:(!c?'후속 측정 기록 없음.':c.calculated===null?`${c.date}: ${c.reason}`:`${c.date} 실측 ${c.displayMeasured} ${result.unit}, 같은 날짜 계산 ${c.displayCalculated} ${result.unit}. 차이 ${c.difference?.short}. ${c.reason??''}`)+(draft?' 미저장 입력을 사용한 시뮬레이션입니다.':''),fields:c?[{label:'실측',value:c.displayMeasured,unit:result.unit,date:c.date,kind:context.mode==='example'?'예시':'실측'},{label:'동일 날짜 계산',value:c.displayCalculated,unit:result.unit,date:c.date,kind:'모델 계산',verification:'검증 미확인'}]:[],data:{lotId:id,draft,comparison:c,unit:result.unit,model:result.model}};
   });
-  register('get_model_information','계산 근거·적용 범위',noArgs,async()=>({tool:'get_model_information',title:'계산 근거·적용 범위',summary:'기존 저장 모델의 시연용 계산입니다. 적용 기간과 오차 범위는 검증 미확인이고 품종 보정·실제 온습도 이력·사진은 계산에 반영되지 않습니다.',data:modelInformation()}));
+  register('get_model_information','계산 근거·적용 범위',noArgs,async()=>({tool:'get_model_information',title:'계산 근거·적용 범위',summary:'품종·저장 방식·설정 온도·1-MCP 처리 여부로 근거가 있는 모델을 선택합니다. 예측 정확도는 독립 검증 미완료이며 산지 입력, 센서 온습도 이력과 사진은 저장 계산에 반영하지 않습니다.',data:modelInformation()}));
   return server;
 }
 
