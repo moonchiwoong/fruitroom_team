@@ -347,25 +347,22 @@ html body,button,input,select,textarea,.btn{font-family:var(--font-sans)}
 .lv-split .lv-kinds{grid-template-columns:1fr!important}
 .qt-v2 .qt-loss-sources{margin:24px 0 0}
 
-/* ── 홍로: 날씨로 고르는 초기 품질 추정 ── */
-.qt-weather{display:grid;gap:20px;margin-top:8px}
-.qt-weather-q{border:0;margin:0;padding:0;min-width:0}
-.qt-weather-q legend{padding:0;margin-bottom:10px;font-size:16px;font-weight:700;color:var(--ds-text)}
-.qt-weather-opts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
-.qt-weather-opts button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-height:64px;padding:10px 12px;text-align:left;border:1px solid var(--ds-line-2);border-radius:10px;background:#fff;cursor:pointer;
-  transition:background-color .18s ease,border-color .18s ease,color .18s ease}
-.qt-weather-opts button b{font-size:15px;font-weight:700;color:var(--ds-text)}
-.qt-weather-opts button span{font-size:13px;line-height:1.4;color:var(--ds-text-2)}
-.qt-weather-opts button:hover{border-color:var(--ds-brand)}
-.qt-weather-opts button.active{border-color:var(--ds-brand);background:var(--ds-brand-soft);box-shadow:inset 0 0 0 1px var(--ds-brand)}
-.qt-weather-opts button.active b{color:var(--ds-brand)}
-.qt-weather-opts button:focus-visible{outline:2px solid var(--ds-brand);outline-offset:2px}
-.qt-weather-manual{border-style:dashed!important}
-.qt-weather-val{margin:8px 0 0;font-size:14px;color:var(--ds-text-2)}
-.qt-weather-val b{color:var(--ds-text);font-variant-numeric:tabular-nums}
-.qt-weather-input{display:flex;flex-direction:column;gap:6px;margin-top:10px;font-size:14px;font-weight:600;color:var(--ds-text)}
-.qt-weather-input input{max-width:240px}
-.qt-weather-input small{font-weight:400;color:var(--ds-text-2)}
-.qt-weather-q.has-err .qt-weather-opts button{border-color:var(--ds-danger)}
-@media(max-width:640px){.qt-weather-opts{grid-template-columns:1fr 1fr}}
-@media(prefers-reduced-motion:reduce){.qt-weather-opts button{transition:none}}
+/* ── 홍로: 날씨로 고르는 초기 품질 추정 (한 줄에 질문 하나) ── */
+.qt-weather{margin-top:4px}
+.qt-weather-lead{margin:0 0 6px;font-size:15px;color:var(--ds-text)}
+.qt-weather-rows{border-top:1px solid var(--ds-line)}
+.qt-weather-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--ds-line)}
+.qt-weather-q{font-size:15px;font-weight:600;color:var(--ds-text);display:flex;align-items:center;gap:8px;white-space:nowrap}
+.qt-weather-q em{font-style:normal;font-size:12px;font-weight:600;color:var(--ds-brand);background:var(--ds-brand-soft);border-radius:4px;padding:1px 6px}
+.qt-weather-seg{display:inline-flex;background:var(--ds-bg-3);border-radius:10px;padding:3px;gap:2px;flex:none}
+.qt-weather-seg button{min-width:64px;min-height:38px;padding:0 12px;border:0;border-radius:8px;background:none;font-size:15px;font-weight:500;color:var(--ds-text-2);cursor:pointer;
+  transition:background-color .18s ease,color .18s ease,box-shadow .18s ease}
+.qt-weather-seg button:hover:not(.active){color:var(--ds-text)}
+.qt-weather-seg button.active{background:#fff;color:var(--ds-brand);font-weight:700;box-shadow:0 1px 3px rgba(25,31,40,.12)}
+.qt-weather-seg button:focus-visible{outline:2px solid var(--ds-brand);outline-offset:1px}
+.qt-weather-more{margin-top:8px}
+.qt-weather-more>summary{min-height:40px;display:inline-flex;align-items:center;font-size:14px;font-weight:600;color:var(--ds-brand);cursor:pointer}
+.qt-weather-note{margin:6px 0 0;font-size:13px;line-height:1.5;color:var(--ds-text-3)}
+@media(max-width:400px){.qt-weather-seg button{min-width:54px;padding:0 8px;font-size:14px}}
+@media(prefers-reduced-motion:reduce){.qt-weather-seg button{transition:none}}
+.qt-weather{max-width:560px}

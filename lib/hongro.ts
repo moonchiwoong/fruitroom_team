@@ -33,22 +33,22 @@ export const HONGRO_WEATHER_FIELDS = [
  */
 const presetAt=(key:keyof typeof HONGRO_REFERENCE_RANGES,f:number,digits:number)=>{const r=HONGRO_REFERENCE_RANGES[key];return Number((r.min+(r.max-r.min)*f).toFixed(digits));};
 export const HONGRO_WEATHER_PRESETS:Record<keyof typeof HONGRO_REFERENCE_RANGES,{question:string;options:{id:'low'|'mid'|'high';label:string;hint:string;value:number}[]}>={
-  chang_min4:{question:'올해 봄(4월) 날씨는 어땠나요?',options:[
-    {id:'low',label:'쌀쌀한 봄',hint:'늦추위·늦서리가 있었던 해',value:presetAt('chang_min4',0.2,1)},
+  chang_min4:{question:'봄 (4월)',options:[
+    {id:'low',label:'쌀쌀',hint:'늦추위·늦서리가 있었던 해',value:presetAt('chang_min4',0.2,1)},
     {id:'mid',label:'보통',hint:'예년과 비슷한 봄',value:presetAt('chang_min4',0.5,1)},
-    {id:'high',label:'따뜻한 봄',hint:'꽃이 일찍 핀 해',value:presetAt('chang_min4',0.8,1)}]},
-  chang_LC56:{question:'5~6월 기온은 어땠나요?',options:[
-    {id:'low',label:'서늘했음',hint:'초여름이 선선했던 해',value:presetAt('chang_LC56',0.2,0)},
+    {id:'high',label:'따뜻',hint:'꽃이 일찍 핀 해',value:presetAt('chang_min4',0.8,1)}]},
+  chang_LC56:{question:'초여름 (5~6월)',options:[
+    {id:'low',label:'서늘',hint:'초여름이 선선했던 해',value:presetAt('chang_LC56',0.2,0)},
     {id:'mid',label:'보통',hint:'예년과 비슷한 초여름',value:presetAt('chang_LC56',0.5,0)},
-    {id:'high',label:'더웠음',hint:'초여름이 일찍 더웠던 해',value:presetAt('chang_LC56',0.8,0)}]},
-  chang_LC78:{question:'7~8월 여름은 어땠나요?',options:[
-    {id:'low',label:'시원한 여름',hint:'비가 잦거나 폭염이 적었던 해',value:presetAt('chang_LC78',0.2,0)},
+    {id:'high',label:'더움',hint:'초여름이 일찍 더웠던 해',value:presetAt('chang_LC56',0.8,0)}]},
+  chang_LC78:{question:'여름 (7~8월)',options:[
+    {id:'low',label:'시원',hint:'비가 잦거나 폭염이 적었던 해',value:presetAt('chang_LC78',0.2,0)},
     {id:'mid',label:'보통',hint:'예년과 비슷한 여름',value:presetAt('chang_LC78',0.5,0)},
-    {id:'high',label:'무더운 여름',hint:'열대야·폭염이 길었던 해',value:presetAt('chang_LC78',0.8,0)}]},
-  chang_9rain:{question:'9월에 비는 얼마나 왔나요?',options:[
-    {id:'low',label:'적게 옴',hint:'맑은 날이 이어진 해',value:presetAt('chang_9rain',0.2,0)},
+    {id:'high',label:'무더움',hint:'열대야·폭염이 길었던 해',value:presetAt('chang_LC78',0.8,0)}]},
+  chang_9rain:{question:'9월 비',options:[
+    {id:'low',label:'적음',hint:'맑은 날이 이어진 해',value:presetAt('chang_9rain',0.2,0)},
     {id:'mid',label:'보통',hint:'가을비가 예년 정도',value:presetAt('chang_9rain',0.5,0)},
-    {id:'high',label:'많이 옴',hint:'태풍·잦은 가을비가 있던 해',value:presetAt('chang_9rain',0.8,0)}]},
+    {id:'high',label:'많음',hint:'태풍·잦은 가을비가 있던 해',value:presetAt('chang_9rain',0.8,0)}]},
 };
 
 /** Exact transcription from the attached coefficient image; no fitting to synthetic rows. */

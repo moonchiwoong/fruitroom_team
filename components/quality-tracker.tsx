@@ -714,34 +714,30 @@ function HongroInputs({form, setForm, errors}: {form: TrackerForm; setForm: (upd
   </>;
 }
 
-/** 기상 항목마다 ‘쌀쌀한/보통/따뜻한’처럼 고르고, 필요하면 숫자를 직접 넣습니다. */
+/** 기상 항목마다 한 줄: 질문 + 3단 선택. 숫자는 필요할 때만 펼쳐 직접 입력합니다. */
 function WeatherChoices({form, setForm, errors}: {form: TrackerForm; setForm: (update: (f: TrackerForm) => TrackerForm) => void; errors: Partial<Record<string, string>>}) {
   const h = form.hongro;
-  const [manual, setManual] = useState<Record<string, boolean>>({});
+  const hasErr = HONGRO_WEATHER_FIELDS.some(f => errors[`hongro.weather.${f.key}`]);
+  const custom = HONGRO_WEATHER_FIELDS.some(f => { const v = String(h.weather[f.key] ?? '').trim(); return v !== '' && !HONGRO_WEATHER_PRESETS[f.key].options.some(o => o.value === Number(v)); });
+  const [open, setOpen] = useState(custom || hasErr);
   const setW = (key: string, v: string) => setForm(f => ({...f, hongro: {...f.hongro, weather: {...f.hongro.weather, [key]: v}}}));
   return <div className="qt-weather">
-    <p className="qt-help">올해 거창 날씨와 가장 가까운 것을 골라 주세요. 정확한 기상 값을 알면 ‘직접 입력’을 누르세요.</p>
-    {HONGRO_WEATHER_FIELDS.map(field => {
+    <p className="qt-weather-lead">올해 거창 날씨와 가까운 쪽을 골라 주세요.</p>
+    <div className="qt-weather-rows">{HONGRO_WEATHER_FIELDS.map(field => {
       const preset = HONGRO_WEATHER_PRESETS[field.key], cur = String(h.weather[field.key] ?? '').trim();
-      const picked = preset.options.find(o => cur !== '' && Number(cur) === o.value);
-      const isManual = manual[field.key] || (cur !== '' && !picked);
-      const err = errors[`hongro.weather.${field.key}`];
-      return <fieldset key={field.key} className={'qt-weather-q' + (err ? ' has-err' : '')}>
-        <legend>{preset.question}</legend>
-        <div className="qt-weather-opts" role="radiogroup" aria-label={preset.question}>
-          {preset.options.map(o => <button key={o.id} type="button" role="radio" aria-checked={!isManual && picked?.id === o.id} className={!isManual && picked?.id === o.id ? 'active' : ''}
-            onClick={() => { setManual(m => ({...m, [field.key]: false})); setW(field.key, String(o.value)); }}>
-            <b>{o.label}</b><span>{o.hint}</span></button>)}
-          <button type="button" role="radio" aria-checked={isManual} className={'qt-weather-manual' + (isManual ? ' active' : '')} onClick={() => setManual(m => ({...m, [field.key]: true}))}><b>직접 입력</b><span>숫자를 알고 있어요</span></button>
-        </div>
-        {isManual ? <label className="qt-weather-input" htmlFor={`tf-hongro-weather-${field.key}`}>{field.label} <small>({field.unit})</small>
-          <input id={`tf-hongro-weather-${field.key}`} type="number" step="any" value={h.weather[field.key]} placeholder="숫자 입력" onChange={e => setW(field.key, e.target.value)} />
-          <small>모델 참고 범위 {field.reference.min.toLocaleString('ko-KR', {maximumFractionDigits: 1})}~{field.reference.max.toLocaleString('ko-KR', {maximumFractionDigits: 1})} {field.unit}</small></label>
-          : <p className="qt-weather-val">계산에 쓰는 값 · {field.label} <b>{cur === '' ? '미선택' : `${Number(cur).toLocaleString('ko-KR')} ${field.unit}`}</b></p>}
-        {err && <span className="qf-err" role="alert">{err}</span>}
-      </fieldset>;
-    })}
-    <p className="qt-help">선택지의 값은 모델 참고 범위의 아래·가운데·위 지점이며, 거창의 실제 평년값이 아닙니다. 이렇게 낸 초기 품질은 ‘기상자료 기반 추정’으로 표시되고 실측값과 구분됩니다.</p>
+      const picked = cur === '' ? undefined : preset.options.find(o => o.value === Number(cur));
+      return <div key={field.key} className="qt-weather-row" role="radiogroup" aria-label={`${preset.question} 날씨`}>
+        <span className="qt-weather-q">{preset.question}{cur !== '' && !picked && <em>직접 입력</em>}</span>
+        <div className="qt-weather-seg">{preset.options.map(o => <button key={o.id} type="button" role="radio" aria-checked={picked?.id === o.id} title={`${o.hint} · ${o.value.toLocaleString('ko-KR')} ${field.unit}`}
+          className={picked?.id === o.id ? 'active' : ''} onClick={() => setW(field.key, String(o.value))}>{o.label}</button>)}</div>
+      </div>;
+    })}</div>
+    <details className="qt-weather-more" open={open} onToggle={e => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
+      <summary>숫자로 보기·직접 입력</summary>
+      <div className="qt-fields two">{HONGRO_WEATHER_FIELDS.map(field => <F key={field.key} id={`hongro-weather-${field.key}`} label={field.label} unit={field.unit} hint={`참고 범위 ${field.reference.min.toLocaleString('ko-KR', {maximumFractionDigits: 1})}~${field.reference.max.toLocaleString('ko-KR', {maximumFractionDigits: 1})}`} err={errors[`hongro.weather.${field.key}`]}>
+        <input id={`tf-hongro-weather-${field.key}`} type="number" step="any" value={h.weather[field.key]} placeholder="숫자 입력" onChange={e => setW(field.key, e.target.value)} /></F>)}</div>
+    </details>
+    <p className="qt-weather-note">선택값은 모델 참고 범위 기준이며 거창의 실제 평년값이 아니에요. 결과는 ‘기상자료 기반 추정’으로 표시돼요.</p>
   </div>;
 }
 
