@@ -141,10 +141,10 @@ function HomePage({lots, loaded, error, retry, openTracker, setTab, onAskAI, ope
         <p className="app-lead">측정한 값을 기록하고, 저장 중 품질 변화를 확인하세요.</p>
         <div className="ah-actions">
           <button className="btn btn-primary btn-lg" onClick={() => openTracker('real', 'new')}>새 사과 등록하기<ArrowUpRight size={18} /></button>
-          <button className="ah-textlink" onClick={() => openTracker('example')}>처음이라면 예시로 체험<ArrowRight size={17} /></button>
+          <button className="ah-textlink" onClick={() => openTracker('example')}>처음이라면 예시로 체험하기<ArrowRight size={17} /></button>
         </div>
       </div>
-      <div className="ah-hero-photo"><img src={PHOTOS.hero} alt="나무 상자에 담겨 저장 중인 사과" /></div>
+      <figure className="ah-hero-photo"><img src={PHOTOS.hero} alt="나무 상자에 담긴 사과를 표현한 3D 그래픽" /><figcaption>3D 그래픽 · 실제 저장고 사진이 아닙니다</figcaption></figure>
     </section>
 
     <section className="ah-section" aria-labelledby="ah-my">

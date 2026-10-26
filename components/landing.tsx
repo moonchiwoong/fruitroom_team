@@ -1,10 +1,10 @@
 'use client';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import dynamic from 'next/dynamic';
-import {Apple, ArrowRight, Loader2, MailCheck} from 'lucide-react';
+import {Apple, ArrowRight, ClipboardList, Gauge, LineChart, Loader2, MailCheck} from 'lucide-react';
 import {authMessage, supabaseBrowser} from '@/lib/supabase-browser';
 import {regions, type RegionId} from '@/lib/initial-quality';
-import {addDays, computeSeries, fmtDate, fmtNum, summarySentence, todayKST, valueAt, type MetricId} from '@/lib/tracker';
+import {addDays, computeSeries, describeChange, fmtDate, fmtNum, todayKST, valueAt, type MetricId} from '@/lib/tracker';
 import {HANDOFF_KEY} from '@/lib/tracker-form';
 
 type Mode = 'signup' | 'login' | 'reset' | 'recovery';
@@ -28,18 +28,6 @@ function useInView<T extends Element>(enabled: boolean) {
   return [ref, seen] as const;
 }
 
-/** 0에서 목표값까지 부드럽게 올라가는 숫자 */
-function CountUp({to, digits, play, animate}: {to: number; digits: number; play: boolean; animate: boolean}) {
-  const [v, setV] = useState(animate ? 0 : to);
-  useEffect(() => {
-    if (!animate) { setV(to); return; }
-    if (!play) return;
-    let raf = 0; const t0 = performance.now(), dur = 1100;
-    const tick = (t: number) => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); setV(to * e); if (k < 1) raf = requestAnimationFrame(tick); };
-    raf = requestAnimationFrame(tick); return () => cancelAnimationFrame(raf);
-  }, [to, play, animate]);
-  return <>{fmtNum(v, digits)}</>;
-}
 
 /** 로그인 전 첫 화면. 체험은 /try 에서 로그인 없이 바로 시작합니다. */
 export default function Landing({recovery = false, onRecovered}: {recovery?: boolean; onRecovered?: () => void}) {
@@ -117,8 +105,7 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
       </section>
 
       <section className="lv-section lv-split" aria-labelledby="lv-kinds">
-        <div className="lv-apple" {...d(0)}><img src="/assets/apple-still.webp" alt="" width={210} height={210} loading="lazy" /></div>
-        <div {...d(1)}>
+        <div {...d(0)}>
           <h2 id="lv-kinds">값이 어디서 왔는지 항상 보여 줍니다</h2>
           <p className="lv-body">측정한 값과 계산한 값, 예시 값을 섞지 않아요. 측정하지 않은 항목은 0으로 바꾸지 않고 ‘미측정’으로 남깁니다.</p>
           <ul className="lv-kinds">
@@ -128,6 +115,14 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
             <li><span className="kind k-missing">미측정</span>측정하지 않은 항목</li>
           </ul>
         </div>
+        <figure className="lv-flow" {...d(1)}>
+          <ol>
+            <li><span className="lv-flow-icon" aria-hidden="true"><Gauge size={22} strokeWidth={1.75} /></span><b>측정</b><p>경도계·당도계 등으로 표본을 측정해요.</p></li>
+            <li><span className="lv-flow-icon" aria-hidden="true"><ClipboardList size={22} strokeWidth={1.75} /></span><b>기록</b><p>측정일·표본 수와 함께 값을 남겨요. 재지 않은 항목은 ‘미측정’으로 둬요.</p></li>
+            <li><span className="lv-flow-icon" aria-hidden="true"><LineChart size={22} strokeWidth={1.75} /></span><b>비교</b><p>같은 날짜의 계산값과 나란히 놓고 차이를 확인해요.</p></li>
+          </ol>
+          <figcaption>서비스 흐름 도식 · 실제 측정 사진이 아닙니다</figcaption>
+        </figure>
       </section>
 
       <section id="join" className="lv-join" aria-labelledby="lv-join-title">
@@ -154,7 +149,8 @@ function ServicePreview({animate}: {animate: boolean}) {
     const init: Record<Exclude<MetricId, 'loss'>, number> = {firmness: 72, brix: 14.2, acidity: 0.38};
     const series = (m: Exclude<MetricId, 'loss'>) => computeSeries({variety: '후지', metric: m, anchor: {day: 0, date: start, value: init[m], kind: '예시', source: 'initial'}, recorded: 'cold', future: 'cold', asOfDay});
     const f = series('firmness'), b = series('brix'), a = series('acidity');
-    const sentence = summarySentence({metric: 'firmness', day, date: addDays(start, day), at: valueAt(f, day), anchor: {day: 0, date: start, value: 72, kind: '예시', source: 'initial'}});
+    const fv = valueAt(f, day), ch = fv.status === 'ok' ? describeChange('firmness', fv.value, init.firmness) : null;
+    const sentence = ch ? (ch.diff === 0 ? '경도 계산값은 초기값과 같습니다.' : `경도 계산값은 초기값보다 ${ch.text}.`) : '이 날짜의 경도 계산값이 없습니다.';
     return {start, asOfDay, day, f, values: {firmness: valueAt(f, day), brix: valueAt(b, day), acidity: valueAt(a, day)}, sentence};
   }, []);
   const W = 420, H = 150, L = 22, R = 24, T = 10, B = 24;
@@ -166,7 +162,7 @@ function ServicePreview({animate}: {animate: boolean}) {
   return <aside ref={ref} className={'lv-preview' + (animate ? ' lv-anim' : '') + (play ? ' is-play' : '')} aria-label="서비스 미리보기 (예시 데이터)">
     <div className="lv-preview-head"><span className="kind k-example">예시 데이터</span><span>후지 · 저온저장 · 저장 시작 {fmtDate(data.start)}</span></div>
     <p className="lv-preview-day">저장 {data.day}일차 · {fmtDate(addDays(data.start, data.day))}</p>
-    <dl className="lv-preview-values">{(['firmness', 'brix', 'acidity'] as const).map(m => { const v = data.values[m]; return <div key={m}><dt>{labels[m]}</dt><dd>{v.status === 'ok' ? <CountUp to={v.value} digits={digits[m]} play={play} animate={animate} /> : '—'}<small>{units[m]}</small></dd></div>; })}</dl>
+    <dl className="lv-preview-values">{(['firmness', 'brix', 'acidity'] as const).map(m => { const v = data.values[m]; return <div key={m}><dt>{labels[m]}</dt><dd>{v.status === 'ok' ? fmtNum(v.value, digits[m]) : '—'}<small>{units[m]}</small></dd></div>; })}</dl>
     <p className="lv-preview-sentence">{data.sentence}</p>
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="예시 경도 변화 그래프. 실선은 분석 기준일까지, 점선은 이후 가정 구간">
       {[0, 100, 200, 300].map(t => <g key={t}><line x1={x(t)} x2={x(t)} y1={T} y2={H - B} stroke="#eef0f2" /><text x={x(t)} y={H - 6} textAnchor="middle" fontSize="12" fill="#6b7684">{t}일</text></g>)}
