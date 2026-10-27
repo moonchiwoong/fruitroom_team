@@ -173,7 +173,7 @@ function HomePage({lots, loaded, error, retry, openTracker, setTab, onAskAI, ope
       <ol>{[['01', '사과 등록', '저장하는 사과를 등록하세요.'], ['02', '측정값 기록', '주기적으로 측정한 값을 기록하세요.'], ['03', '품질 변화 확인', '저장 중인 사과의 품질 변화를 한눈에 확인하세요.']].map(([n, t, d]) =>
         <li key={n}><span>{n}</span><b>{t}</b><p>{d}</p></li>)}</ol>
     </section>
-    <div className="ah-ask"><MessageCircle size={18} /><span>기록에 궁금한 점이 있나요?</span><button className="ah-textlink" data-ai-return onClick={onAskAI}>내 사과에 질문하기<ArrowRight size={16} /></button></div>
+    <div className="ah-ask"><MessageCircle size={18} /><span>지금 내 사과 상태가 궁금하다면</span><button className="ah-textlink" data-ai-return onClick={onAskAI}>내 사과 상태 보기<ArrowRight size={16} /></button></div>
   </div>;
 }
 
