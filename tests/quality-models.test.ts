@@ -20,8 +20,7 @@ test('day zero preserves all available model initial values and loss zero withou
     if(storage==='ca'&&mcp==='treated')continue;
     for(const metric of ['firmness','brix','acidity','loss'] as const){const input={...fuji(metric),storage,mcp};near(predictQuality(input).value,metric==='loss'?0:input.anchor!.value);}
   }
-  assert.equal(predictQuality(hongro('loss')).value,null);
-  near(predictQuality({...hongro('loss'),allowFujiReference:true}).value,0);
+  near(predictQuality(hongro('loss')).value,0);near(predictQuality(hongro('loss',0,4)).value,0);
 });
 test('Hongro 60-day boundary is continuous and 120-day endpoints depend on initial values',()=>{
   for(const temperature of [0,4]){
@@ -47,12 +46,15 @@ test('condition selection rejects absent cultivar, Hongro temperature interpolat
   assert.deepEqual(predictQuality({...hongro(),region:'거창'}),predictQuality({...hongro(),region:'청송'}));
   assert.match(predictQuality({...fuji(),temperature:4}).warnings.join(' '),/온도가 명시되지/);
 });
-test('Hongro borrowed loss requires explicit opt-in and keeps Fuji provenance and 120-day limit',()=>{
-  const unavailable=predictQuality(hongro('loss',120));assert.equal(unavailable.value,null);assert.match(unavailable.reason??'',/자료 부족/);
-  const reference=predictQuality({...hongro('loss',120),allowFujiReference:true});near(reference.value,1.62084);
-  assert.equal(reference.kind,'참고 추정');assert.equal(reference.modelId,'fuji-cold-loss');assert.match(reference.validation,new RegExp(HONGRO_REFERENCE_NOTICE));assert.equal(reference.range?.max,120);assert.ok(reference.warnings.some(w=>w.includes('타당성')));
-  assert.equal(predictQuality({...hongro('loss',121),allowFujiReference:true}).value,null);
-  assert.equal(predictQuality({...hongro('loss',60),storage:'ca',allowFujiReference:true}).value,null);
+test('Hongro loss uses the dedicated 0℃·4℃ workbook equations (E8·E9) within 0~120 days',()=>{
+  const at0=predictQuality(hongro('loss',120));near(at0.value,0.0215*120);assert.equal(at0.kind,'모델 계산');assert.equal(at0.modelId,'hongro-cold0-loss');assert.equal(at0.range?.max,120);
+  near(predictQuality(hongro('loss',60,4)).value,0.0272*60);near(predictQuality(hongro('loss',120,4)).value,3.264);
+  assert.equal(predictQuality(hongro('loss',121)).value,null);
+  assert.equal(predictQuality(hongro('loss',60,2)).value,null);
+  assert.equal(predictQuality({...hongro('loss',60),storage:'ca'}).value,null);
+  assert.equal(predictQuality({...hongro('loss',60),mcp:'unknown'}).value,null);
+  // 다른 품종 식으로 대체하지 않습니다.
+  assert.equal(predictQuality({...hongro('loss',60,2),allowFujiReference:true}).value,null);
 });
 test('late anchors use original nonlinear and piecewise time axis, including ratio models',()=>{
   const day=100,t0=50,measured=65;
@@ -82,7 +84,7 @@ test('measured and predicted loss are independent and missing evidence is not ze
   assert.equal(series.ok,true);const at=valueAt(series,30);assert.equal(at.status,'ok');if(at.status==='ok')near(at.value,predicted.value!);
 });
 test('series, legacy wrappers, metrics and serializable exports share the same exact values',()=>{
-  for(const input of [fuji('loss'),fuji('firmness'),hongro('firmness'),{...hongro('loss'),allowFujiReference:true}]){
+  for(const input of [fuji('loss'),fuji('firmness'),hongro('firmness'),hongro('loss')]){
     const points=getQualitySeries(input,{to:120}),json=JSON.parse(JSON.stringify(points));
     for(const day of [0,60,120]){
       assert.deepEqual(points[day],{day,...predictQuality({...input,day})});assert.deepEqual(json[day],points[day]);
@@ -91,7 +93,7 @@ test('series, legacy wrappers, metrics and serializable exports share the same e
   near(storageValue('mcp','firmness',120,{firmness:72,brix:14,acidity:0.18}),72);
   const mcp=predictQuality({...fuji('firmness',120),mcp:'treated'});assert.equal(mcp.modelVersion,FUJI_MODEL_VERSION);assert.ok(mcp.warnings.some(w=>w.includes('E6')&&w.includes('불일치')));
   const all=predictAllQuality({cultivar:'홍로',storage:'cold',temperature:0,mcp:'untreated',day:120,anchors:{firmness:{day:0,value:68},brix:{day:0,value:14},acidity:{day:0,value:0.18}}});
-  near(all.firmness.value,53.6);assert.equal(all.loss.value,null);
+  near(all.firmness.value,53.6);near(all.loss.value,2.58);
 });
 test('condition transitions preserve time axis and are marked as unvalidated scenarios',()=>{
   const r=computeSeries({variety:'후지',metric:'brix',anchor:{day:50,date:'2026-10-21',value:14,kind:'실측',source:'initial'},recorded:'cold',future:'mcp',asOfDay:150});
