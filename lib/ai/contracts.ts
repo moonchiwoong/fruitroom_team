@@ -10,6 +10,7 @@ const form = z.object({
   name:text,variety:text,harvest_date:text,intake_date:text,sameStart:z.boolean(),storage_start_date:text,initial_measured_on:text,initial_sample_count:text,
   firmness:text,brix:text,acidity:text,weight:text,packaging:text,location:text,sensor_id:text,
   storage:z.enum(['일반 저온','CA','기타']),mcp:z.enum(['미처리','처리','미확인']),temperature:text.default(''),loss_reference:z.boolean().default(false),team_shared:z.boolean(),
+  name_auto:z.boolean().default(false),firmness_unit:z.enum(['N','kgf']).default('N'),missing:z.object({firmness:z.boolean(),brix:z.boolean()}).strict().default({firmness:false,brix:false}),
   measure:z.object({probe_mm:text,peeled:z.enum(['','껍질 제거','껍질 포함']),position:text,fruit_temp:text,instrument:text}).strict(),
   mcpd:z.object({treated_on:text,product:text,concentration:text,hours:text,temp:text}).strict(),
   ca:z.object({from:text,to:text,o2:text,co2:text}).strict(),

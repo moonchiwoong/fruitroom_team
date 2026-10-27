@@ -116,12 +116,12 @@ export function valueAt(s: Series, day: number): ValueAt {
 export type MeasuredPoint = {date: string; day: number; value: number; sampleCount: number | null; kind: DataKind; id: string};
 type ObsLike = {id: string; date: string; firmness: number | null; brix: number | null; acidity?: number | null; tracked_weight?: number | null; sample_count: number; details?: {tracked?: {sample_id?: string | null}} | null};
 /** 지표별 측정점. 감모율은 같은 추적 표본의 초기·후속 중량이 모두 있을 때만 계산합니다. */
-export function measuredPoints(m: MetricId, observations: ObsLike[], startDate: string, kind: DataKind, trackedInitial: number | null, initialEvidence?: {sampleId?: string | null; date?: string | null}): MeasuredPoint[] {
+export function measuredPoints(m: MetricId, observations: ObsLike[], startDate: string, kind: DataKind, trackedInitial: number | null, initialEvidence?: {sampleId?: string | null; date?: string | null; count?: number | null}): MeasuredPoint[] {
   if (!isDate(startDate)) return [];
   return observations.flatMap(o => {
     if (!isDate(o.date) || o.date < startDate) return [];
     let v: number | null | undefined;
-    if (m === 'loss') { const loss = trackedLoss({sampleId: initialEvidence?.sampleId, date: initialEvidence?.date, weight: trackedInitial}, {sampleId: o.details?.tracked?.sample_id, date: o.date, weight: o.tracked_weight}); v = loss.ok ? loss.value : null; }
+    if (m === 'loss') { const laterCount = (o.details?.tracked as {count?: number | null} | undefined)?.count ?? null; const sameCount = initialEvidence?.count == null || laterCount == null || laterCount === initialEvidence.count; const loss = trackedLoss({sampleId: initialEvidence?.sampleId, date: initialEvidence?.date, weight: trackedInitial}, {sampleId: o.details?.tracked?.sample_id, date: o.date, weight: o.tracked_weight}); v = loss.ok && sameCount ? loss.value : null; }
     else v = o[m] as number | null | undefined;
     return v === null || v === undefined || !Number.isFinite(v) ? [] : [{date: o.date, day: daysBetween(startDate, o.date), value: v, sampleCount: o.sample_count, kind, id: o.id}];
   }).sort((a, b) => a.day - b.day);

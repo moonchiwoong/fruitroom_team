@@ -31,12 +31,19 @@ test('unified Hongro form preserves measured 0/60/120-day endpoints for both tem
 test('Hongro form rejects missing active inputs and dates outside the 120-day model',()=>{
   const f=measuredForm();
   for(const days of [-1,120.001,NaN,Infinity])assert.throws(()=>calculateHongroForm(f.hongro,days));
+  // 빈칸은 기록할 수 있지만(필수 오류 아님) 계산에는 쓰지 않습니다.
   f.hongro.initial.acidity='';
-  assert.ok(validateHongroForm(f.hongro)['hongro.initial.acidity']);
-  assert.ok(validateForm(f,false)['hongro.initial.acidity']);
-  assert.throws(()=>calculateHongroForm(f.hongro,0));
+  assert.equal(validateHongroForm(f.hongro)['hongro.initial.acidity'],undefined);
+  assert.throws(()=>calculateHongroForm(f.hongro,0),/초기 산도/);
+  // 저장할 때 경도·당도 빈칸은 ‘미측정’을 고르도록 안내하고, 미측정이면 통과합니다.
+  f.hongro.initial.brix='';
+  assert.ok(validateForm(f,true)['hongro.initial.brix']);
+  f.missing.brix=true;
+  assert.equal(validateForm(f,true)['hongro.initial.brix'],undefined);
+  // 날씨 추정: 고르지 않은 항목은 기록 가능, 계산은 하지 않음.
   f.hongro={...emptyHongroForm(),source:'weather'};
-  assert.equal(Object.keys(validateHongroForm(f.hongro)).length,4);
+  assert.equal(Object.keys(validateHongroForm(f.hongro)).length,0);
+  assert.throws(()=>calculateHongroForm(f.hongro,0),/비어 있어요/);
   assert.equal(hongroStorageStart({...f,sameStart:true,storage_start_date:'2026-09-03'}),'2026-09-01');
   assert.equal(hongroStorageStart({...f,sameStart:false,storage_start_date:'2026-09-03'}),'2026-09-03');
 });
