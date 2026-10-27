@@ -64,7 +64,7 @@ type MutableBody = {geometry: THREE.BufferGeometry; original: Float32Array; cent
 type ViewerApi = {controls: OrbitControls; camera: THREE.PerspectiveCamera; group: THREE.Group; bodies: MutableBody[]; update: (appearance: AppleAppearance) => void};
 
 /** The downloaded GLB is immutable; this viewer owns its parsed GPU resources. */
-export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '/models/hongro-apple.glb'}: QualityAppleViewerProps) {
+export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '/models/apple-web.glb'}: QualityAppleViewerProps) {
   const mount = useRef<HTMLDivElement>(null), api = useRef<ViewerApi | null>(null);
   const loss = metrics.loss.ok && metrics.loss.value !== null ? metrics.loss.value : null;
   const appearance = appleAppearance(loss), appearanceRef = useRef(appearance);
@@ -175,7 +175,7 @@ export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '
       update(appearanceRef.current);
       setLoadState('ready');
     })().catch(error => {
-      if (!disposed) {setLoadState('error'); setErrorText(`홍로 GLB 모델을 불러오지 못했습니다. ${error instanceof Error ? error.message : '네트워크 또는 파일을 확인해 주세요.'}`);}
+      if (!disposed) {setLoadState('error'); setErrorText(`사과 3D 모델을 불러오지 못했습니다. ${error instanceof Error ? error.message : '네트워크 또는 파일을 확인해 주세요.'}`);}
     });
     return () => {
       disposed = true; cancelAnimationFrame(frame); observer.disconnect(); controls.dispose();
@@ -197,7 +197,7 @@ export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '
   const metricInfo = {firmness: ['경도', 1], brix: ['당도', 1], acidity: ['산도', 3], loss: ['감모율', 3]} as const;
   return <section className={styles.viewer} data-testid="quality-apple-viewer" data-day={day} data-load-state={loadState}>
     <div className={styles.heading}><span>설명용 외관 시각화</span><b>저장 {Number.isFinite(day) ? day : '—'}일차</b></div>
-    <p className={styles.modelNote}>{isHongro ? '홍로 사진 기반 근사 모델' : '홍로 사진 기반 공통 설명용 모델 · 후지의 실제 외형이 아닙니다'}. 정밀 스캔이 아니며 뒷면·깊이·실제 크기는 확인되지 않았습니다.</p>
+    <p className={styles.modelNote}>공통 설명용 사과 모델 · {isHongro ? '홍로' : '후지'}의 실측 외형이 아닙니다. 정밀 스캔이 아니며 실제 크기는 확인되지 않았습니다.</p>
     <div className={styles.stage}>
       <div className={styles.canvas} ref={mount} role="img" aria-label="품질 계산과 연결된 사과 3D 모델. 드래그로 회전, 확대·축소 버튼으로 크기를 조절합니다." tabIndex={0}
         onKeyDown={event => {
@@ -214,7 +214,7 @@ export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '
             }
           }
         }} />
-      {loadState === 'loading' && <p className={styles.overlay} role="status">홍로 3D 모델을 불러오는 중입니다…</p>}
+      {loadState === 'loading' && <p className={styles.overlay} role="status">사과 3D 모델을 불러오는 중입니다…</p>}
       {loadState === 'error' && <div className={styles.overlay} role="alert"><AlertTriangle size={22}/><p>{errorText}</p><button type="button" onClick={() => {bytesCache.delete(modelUrl); setRetry(value => value + 1);}}>3D 모델 다시 불러오기</button><small>아래 품질 계산값은 계속 확인할 수 있습니다.</small></div>}
     </div>
     <div className={styles.tools}>

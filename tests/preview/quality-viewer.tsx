@@ -19,7 +19,7 @@ function QualityViewerFixture() {
       <label><input type="checkbox" checked={mobile} onChange={event=>setMobile(event.target.checked)}/>모바일 폭 360px</label>
     </div>
     <div style={{display:'flex',gap:10,marginBottom:12}}>{[0,60,120,121].map(value=><button key={value} onClick={()=>setDay(value)}>{value}일</button>)}</div>
-    <QualityAppleViewer day={day} cultivar={cultivar} metrics={metrics} modelUrl={failed?'/models/missing-apple.glb':'/models/hongro-apple.glb'}/>
+    <QualityAppleViewer day={day} cultivar={cultivar} metrics={metrics} modelUrl={failed?'/models/missing-apple.glb':'/models/apple-web.glb'}/>
   </main>;
 }
 

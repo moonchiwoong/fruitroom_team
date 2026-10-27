@@ -44,11 +44,12 @@ test('visual saturation does not change supplied loss value', () => {
 });
 
 test('provided GLB vertices change at day 120, reset at day 0, and remain unavailable without reference opt-in', context => {
-  const bytes = readFileSync(new URL('../public/models/hongro-apple.glb', import.meta.url));
+  const bytes = readFileSync(new URL('../public/models/apple-web.glb', import.meta.url));
   assert.equal(bytes.readUInt32LE(0), 0x46546c67);
   const jsonLength = bytes.readUInt32LE(12);
   const gltf = JSON.parse(bytes.subarray(20, 20 + jsonLength).toString('utf8'));
-  const body = gltf.meshes.find((mesh: {name:string}) => mesh.name === 'Hongro_Apple_Body');
+  const bodyNode = gltf.nodes.find((node: {name:string}) => node.name === 'Apple_Body');
+  const body = gltf.meshes[bodyNode.mesh];
   assert.ok(body); assert.equal(body.primitives[0].targets, undefined);
   assert.ok(gltf.images.every((image:{bufferView?:number;uri?:string}) => typeof image.bufferView === 'number' && !image.uri));
   const accessor = gltf.accessors[body.primitives[0].attributes.POSITION];

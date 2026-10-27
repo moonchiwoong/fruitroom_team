@@ -11,7 +11,7 @@ export type AppleAppearanceConfig = {
 };
 export const APPLE_APPEARANCE_CONFIG: Readonly<AppleAppearanceConfig> = Object.freeze({
   volumeLossStrength: 1,
-  wrinkleStrength: 0.045,
+  wrinkleStrength: 0.028,
   wrinkleHalfSaturationPercent: 3,
   maxVisualLossPercent: 35,
 });
@@ -49,7 +49,8 @@ export function wrinkleApplePoint(x: number, y: number, z: number, appearance: A
   const theta = Math.atan2(z, x);
   // Keep the stem socket and calyx stable; the stem is uniformly scaled with the fruit.
   const sideWeight = Math.min(1, radius * 1.6);
-  const wave = Math.sin(theta * 29 + y * 6) * Math.sin(y * 27 + Math.sin(theta * 7) * 1.4);
+  // 넓고 얕은 굴곡: 짧은 주기의 물결은 텍스처를 뭉개 보이게 해서 낮은 주파수만 씁니다.
+  const wave = Math.sin(theta * 9 + y * 3) * Math.sin(y * 7 + Math.sin(theta * 4) * 1.2);
   const depth = appearance.wrinkleAmplitude * sideWeight * (0.55 + 0.45 * wave);
   return [x * (1 - depth), y * (1 - depth * 0.12), z * (1 - depth)];
 }

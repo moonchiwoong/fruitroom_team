@@ -1,9 +1,11 @@
-hongro-apple.glb
-Source: user-provided Hongro_Apple_Blender_Package.zip / Hongro_Apple/hongro_apple.glb.
-Unmodified GLB, embedded textures. Hongro_Apple_Body and Hongro_Stem meshes.
-Photo-guided approximation from one 255 x 246 front photograph, not a 3D scan.
-Rear surface, depth, underside and nominal 80 mm size are estimates.
-Cultivar was supplied by the user and was not verified from the photograph.
+apple-web.glb
+Source: user-provided zip (2026-10-27) / Apple_Web.glb (Khronos glTF Blender I/O v4.5.48).
+Nodes: Apple_Body (Apple_Quad_Surface_UV), Apple_Stem, Apple_Calyx.
+Changes: base colour, roughness and stem colour textures re-encoded from PNG to JPEG q90
+to reduce size (5.47 MB -> 3.02 MB). Geometry, normal maps and materials are unchanged.
+Cultivar and real size of the source apple are not stated in the file and were not verified.
 No quality-change morph targets are present. The web viewer applies reversible
-vertex displacement to the body and scales the whole model for illustration.
-This model is not a measured Fuji shape, a quality assessment, or validation data.
+vertex displacement to the body and scales the whole model for illustration only.
+This model is not a 3D scan, a quality assessment, or validation data.
+Previous model (hongro-apple.glb, from one 255x246 photo) was replaced because its
+texture was too low-resolution.
