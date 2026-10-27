@@ -74,7 +74,7 @@ export default function Home() {
     <SiteHeader tab={tab} setTab={setTab} menu={menu} setMenu={setMenu} />
     <main className="site-main">
       {tab === 'home' && <HomePage lots={lots} loaded={lotsLoaded} error={lotsError} retry={reload} openTracker={openTracker} setTab={setTab} openLot={id => { setLotFocus(id); setTab('lots'); }} onAskAI={() => setAIContext({mode:'real',scope:'all'})} />}
-      {tab === 'track' && <PageHead title={<>사과의 변화,<br />쉽게 확인하세요.</>} desc="측정한 값과 앞으로의 계산값을 비교해 보세요." />}
+      {tab === 'track' && <PageHead title="사과 품질을 확인해 보세요" desc="보관 조건을 기록하고, 초기 품질 입력 방식을 골라 주세요." />}
       {tab === 'lots' && <PageHead title={<>저장한 사과,<br />기록을 이어가세요.</>} desc={<>사과별 측정 기록을<br />한곳에서 확인하세요.</>} action={<button className="btn btn-primary btn-lg" onClick={() => openTracker('real', 'new')}>+ 새 사과 등록</button>} />}
       {tab === 'account' && <PageHead title="내 정보" desc="이름·소속·주 산지를 관리합니다." />}
       {tab === 'model' && <PageHead title={current.title} desc={current.desc} />}

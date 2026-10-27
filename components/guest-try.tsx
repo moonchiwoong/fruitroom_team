@@ -43,8 +43,8 @@ export default function GuestTry() {
     </div></header>
     <main className="site-main">
       <div className="page-hero"><div className="page-hero-inner">
-        <h1>{view === 'basis' ? '계산 근거·적용 범위' : '품질 예측 체험'}</h1>
-        <p>{view === 'basis' ? '계산에 쓰는 식과 출처, 적용 조건과 검증 상태입니다.' : mode === 'example' ? '예시 값으로 저장 조건과 날짜를 바꿔 보세요. 가입하지 않아도 됩니다.' : '내 측정값을 넣어 결과를 볼 수 있어요. 기록으로 저장할 때만 로그인이 필요합니다.'}</p>
+        <h1>{view === 'basis' ? '계산 근거·적용 범위' : '사과 품질을 확인해 보세요'}</h1>
+        <p>{view === 'basis' ? '계산에 쓰는 식과 출처, 적용 조건과 검증 상태입니다.' : '보관 조건을 기록하고, 초기 품질 입력 방식을 골라 주세요. 가입하지 않아도 써 볼 수 있어요.'}</p>
       </div></div>
       <div className="page-body">
         {view === 'track'

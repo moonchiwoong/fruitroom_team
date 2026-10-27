@@ -51,6 +51,9 @@ export function cleanDetails(v:unknown){
  const date=(x:unknown,label:string)=>x===undefined||x===null||x===''?null:validDate(x,label);
  if(Object.hasOwn(s,'storage_temperature'))o.storage_temperature=num(s.storage_temperature,-20,50,'설정 저장 온도 ℃');
  if(Object.hasOwn(s,'loss_reference')){if(typeof s.loss_reference!=='boolean')throw new InputError('후지 기반 참고 추정 선택값을 확인해 주세요.');o.loss_reference=s.loss_reference;}
+ if(Object.hasOwn(s,'initial_source')&&s.initial_source!==null){if(!['실측','날씨 기반 추정'].includes(s.initial_source))throw new InputError('초기 품질 출처를 확인해 주세요.');o.initial_source=s.initial_source;}
+ if(s.firmness_input){const f=s.firmness_input;if(!['N','kgf'].includes(f.unit))throw new InputError('경도 단위는 N 또는 kgf만 저장합니다.');o.firmness_input={value:num(f.value,0,300,'입력한 경도'),unit:f.unit};}
+ if(Object.hasOwn(s,'not_measured')){if(!Array.isArray(s.not_measured)||s.not_measured.some((k:unknown)=>!['firmness','brix'].includes(k as string)))throw new InputError('미측정 항목을 확인해 주세요.');o.not_measured=[...new Set(s.not_measured as string[])];}
  if(s.measure){const m=s.measure;o.measure={probe_mm:num(m.probe_mm,0.5,50,'탐침 직경 mm'),peeled:m.peeled===undefined||m.peeled===null||m.peeled===''?null:(['껍질 제거','껍질 포함'].includes(m.peeled)?m.peeled:(()=>{throw new InputError('껍질 제거 여부를 확인해 주세요.');})()),position:txt(m.position,'측정 위치'),fruit_temp:num(m.fruit_temp,-5,40,'과실 온도 °C'),instrument:txt(m.instrument,'측정 기기')};}
  if(s.mcp){const m=s.mcp;o.mcp={treated_on:date(m.treated_on,'1-MCP 처리일'),product:txt(m.product,'제품명'),concentration:txt(m.concentration,'농도',40),hours:num(m.hours,0,500,'처리 시간 h'),temp:num(m.temp,-5,40,'처리 온도 °C')};}
  if(s.ca){const m=s.ca;o.ca={from:date(m.from,'CA 시작일'),to:date(m.to,'CA 종료일'),o2:num(m.o2,0,21,'산소 농도 %'),co2:num(m.co2,0,30,'이산화탄소 농도 %')};}

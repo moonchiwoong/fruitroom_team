@@ -19,17 +19,38 @@ export type TrackerForm = {
   tracked: {sample_id: string; count: string; initial_weight: string};
   hongro: HongroTrackerForm;
   team_shared: boolean;
+  /** 이름을 사용자가 직접 고치기 전까지는 품종·저장 시작일로 자동 제안합니다. */
+  name_auto: boolean;
+  /** 경도는 기기에서 읽은 숫자와 단위 그대로 입력하고, 계산·저장은 N으로 합니다. */
+  firmness_unit: 'N' | 'kgf';
+  /** ‘미측정’을 직접 고른 항목. 빈칸(아직 입력 안 함)·미측정·숫자 0을 구분합니다. */
+  missing: {firmness: boolean; brix: boolean};
 };
+
+export const KGF_TO_N = 9.80665;
+/** 입력한 경도를 N으로 바꿉니다. 빈칸·잘못된 값은 null. */
+export function firmnessToN(raw: string, unit: 'N' | 'kgf'): number | null {
+  const p = parseOptionalNumber(raw); if (p.status !== 'valid') return null;
+  return unit === 'kgf' ? p.value * KGF_TO_N : p.value;
+}
+/** 자동 이름: ‘홍로 · 10월 27일 저장’, 저장 시작일이 없으면 ‘홍로 · 새 물량’. */
+export function suggestName(f: Pick<TrackerForm, 'variety' | 'sameStart' | 'intake_date' | 'storage_start_date'>): string {
+  const v = isHongroVariety(f.variety) ? '홍로' : (f.variety || '후지'), d = f.sameStart ? f.intake_date : f.storage_start_date;
+  if (!isDate(d)) return `${v} · 새 물량`;
+  const [, m, day] = d.split('-').map(Number); return `${v} · ${m}월 ${day}일 저장`;
+}
+export const effectiveName = (f: TrackerForm) => f.name_auto && !f.name.trim() ? suggestName(f) : f.name;
 
 const s = (v: unknown) => v === null || v === undefined ? '' : String(v);
 
 export function emptyForm(): TrackerForm {
   return {
-    name: '', variety: '후지', harvest_date: '', intake_date: '', sameStart: true, storage_start_date: '', initial_measured_on: '', initial_sample_count: '',
+    name: '', variety: '후지', harvest_date: '', intake_date: '', sameStart: false, storage_start_date: '', initial_measured_on: '', initial_sample_count: '',
     firmness: '', brix: '', acidity: '', weight: '', packaging: '', location: '', sensor_id: '', storage: '일반 저온', mcp: '미확인', temperature: '', loss_reference: false,
     measure: {probe_mm: '', peeled: '', position: '', fruit_temp: '', instrument: ''},
     mcpd: {treated_on: '', product: '', concentration: '', hours: '', temp: ''},
     ca: {from: '', to: '', o2: '', co2: ''}, tracked: {sample_id: '', count: '', initial_weight: ''}, hongro: emptyHongroForm(), team_shared: false,
+    name_auto: true, firmness_unit: 'N', missing: {firmness: false, brix: false},
   };
 }
 
@@ -41,11 +62,14 @@ export function formFromLot(l: Lot): TrackerForm {
     initial: {firmness:s(h.initial.firmness),brix:s(h.initial.brix),acidity:s(h.initial.acidity),weight:s(h.initial.weight),diameter:s(h.initial.diameter)},
     weather: {chang_min4:s(h.weather.chang_min4),chang_LC56:s(h.weather.chang_LC56),chang_LC78:s(h.weather.chang_LC78),chang_9rain:s(h.weather.chang_9rain)},
   } : emptyHongroForm();
+  const fin = d.firmness_input, nm = d.not_measured ?? [];
+  const unit: 'N' | 'kgf' = fin?.unit === 'kgf' ? 'kgf' : 'N';
+  if (unit === 'kgf' && fin?.value != null) { if (h) hongro.initial.firmness = s(fin.value); }
   return {
     name: l.name ?? '', variety: l.variety ?? '', harvest_date: s(l.harvest_date), intake_date: s(l.intake_date),
     sameStart: !l.storage_start_date || l.storage_start_date === l.intake_date, storage_start_date: s(l.storage_start_date),
     initial_measured_on: s(l.initial_measured_on), initial_sample_count: s(l.initial_sample_count),
-    firmness: s(l.firmness), brix: s(l.brix), acidity: s(l.acidity), weight: s(l.weight),
+    firmness: unit === 'kgf' && fin?.value != null && !h ? s(fin.value) : s(l.firmness), brix: s(l.brix), acidity: s(l.acidity), weight: s(l.weight),
     packaging: s(l.packaging), location: s(l.location), sensor_id: s(l.sensor_id),
     storage: (['일반 저온', 'CA', '기타'].includes(l.storage) ? l.storage : '기타') as TrackerForm['storage'],
     mcp: (['미처리', '처리', '미확인'].includes(l.mcp) ? l.mcp : '미확인') as TrackerForm['mcp'],
@@ -55,6 +79,7 @@ export function formFromLot(l: Lot): TrackerForm {
     tracked: {sample_id: s(d.tracked?.sample_id), count: s(d.tracked?.count), initial_weight: s(d.tracked?.initial_weight)},
     temperature: s(d.storage_temperature ?? (h ? h.storage === 'cold0' ? 0 : 4 : null)), loss_reference: d.loss_reference === true,
     hongro, team_shared: !!l.team_shared,
+    name_auto: false, firmness_unit: unit, missing: {firmness: nm.includes('firmness'), brix: nm.includes('brix')},
   };
 }
 
@@ -82,23 +107,29 @@ export function payloadFromForm(f: TrackerForm, mode: 'real' | 'example' = 'real
   const isHongro=isHongroVariety(f.variety);
   const h=f.hongro;
   const quality=isHongro ? (h.source==='measured' ? h.initial : {firmness:'',brix:'',acidity:'',weight:''}) : f;
+  const measuredInput = !isHongro || h.source === 'measured';
+  const firmN = measuredInput && !f.missing.firmness ? firmnessToN(quality.firmness, f.firmness_unit) : null;
+  if (measuredInput && quality.firmness.trim() && firmN === null) num(quality.firmness);
   return {
     record_mode: mode,
-    name: f.name.trim(), variety: f.variety.trim(), intake_date: f.intake_date, harvest_date: f.harvest_date || null,
+    name: effectiveName(f).trim(), variety: f.variety.trim(), intake_date: f.intake_date, harvest_date: f.harvest_date || null,
     storage_start_date: f.sameStart ? (f.intake_date || null) : (f.storage_start_date || null),
     initial_measured_on: f.initial_measured_on || null, initial_sample_count: num(f.initial_sample_count),
-    firmness: num(quality.firmness), brix: num(quality.brix), acidity: num(quality.acidity), weight: num(quality.weight),
+    firmness: firmN, brix: measuredInput && !f.missing.brix ? num(quality.brix) : null, acidity: num(quality.acidity), weight: num(quality.weight),
     packaging: txt(f.packaging), location: txt(f.location), sensor_id: txt(f.sensor_id),
     storage: f.storage, mcp: f.mcp, team_shared: f.team_shared,
     details: {
       storage_temperature: num(f.temperature), loss_reference: f.loss_reference === true,
+      initial_source: isHongro && h.source === 'weather' ? '날씨 기반 추정' : '실측',
+      firmness_input: (() => { const raw = isHongro ? h.initial.firmness : f.firmness; return !f.missing.firmness && firmnessToN(raw, f.firmness_unit) !== null ? {value: num(raw), unit: f.firmness_unit} : null; })(),
+      not_measured: (['firmness', 'brix'] as const).filter(k => f.missing[k]),
       measure: {probe_mm: num(f.measure.probe_mm), peeled: f.measure.peeled || null, position: txt(f.measure.position), fruit_temp: num(f.measure.fruit_temp), instrument: txt(f.measure.instrument)},
       mcp: {treated_on:f.mcpd.treated_on||null,product:txt(f.mcpd.product),concentration:txt(f.mcpd.concentration),hours:num(f.mcpd.hours),temp:num(f.mcpd.temp)},
       ca: {from:f.ca.from||null,to:f.ca.to||null,o2:num(f.ca.o2),co2:num(f.ca.co2)},
       tracked: {sample_id:txt(f.tracked.sample_id),count:num(f.tracked.count),initial_weight:num(f.tracked.initial_weight)},
       ...(isHongro ? {hongro: {
         schemaVersion: 1, modelVersion: HONGRO_MODEL_VERSION, cultivar:'hongro', region:'geochang', mode:'real', source:h.source, storage:h.storage,
-        initial: {firmness:num(h.initial.firmness),brix:num(h.initial.brix),acidity:num(h.initial.acidity),weight:num(h.initial.weight),diameter:num(h.initial.diameter)},
+        initial: {firmness:f.missing.firmness?null:firmnessToN(h.initial.firmness,f.firmness_unit),brix:f.missing.brix?null:num(h.initial.brix),acidity:num(h.initial.acidity),weight:num(h.initial.weight),diameter:num(h.initial.diameter)},
         weather: {chang_min4:num(h.weather.chang_min4),chang_LC56:num(h.weather.chang_LC56),chang_LC78:num(h.weather.chang_LC78),chang_9rain:num(h.weather.chang_9rain)},
         units: {...HONGRO_UNITS},
       }} : {}),
@@ -112,7 +143,13 @@ export function validateForm(f: TrackerForm, forSave: boolean): Partial<Record<s
   const isHongro=isHongroVariety(f.variety);
   const numCheck = (k: string, v: string, min: number, max: number, label: string) => { const p = parseOptionalNumber(v); if (p.status === 'missing') return; if (p.status === 'invalid') { e[k] = `${label}: ${p.reason}`; return; } if (p.value < min || p.value > max) e[k] = `${label}: 단위와 소수점을 확인해 주세요. 기존 시스템의 저장 허용 범위는 ${min}~${max}이며, 정상 품질이나 모델 적용 범위를 뜻하지 않습니다.`; };
   if(isHongro)Object.assign(e,validateHongroForm(f.hongro));
-  else {numCheck('firmness', f.firmness, 0, 300, '경도'); numCheck('brix', f.brix, 0, 40, '당도'); numCheck('acidity', f.acidity, 0, 10, '산도'); numCheck('weight', f.weight, 1, 2000, '평균 중량');}
+  const measuredInput = !isHongro || f.hongro.source === 'measured';
+  if (measuredInput) {
+    const q = isHongro ? f.hongro.initial : f, pre = isHongro ? 'hongro.initial.' : '';
+    if (!f.missing.firmness) { numCheck(pre + 'firmness', q.firmness, 0, f.firmness_unit === 'kgf' ? 30.6 : 300, '경도'); }
+    if (forSave) for (const k of ['firmness', 'brix'] as const) if (!f.missing[k] && !q[k].trim() && !e[pre + k]) e[pre + k] = `${k === 'firmness' ? '경도' : '당도'} 값을 입력하거나 ‘미측정’을 골라 주세요.`;
+  }
+  if (!isHongro) {numCheck('brix', f.brix, 0, 40, '당도'); numCheck('acidity', f.acidity, 0, 10, '산도'); numCheck('weight', f.weight, 1, 2000, '평균 중량');}
   numCheck('initial_sample_count', f.initial_sample_count, 1, 10000, '표본 수');
   if (f.initial_sample_count.trim() && !Number.isInteger(Number(f.initial_sample_count))) e.initial_sample_count = '표본 수는 정수로 입력해 주세요.';
   numCheck('probe_mm', f.measure.probe_mm, 0.5, 50, '탐침 직경'); numCheck('fruit_temp', f.measure.fruit_temp, -5, 40, '과실 온도');
@@ -124,14 +161,15 @@ export function validateForm(f: TrackerForm, forSave: boolean): Partial<Record<s
   if (f.tracked.sample_id.length > 80) e.tracked_sample_id = '추적 표본 ID는 80자 이내로 입력해 주세요.';
   }
   const start = f.sameStart ? f.intake_date : f.storage_start_date;
-  if(isHongro&&!start)e.storage_start_date='홍로 계산에 사용할 실제 저장 시작일을 입력해 주세요.';
+  if(isHongro&&!start&&forSave)e.storage_start_date='홍로 계산에 사용할 실제 저장 시작일을 입력해 주세요.';
   if (f.harvest_date && f.intake_date && f.harvest_date > f.intake_date) e.harvest_date = '수확일이 입고일보다 늦습니다.';
   for (const [k, v] of [['harvest_date', f.harvest_date], ['intake_date', f.intake_date], ['storage_start_date', start], ['initial_measured_on', f.initial_measured_on]] as const) if (v) { if (!isDate(v)) e[k] = '유효한 날짜를 입력해 주세요.'; else if (v > today && !e[k]) e[k] = '오늘 이후 날짜는 입력할 수 없습니다.'; }
   if (start && f.initial_measured_on && f.initial_measured_on < start) e.initial_measured_on = '측정일이 저장 시작일보다 빠릅니다.';
   if (forSave) {
-    if (!f.name.trim()) e.name = '물량 이름을 입력해 주세요.';
+    if (!effectiveName(f).trim()) e.name = '물량 이름을 입력해 주세요.';
     if (!f.variety.trim()) e.variety = '품종을 입력해 주세요.';
-    if (!f.intake_date) e.intake_date = '입고일을 입력해 주세요.';
+    if (!f.intake_date) e.intake_date = '기록을 저장하려면 입고일이 필요해요.';
+    if (!f.sameStart && !f.storage_start_date) e.storage_start_date = '저장을 시작한 날을 입력해 주세요.';
   }
   return e;
 }
@@ -141,7 +179,7 @@ export function validateForm(f: TrackerForm, forSave: boolean): Partial<Record<s
 export type Draft = {form: TrackerForm; baseSig: string; savedAt: string};
 const draftKey = (user: string, mode: string, lot: string) => `appletrack:draft:v1:${user}:${mode}:${lot}`;
 export function loadDraft(user: string, mode: string, lot: string): Draft | null {
-  try { const raw = window.localStorage.getItem(draftKey(user, mode, lot)); if (!raw) return null; const d = JSON.parse(raw), empty = emptyForm(); return d && d.form ? {...d, form: {...empty, ...d.form, measure: {...empty.measure, ...d.form.measure}, mcpd: {...empty.mcpd, ...d.form.mcpd}, ca: {...empty.ca, ...d.form.ca}, tracked: {...empty.tracked, ...d.form.tracked}, hongro:{...empty.hongro,...d.form.hongro,initial:{...empty.hongro.initial,...d.form.hongro?.initial},weather:{...empty.hongro.weather,...d.form.hongro?.weather}}}} : null; } catch { return null; }
+  try { const raw = window.localStorage.getItem(draftKey(user, mode, lot)); if (!raw) return null; const d = JSON.parse(raw), empty = emptyForm(); return d && d.form ? {...d, form: {...empty, ...d.form, measure: {...empty.measure, ...d.form.measure}, mcpd: {...empty.mcpd, ...d.form.mcpd}, ca: {...empty.ca, ...d.form.ca}, tracked: {...empty.tracked, ...d.form.tracked}, missing: {...empty.missing, ...d.form.missing}, hongro:{...empty.hongro,...d.form.hongro,initial:{...empty.hongro.initial,...d.form.hongro?.initial},weather:{...empty.hongro.weather,...d.form.hongro?.weather}}}} : null; } catch { return null; }
 }
 export function saveDraft(user: string, mode: string, lot: string, d: Draft): boolean {
   try { window.localStorage.setItem(draftKey(user, mode, lot), JSON.stringify(d)); return window.localStorage.getItem(draftKey(user, mode, lot)) !== null; } catch { return false; }
