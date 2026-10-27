@@ -72,8 +72,8 @@ test('actual CSV builder exports selected and plotted loss values with percent/r
     assert.ok(csv.startsWith('\uFEFF애플트랙 품질 결과\n'));
     assert.deepEqual(summary.slice(1,8),[String(selected.ok),selected.value===null?'null':selected.value,'%',selected.kind,selected.modelId||'',selected.modelVersion||'',selected.source.join(' / ')]);
     assert.deepEqual(measured,['감모율',input.selDate,120,5,'%','실측','tracked-measurement-120']);
-    if(allowFujiReference){near(Number(summary[2]),1.62084);assert.equal(graph?.[3],summary[2]);assert.equal(graph?.[5],'참고 추정');assert.ok(csv.includes('1.62084'));assert.ok(csv.includes('홍로에 대해 검증되지 않은 후지 기반 참고 추정'));}
-    else {assert.equal(summary[2],'null');assert.equal(graph,undefined);assert.ok(csv.includes('자료 부족'));}
+    // 홍로 0℃ 전용 감모율 식(엑셀 E8)을 쓰며, 다른 품종 식으로 대체하지 않습니다.
+    near(Number(summary[2]),0.0215*120);assert.equal(graph?.[3],summary[2]);assert.equal(graph?.[5],'모델 계산');assert.equal(selected.modelId,'hongro-cold0-loss');assert.ok(!csv.includes('후지 기반 참고 추정'));
   }
 });
 
@@ -84,7 +84,7 @@ test('actual CSV builder preserves 121-day null results while retaining valid gr
     assert.equal(selected.value,null);assert.equal(summary[2],'null');assert.equal(summary[10],selected.reason);assert.match(String(summary[10]),/모델 적용 범위 초과/);
   }
   assert.equal(rows.some(row=>row[0]===121&&typeof row[2]==='string'),false);
-  assert.ok(rows.some(row=>row[0]===120&&row[2]==='감모율'&&Math.abs(Number(row[3])-1.62084)<1e-12));
+  assert.ok(rows.some(row=>row[0]===120&&row[2]==='감모율'&&Math.abs(Number(row[3])-0.0215*120)<1e-12));
   assert.ok(rows.some(row=>row[6]==='tracked-measurement-120'&&row[3]===5));
 });
 

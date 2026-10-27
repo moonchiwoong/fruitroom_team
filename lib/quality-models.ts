@@ -14,15 +14,18 @@ export type QualityAnchor = {day:number; value:number};
 export type ModelRange = {min:number; max:number; validatedDays:null};
 export const QUALITY_MODEL_VERSION = 'appletrack-storage@2026-10-26.1';
 export const FUJI_MODEL_VERSION = 'fuji-xlsx-2026-10-26.1';
-export const HONGRO_STORAGE_MODEL_VERSION = 'hongro-xlsx-approximation-2026-10-26.1';
+export const HONGRO_STORAGE_MODEL_VERSION = 'hongro-xlsx-approximation-2026-10-27.1';
 export const QUALITY_METRICS:QualityMetric[] = ['firmness','brix','acidity','loss'];
 export const QUALITY_UNITS:Record<QualityMetric,string> = {firmness:'N',brix:'°Brix',acidity:'%',loss:'%'};
 export const FUJI_SOURCE = 'data/evidence/사과_품질예측_회귀식.xlsx';
 export const HONGRO_SOURCE = 'data/evidence/거창_품질예측식(1).xlsx';
 export const HONGRO_PAPER = 'data/evidence/kjfp-25-7-779.pdf';
+export const HONGRO_LOSS_SOURCE = 'data/evidence/홍로_품질예측식_감모율포함.xlsx';
+/** 홍로 감모율(%) 일률: 엑셀 Sheet1!E8(0℃)·E9(4℃), 0 ≤ t ≤ 120 */
+export const HONGRO_LOSS_RATE = {0: 0.0215, 4: 0.0272} as const;
 export const FUJI_MCP_SOURCE_NOTE = '최신 사과_품질예측_회귀식.xlsx Sheet1!E6의 y=y0를 사용합니다. 이전 data/storage-quality-model.xlsx E6에는 이차식이 있으며 보존했습니다. 최신 파일 C6의 ‘2차’ 분류와 유지식 E6의 불일치는 미해결입니다.';
 export const HONGRO_REFERENCE_NOTICE = '홍로에 대해 검증되지 않은 후지 기반 참고 추정';
-export const HONGRO_NO_LOSS_REASON = '자료 부족: 홍로 저온 저장 감모율 모델이 없습니다. 후지 식으로 참고 추정 보기를 명시적으로 선택한 경우에만 별도 참고값을 제공합니다.';
+export const HONGRO_NO_LOSS_REASON = '적용 모델 없음: 홍로 감모율 식은 1-MCP 미처리 일반 저온 0℃·4℃에만 있습니다.';
 export const MODEL_RANGE_NOTICE = '표시 범위는 상품성 유지 기간이나 안전한 보관 기간을 보장하지 않습니다.';
 const UNVALIDATED = '독립 예측 정확도 검증 미완료';
 const FUJI_TEMPERATURE_NOTE = '후지 원자료에 저장 온도가 명시되지 않아 선택 온도에서의 적용 타당성은 미확인입니다. 온도 보정이나 센서 이력 보정은 적용하지 않습니다.';
@@ -62,8 +65,8 @@ export const FUJI_FORMULAS:Record<QualityMetric,Record<FujiMethod,string>> = {
   acidity:{cold:'A(t) = A0·EXP(−0.004377t)',mcp:'A(t) = A0·(1 − (1/3)·MIN(t/100,1))',ca:'A(t) = A0·(1 − (1/3)·MIN(t/100,1))'},
 };
 export const HONGRO_FORMULAS = {
-  cold0:{firmness:'F(t) = MAX(0, F0 − MIN(t,60) × 7.0/60 − MAX(t−60,0) × 7.4/60)',brix:'S(t) = S0',acidity:'A(t) = MAX(0, A0 − MAX(t−60,0) × 0.05/60)'},
-  cold4:{firmness:'F(t) = MAX(0, F0 − MIN(t,60) × 7.0/60 − MAX(t−60,0) × 8.6/60)',brix:'S(t) = S0',acidity:'A(t) = MAX(0, A0 − MAX(t−60,0) × 0.03/60)'},
+  cold0:{firmness:'F(t) = MAX(0, F0 − MIN(t,60) × 7.0/60 − MAX(t−60,0) × 7.4/60)',brix:'S(t) = S0',acidity:'A(t) = MAX(0, A0 − MAX(t−60,0) × 0.05/60)',loss:'L(t) = 0.0215 × t (0 ≤ t ≤ 120)'},
+  cold4:{firmness:'F(t) = MAX(0, F0 − MIN(t,60) × 7.0/60 − MAX(t−60,0) × 8.6/60)',brix:'S(t) = S0',acidity:'A(t) = MAX(0, A0 − MAX(t−60,0) × 0.03/60)',loss:'L(t) = 0.0272 × t (0 ≤ t ≤ 120)'},
 } as const;
 
 export const MODEL_REGISTRY:ModelDefinition[] = [
@@ -76,13 +79,13 @@ export const MODEL_REGISTRY:ModelDefinition[] = [
     warnings:[FUJI_TEMPERATURE_NOTE,MODEL_RANGE_NOTICE,...(method==='mcp'&&metric==='firmness'?[FUJI_MCP_SOURCE_NOTE]:[])],
     connection:metric==='acidity'?'ratio' as const:'delta' as const,
   }))),
-  ...([0,4] as const).flatMap(temperature=>(['firmness','brix','acidity'] as const).map(metric=>({
+  ...([0,4] as const).flatMap(temperature=>(['firmness','brix','acidity','loss'] as const).map(metric=>({
     id:`hongro-cold${temperature}-${metric}`,version:HONGRO_STORAGE_MODEL_VERSION,cultivar:'hongro' as const,
     label:`홍로 일반 저온 저장 ${temperature}℃`,storage:'cold' as const,temperature,mcp:'untreated' as const,
     metric,unit:QUALITY_UNITS[metric],formula:HONGRO_FORMULAS[temperature===0?'cold0':'cold4'][metric],
-    source:[HONGRO_SOURCE,HONGRO_PAPER],range:{min:0,max:120,validatedDays:null},
-    validation:`엑셀 근사 모델 · 논문이 직접 제시한 회귀식으로 확인되지 않음 · ${UNVALIDATED}`,
-    warnings:[MODEL_RANGE_NOTICE,...(metric==='brix'?['엑셀 명시 수식 S(t)=S0를 사용합니다. 비고의 감소 설명에서 계수를 만들지 않습니다.']:[])],
+    source:metric==='loss'?[HONGRO_LOSS_SOURCE]:[HONGRO_SOURCE,HONGRO_PAPER],range:{min:0,max:120,validatedDays:null},
+    validation:metric==='loss'?`엑셀 제공 식 · 모형 유형·비고·관측 근거 미기재 · ${UNVALIDATED}`:`엑셀 근사 모델 · 논문이 직접 제시한 회귀식으로 확인되지 않음 · ${UNVALIDATED}`,
+    warnings:[MODEL_RANGE_NOTICE,...(metric==='brix'?['엑셀 명시 수식 S(t)=S0를 사용합니다. 비고의 감소 설명에서 계수를 만들지 않습니다.']:[]),...(metric==='loss'?['저장 시작일(0일) 0%에서 시작하는 시간식입니다. 실측 중량이 없어도 계산하며, 실측 감모율과 따로 표시합니다. 원자료에 모형 유형·관측 근거가 적혀 있지 않습니다.']:[])],
     connection:'delta' as const,
   }))),
 ];
@@ -109,10 +112,6 @@ export function selectQualityModel(input:QualityInput):{model:ModelDefinition|nu
   if(cultivar==='hongro'){
     if(input.storage!=='cold'||input.mcp!=='untreated')return {model:null,reference:false,reason:'적용 모델 없음: 홍로는 1-MCP 미처리 일반 저온 저장 0℃·4℃ 식만 있습니다.'};
     if(input.temperature!==0&&input.temperature!==4)return {model:null,reference:false,reason:'적용 모델 없음: 홍로는 정확히 0℃·4℃만 지원하며 온도 보간을 하지 않습니다.'};
-    if(input.metric==='loss'){
-      if(!input.allowFujiReference)return {model:null,reference:false,reason:HONGRO_NO_LOSS_REASON};
-      return {model:definitions.get('fuji-cold-loss')!,reference:true,reason:null};
-    }
     const model=definitions.get(`hongro-cold${input.temperature}-${input.metric}`)??null;
     return {model,reference:false,reason:model?null:'적용 모델 없음: 예측 항목을 확인해 주세요.'};
   }
@@ -127,6 +126,7 @@ function curve(model:ModelDefinition,t:number):number {
   }
   if(model.metric==='firmness')return -Math.min(t,60)*7/60-Math.max(t-60,0)*(model.temperature===0?7.4:8.6)/60;
   if(model.metric==='acidity')return -Math.max(t-60,0)*(model.temperature===0?0.05:0.03)/60;
+  if(model.metric==='loss')return HONGRO_LOSS_RATE[model.temperature===0?0:4]*t;
   return 0;
 }
 /** Main calculator: raw data remain null on failure; zero is only a computed value. */

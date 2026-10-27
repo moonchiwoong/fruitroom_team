@@ -58,9 +58,10 @@ test('provided GLB vertices change at day 120, reset at day 0, and remain unavai
   const start = binaryStart + (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
   const stride = view.byteStride ?? 12;
   const input = {cultivar:'hongro',storage:'cold' as const,temperature:0,mcp:'untreated' as const,metric:'loss' as const};
-  const baseline = appleAppearance(predictQuality({...input,day:0,allowFujiReference:true}).value);
-  const later = appleAppearance(predictQuality({...input,day:120,allowFujiReference:true}).value);
-  const missing = appleAppearance(predictQuality({...input,day:120,allowFujiReference:false}).value);
+  const baseline = appleAppearance(predictQuality({...input,day:0}).value);
+  const later = appleAppearance(predictQuality({...input,day:120}).value);
+  // 지원하지 않는 온도(2℃)에서는 감모율이 없으므로 외관을 바꾸지 않습니다.
+  const missing = appleAppearance(predictQuality({...input,temperature:2,day:120}).value);
   const original:number[] = [], changed:number[] = [], restored:number[] = [], unknown:number[] = [];
   const centre = accessor.min.map((value:number, i:number) => (value + accessor.max[i]) / 2);
   const radius = Math.max(...accessor.max.map((value:number, i:number) => value - accessor.min[i])) / 2;
@@ -74,6 +75,6 @@ test('provided GLB vertices change at day 120, reset at day 0, and remain unavai
   assert.equal(positionChecksum(restored),positionChecksum(original));
   assert.equal(positionChecksum(unknown),positionChecksum(original));
   assert.equal(missing.available,false); assert.equal(missing.lossPercent,null);
-  assert.equal(later.lossPercent,1.62084); assert.ok(later.lengthScale<baseline.lengthScale);
+  assert.ok(Math.abs(later.lossPercent!-2.58)<1e-9); assert.ok(later.lengthScale<baseline.lengthScale);
   context.diagnostic(`GLB body vertices=${accessor.count}; checksum day0=${positionChecksum(original)}; day120=${positionChecksum(changed)}; reset=${positionChecksum(restored)}; lengthScale120=${later.lengthScale}`);
 });

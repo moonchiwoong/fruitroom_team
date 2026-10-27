@@ -362,7 +362,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     return {ok: true, title: `적용 예측식: ${sel.model.label}`, detail: hongro ? '입력한 온도에 해당하는 식으로만 계산해요.' : '후지 원자료에 저장 온도가 없어 온도와 관계없이 같은 식을 써요. 해당 온도에서의 적용 타당성은 확인되지 않았어요.'};
   })();
   const measuredLossRows = measured.loss.map(p => ({date: p.date, day: p.day, value: p.value}));
-  const lossPlan = hongro ? '적용식·조건 확인 필요 — 홍로 감모율 예측식이 없어요. 실측 감모율을 앞으로 늘려 보거나 다른 품종의 식을 빌려 쓰지 않아요.' : modelResults.loss.ok ? '후지 감모율 식으로 저장일수에 따라 계산해요(검증 전).' : (modelResults.loss.reason ?? '적용식·조건 확인 필요');
+  const lossPlan = modelResults.loss.ok ? `${hongro ? `홍로 ${num(form.temperature)}℃ 감모율 식` : '후지 감모율 식'}으로 저장일수에 따라 계산해요(검증 전). 실측 감모율과는 따로 표시해요.` : (modelResults.loss.reason ?? '적용식·조건 확인 필요').replace(/^적용 모델 없음:\s*/, '이 조건에 적용할 감모율 식이 확인되지 않았어요. ');
   const missingWeather = HONGRO_WEATHER_FIELDS.filter(f => String(form.hongro.weather[f.key] ?? '').trim() === '').map(f => HONGRO_WEATHER_PRESETS[f.key].question.replace(/\s*\(.*\)/, ''));
   const supportRows: {key: string; label: string; ok: boolean; text: string}[] = (() => {
     const rows: {key: string; label: string; ok: boolean; text: string}[] = [];
@@ -377,7 +377,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
       else if (iv === null && !r.ok) rows.push({key: m, label, ok: false, text: weatherMode ? '날씨 추정값이 생기면 계산할 수 있어요.' : (m === 'firmness' || m === 'brix') && form.missing[m] ? '미측정으로 기록했어요. 이 항목은 예측하지 않아요.' : `처음 측정한 ${metricMeta[m].label} 값을 넣으면 계산할 수 있어요.`});
       else rows.push({key: m, label, ok: r.ok, text: r.ok ? `예측 가능 · ${r.modelId ?? ''}` : (r.reason ?? '적용식 확인 필요').replace(/^적용 모델 없음:\s*/, '이 조건에 적용할 예측식이 확인되지 않았어요. ')});
     }
-    rows.push({key: 'loss', label: '앞으로의 감모율 예측', ok: !hongro && modelResults.loss.ok, text: lossPlan});
+    rows.push({key: 'loss', label: '앞으로의 감모율 예측', ok: modelResults.loss.ok, text: lossPlan});
     rows.push({key: 'measured-loss', label: '실측 감모율', ok: measuredLossRows.length > 0, text: measuredLossRows.length ? `${measuredLossRows.length}건 계산됨 (같은 표본·같은 개수 기록)` : '같은 표본의 초기·후속 중량이 쌓이면 계산해요.'});
     const saveErr = exampleMode ? ['예시는 저장되지 않아요.'] : Object.values(validateForm(form, true)).filter(Boolean) as string[];
     rows.push({key: 'save', label: '기록 저장', ok: saveErr.length === 0, text: saveErr.length ? saveErr[0] : guest ? '로그인하면 이 입력 그대로 저장할 수 있어요.' : '지금 입력한 보관 조건과 초기 품질을 저장할 수 있어요.'});
@@ -650,7 +650,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
             measured={measured[metric]} startDate={startDate} asOfDay={asOfDay} selectedDay={selDay} onSelect={setSelectedDay} exampleMode={exampleMode} />
             : <div className="qt-empty">저장 시작일(또는 입고일)을 입력하면 그래프가 나타납니다. <button className="linkbtn" onClick={() => focus('tf-intake_date')}>입고일 입력하기</button></div>}
           {startOk && !series[metric].ok && <div className="qt-chart-note"><AlertTriangle size={14} />{(series[metric] as {reason: string}).reason}{!anchors[metric] && metric !== 'loss' && <button className="linkbtn" onClick={() => focus('tf-' + metric)}>입력하기</button>}</div>}
-          {metric === 'loss' && !exampleMode ? <p className="qt-help">점: 동일 표본 실측 감모율 · 선: 모델 예측 또는 명시적으로 선택한 후지 기반 참고 추정. 실측 중량 사이를 보간한 선이 아닙니다.</p> : <ChartLegend exampleMode={exampleMode} hasMeasured={true} initialSource={hongro ? sourceLabel : undefined} hasBaseline={hongro ? !!hongroResult && showConditions : !!baseline && compatible && !sameAsBaseline} baselineLabel={hongro ? num(form.temperature)===0?'4℃ 저온저장':'0℃ 저온저장' : baseline ? `${baseline.label} (회색 점선)` : ''} />}
+          {metric === 'loss' && !exampleMode ? <p className="qt-help">점: 동일 표본 실측 감모율 · 선: 품종·온도별 감모율 식으로 계산한 예측. 실측 중량 사이를 보간한 선이 아닙니다.</p> : <ChartLegend exampleMode={exampleMode} hasMeasured={true} initialSource={hongro ? sourceLabel : undefined} hasBaseline={hongro ? !!hongroResult && showConditions : !!baseline && compatible && !sameAsBaseline} baselineLabel={hongro ? num(form.temperature)===0?'4℃ 저온저장':'0℃ 저온저장' : baseline ? `${baseline.label} (회색 점선)` : ''} />}
           <div className="qt-date-control">
             <div className="qt-range-control"><label htmlFor="qt-selected-day">저장 경과일 <strong>{selectedDayLabel}</strong></label><input id="qt-selected-day" className="qt-slider" type="range" min={0} max={maxDays} value={Number.isFinite(selDay) ? Math.max(0,Math.min(maxDays,selDay)) : 0} disabled={!startOk} onChange={e => setSelectedDay(+e.target.value)} /><div className="qt-range-ends"><span>0일 · 저장 시작</span><span>{maxDays}일</span></div></div>
           </div>
