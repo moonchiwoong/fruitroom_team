@@ -145,25 +145,16 @@ try {
     assert.match(csv,/\[모델 정보\]/);assert.match(csv,/미검증/);assert.match(csv,/\[측정 기록\]/);
     assert.match(csv,/경도\(N\) 계산/);return {filename:download.suggestedFilename(),bytes:Buffer.byteLength(csv)};
   });
-  await run('3D 외관 예시: 기본 접힘·캔버스·회전·확대·다시 접기',async()=>{
-    const disclosure=page.locator('details.qt-3d');
-    assert.equal(await disclosure.getAttribute('open'),null);
-    await disclosure.locator('summary').click();
-    await page.locator('.three-mount canvas').waitFor();
-    await page.waitForFunction(()=>!document.querySelector('.viewer-loading'));
-    const canvas=await page.locator('.three-mount canvas').boundingBox();
+  await run('결과 화면 3D 사과: 기본 표시·캔버스·확대·시점 초기화',async()=>{
+    const viewer=page.locator('.qt4-apple [data-testid="quality-apple-viewer"]');
+    await viewer.locator('canvas').waitFor();
+    await page.waitForFunction(()=>document.querySelector('.qt4-apple [data-testid="quality-apple-viewer"]')?.dataset.loadState!=='loading');
+    const canvas=await viewer.locator('canvas').boundingBox();
     assert.ok(canvas&&canvas.width>100&&canvas.height>100);
-    try {
-      await disclosure.scrollIntoViewIfNeeded();await screenshotView(page,'desktop-3d-example.png');
-      await page.getByRole('button',{name:'자동 회전',exact:true}).click();
-      assert.equal(await page.getByRole('button',{name:'자동 회전 정지',exact:true}).getAttribute('aria-pressed'),'true');
-      await page.getByRole('button',{name:'확대',exact:true}).click();
-      await page.getByRole('button',{name:'시점 초기화',exact:true}).click();
-    } finally {
-      if(await disclosure.getAttribute('open')!==null)await disclosure.locator('summary').click();
-    }
-    assert.equal(await page.locator('.three-mount canvas').count(),0);
-    return {canvasWidth:canvas.width,canvasHeight:canvas.height,note:'Local browser render; native WebGL vs software fallback is not asserted.'};
+    await viewer.scrollIntoViewIfNeeded();await screenshotView(page,'desktop-3d-result.png');
+    await page.getByRole('button',{name:'3D 사과 확대',exact:true}).click();
+    await page.getByRole('button',{name:'시점 초기화',exact:true}).click();
+    return {canvasWidth:canvas.width,canvasHeight:canvas.height,loadState:await viewer.getAttribute('data-load-state'),note:'Local browser render; native WebGL vs software fallback is not asserted.'};
   });
   await run('물량 이름·품종·위치 검색 및 빈 검색 결과',async()=>{
     await navigate(page,'물량 관리');await page.locator('#lot-search-input').waitFor();

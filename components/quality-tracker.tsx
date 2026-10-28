@@ -338,6 +338,8 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     return out;
   })();
   const firstBrix = initialValue('brix');
+  const lastObsDate = pastObs.length ? pastObs.reduce((a, o) => o.date > a ? o.date : a, pastObs[0].date) : null;
+  const staleDays: number | null = !exampleMode && !!activeLot && !!lastObsDate && isDate(asOf) ? daysBetween(lastObsDate, asOf) : null;
 
   // ── 입력 화면: 물량 전환 · 저장고 조건 불러오기 · 조건 판별 · 입력·예측 조건 확인 ──
   const [storeOpen, setStoreOpen] = useState(false), [storeFrom, setStoreFrom] = useState('');
@@ -641,8 +643,37 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           </div>
         </div>
         {hongro && <><p className="qt-help">홍로 · {form.storage} · {form.temperature || '미입력'}℃ · 1-MCP {form.mcp} · 저장 {selectedDayLabel} · 초기품질 출처: {sourceLabel}{exampleMode ? ' · 예시 데이터' : ''}</p><div className="qt-latest-values">{(['weight', 'diameter'] as const).map(m => <div key={m}><dt>{m === 'weight' ? '중량' : '횡경'} · 초기값만 제공</dt><dd>{hongroResult?.initial[m] === undefined ? '미입력' : `${fmtNum(hongroResult.initial[m]!, 1)} ${HONGRO_UNITS[m]}`}</dd></div>)}</div><p className="qt-help">중량·횡경의 저장 중 변화와 홍로 자체 감모율은 자료 부족입니다. 당도는 S(t)=S0로, 저장 중 변화를 반영하지 않습니다.</p></>}
-        <div className="qt2-grid">
-          <div className="qt2-chart">
+        <div className="qt4-top">
+          <div className="qt4-apple"><Boundary><QualityAppleViewer compact day={selDay} cultivar={form.variety} metrics={modelResults} /></Boundary></div>
+          <aside id="qt-metric-result" role="tabpanel" aria-labelledby={'qt-tab-' + metric} className="qt2-result qt4-summary">
+            <p className="qt2-result-when">{whenLabel}{Number.isFinite(selDay) ? ` · 저장 ${selDay}일차` : ''}{isDate(selDate) ? ` · ${fmtDate(selDate)}` : ''}</p>
+            <div className="qt2-result-main" aria-live="polite">
+              <p className="qt2-result-label">{metricMeta[metric].label} {modelResults[metric].kind === '실측' ? '실측값' : modelResults[metric].kind === '참고 추정' ? '참고 추정값' : '계산값'}<span>{plainMeaning[metric]}</span></p>
+              {selectedValue.status === 'ok' ? <>
+                <p className="qt2-result-value">{fmtNum(selectedValue.value, metricMeta[metric].digits)}<span>{displayUnit(metric)}</span></p>
+                {resultLines.map(t => <p key={t} className="qt2-result-change">{t}</p>)}
+              </> : <div className="qt2-result-na"><b>이 날짜의 값을 표시할 수 없어요</b><p>{selectedValue.reason}</p><button className="linkbtn" onClick={() => focus(hongro ? `tf-hongro-initial-${metric}` : 'tf-' + (metric === 'loss' ? 'tracked_sample_id' : metric))}>필요한 입력 확인하기</button></div>}
+            </div>
+            <p className="qt2-result-note">{exampleMode ? '예시 데이터로 계산한 시연 결과이며, 실제 측정값과 다를 수 있어요.' : modelResults[metric].kind === '실측' ? '같은 추적 표본의 실측 중량으로 계산했어요. 품질 판정이 아닙니다.' : modelResults[metric].kind === '참고 추정' ? '홍로 미검증 · 후지 기반 참고 추정 — 실제 측정값과 다를 수 있으며, 출하·안전 판정이 아닙니다.' : '모델 계산 · 검증 미확인 — 실제 측정값과 다를 수 있으며, 출하·안전 판정이 아닙니다.'}</p>
+            {latestPoint && latestPoint.day !== selDay && <p className="qt4-line">최근 {exampleMode ? '예시 측정' : '실측'}({shortDate(latestPoint.date)}) {fmtNum(latestPoint.value, metricMeta[metric].digits)} {displayUnit(metric)}{firstValue !== null && latestPoint.day > t0 ? ` — 처음보다 ${describeChange(metric, latestPoint.value, firstValue).text}` : ''}</p>}
+            {staleDays !== null && staleDays >= 14 && <p className="qt4-line warn">마지막 측정이 {staleDays}일 전이에요. 오늘 측정값을 기록하면 최근 상태로 다시 계산할 수 있어요.</p>}
+            <div className="qt4-summary-actions">
+          {!exampleMode && activeLot && !guest ? <ObservationForm lot={activeLot} label="오늘 측정값 기록" className="btn btn-primary" onSaved={() => setReload(r => r + 1)} disabled={false} />
+            : guest && !exampleMode ? <button className="btn btn-primary" onClick={handoffToLogin}><Save size={16} />로그인하고 저장하기</button>
+            : exampleMode ? <button className="btn btn-primary" onClick={() => changeMode('real')}>내 측정값 입력하기</button>
+            : <button className="btn btn-primary" onClick={() => { setEditing(true); requestAnimationFrame(() => document.getElementById('qt-input-editor')?.scrollIntoView({behavior: 'smooth', block: 'start'})); }}>입력 정보 수정</button>}
+
+            </div>
+          </aside>
+          <div className="qt4-tiles" role="group" aria-label="지표 요약 · 누르면 그래프가 바뀌어요">
+            {visibleMetrics.map(m => { const r = modelResults[m], an = anchors[m], ok = r.ok && r.value !== null;
+              return <button key={m} type="button" className={'qt4-tile' + (metric === m ? ' active' : '')} aria-pressed={metric === m} onClick={() => setMetric(m)}>
+                <span className="qt4-tile-label">{metricMeta[m].label}</span>
+                <span className="qt4-tile-value">{ok ? <>{fmtNum(r.value!, metricMeta[m].digits)}<small>{displayUnit(m)}</small></> : '계산 없음'}</span>
+                <span className="qt4-tile-note">{!ok ? (r.reason ?? '자료 부족').replace(/^적용 모델 없음:\s*/, '') : m === 'loss' ? (actualLoss ? `실측 ${fmtNum(actualLoss.value, 2)} %` : `${r.kind} · 저장일수로 계산`) : an ? `${an.source === 'latest' ? '계산 시작점' : '처음'}보다 ${describeChange(m, r.value!, an.value).short}` : r.kind}</span>
+              </button>; })}
+          </div>
+          <div className="qt2-chart qt4-chart">
           <div className="qt-chartbox">
           <div className="qt2-chart-head"><h2>{metricMeta[metric].label} 변화</h2>
         <div className="seg qt-tabs" role="tablist" aria-label="지표" onKeyDown={e => {
@@ -667,23 +698,9 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         </div>
 
           </div>
-          <aside id="qt-metric-result" role="tabpanel" aria-labelledby={'qt-tab-' + metric} className="qt2-result">
-            <p className="qt2-result-when">{whenLabel}{Number.isFinite(selDay) ? ` · 저장 ${selDay}일차` : ''}{isDate(selDate) ? ` · ${fmtDate(selDate)}` : ''}</p>
-            <div className="qt2-result-main" aria-live="polite">
-              <p className="qt2-result-label">{metricMeta[metric].label} {modelResults[metric].kind === '실측' ? '실측값' : modelResults[metric].kind === '참고 추정' ? '참고 추정값' : '계산값'}<span>{plainMeaning[metric]}</span></p>
-              {selectedValue.status === 'ok' ? <>
-                <p className="qt2-result-value">{fmtNum(selectedValue.value, metricMeta[metric].digits)}<span>{displayUnit(metric)}</span></p>
-                {resultLines.map(t => <p key={t} className="qt2-result-change">{t}</p>)}
-              </> : <div className="qt2-result-na"><b>이 날짜의 값을 표시할 수 없어요</b><p>{selectedValue.reason}</p><button className="linkbtn" onClick={() => focus(hongro ? `tf-hongro-initial-${metric}` : 'tf-' + (metric === 'loss' ? 'tracked_sample_id' : metric))}>필요한 입력 확인하기</button></div>}
-            </div>
-            <p className="qt2-result-note">{exampleMode ? '예시 데이터로 계산한 시연 결과이며, 실제 측정값과 다를 수 있어요.' : modelResults[metric].kind === '실측' ? '같은 추적 표본의 실측 중량으로 계산했어요. 품질 판정이 아닙니다.' : modelResults[metric].kind === '참고 추정' ? '홍로 미검증 · 후지 기반 참고 추정 — 실제 측정값과 다를 수 있으며, 출하·안전 판정이 아닙니다.' : '모델 계산 · 검증 미확인 — 실제 측정값과 다를 수 있으며, 출하·안전 판정이 아닙니다.'}</p>
-          </aside>
         </div>
-        <dl className="qt2-strip">
-          <div><dt>처음 측정</dt><dd>{firstValue !== null ? <>{fmtNum(firstValue, metricMeta[metric].digits)} <small>{displayUnit(metric)}</small></> : '미측정'}</dd></div>
-          <div><dt>최근 {exampleMode ? '예시' : '실제'} 측정</dt><dd>{latestPoint ? <>{fmtNum(latestPoint.value, metricMeta[metric].digits)} <small>{metricMeta[metric].unit}</small><span className="qt2-strip-date"> · {shortDate(latestPoint.date)}</span></> : '아직 기록 없음'}</dd></div>
-          <div><dt>{latestBrix ? '최근 당도' : '처음 당도'}</dt><dd>{latestBrix ? <>{fmtNum(latestBrix.value, 1)} <small>°Brix</small></> : firstBrix !== null ? <>{fmtNum(firstBrix, 1)} <small>°Brix</small></> : '미측정'}</dd></div>
-        </dl>
+        <div className="qt2-more">
+        <details className="qt2-fold"><summary>감모율 실측·예측 구분<Plus size={16} /></summary>
         <section className="qt-loss-sources" aria-label="감모율 자료 구분">
           <h3>감모율: 실측과 예측을 나눠 보여 줘요</h3>
           <div className="qt-latest-values">
@@ -691,14 +708,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
             <div><dt>앞으로의 감모율 예측</dt><dd>{modelResults.loss.ok ? `${fmtNum(modelResults.loss.value!,2)} %` : '확인 필요'}</dd><small>{modelResults.loss.ok ? `${modelResults.loss.kind} · 저장일수로 계산` : lossPlan}</small></div>
           </div>
         </section>
-        <div className="qt2-cta">
-          <div><h3>직접 측정한 값이 있나요?</h3><p>오늘의 기록을 더하면 실제 변화와 비교할 수 있어요.</p></div>
-          {!exampleMode && activeLot && !guest ? <ObservationForm lot={activeLot} label="오늘 측정값 기록" className="btn btn-primary btn-lg" onSaved={() => setReload(r => r + 1)} disabled={false} />
-            : guest && !exampleMode ? <button className="btn btn-primary btn-lg" onClick={handoffToLogin}><Save size={16} />로그인하고 저장하기</button>
-            : exampleMode ? <button className="btn btn-primary btn-lg" onClick={() => changeMode('real')}>내 측정값 입력하기</button>
-            : <button className="btn btn-primary btn-lg" onClick={() => { setEditing(true); requestAnimationFrame(() => document.getElementById('qt-input-editor')?.scrollIntoView({behavior: 'smooth', block: 'start'})); }}>입력 정보 수정</button>}
-        </div>
-        <div className="qt2-more">
+        </details>
         {<details className="qt2-fold"><summary>측정값과 비교 보기<Plus size={16} /></summary><section className="qt-latest" aria-label="최근 실측 비교"><div className="qt-latest-head"><h3>최근 {exampleMode ? '예시 측정' : '실측'}과 비교</h3>{!exampleMode && activeLot && <ObservationForm lot={activeLot} onSaved={() => setReload(r => r + 1)} disabled={false} />}</div>
           {latestPoint ? <><button className="linkbtn qt-latest-date" disabled={latestPoint.day < 0 || latestPoint.day > MODEL_RANGE.displayDays} onClick={() => setSelectedDay(latestPoint.day)}>최근 측정 날짜 선택</button><p className="qt-help">{fmtDate(latestPoint.date)} · 저장 {latestPoint.day}일차 · 표본 {latestPoint.sampleCount ?? '미기록'}{latestPoint.sampleCount ? '개' : ''}</p>
             <dl className="qt-latest-values"><div><dt>{exampleMode ? '예시 측정' : metric === 'loss' ? '실측 중량 기반 감모율' : '실측'}</dt><dd>{fmtNum(latestPoint.value, metricMeta[metric].digits)} <small>{metricMeta[metric].unit}</small></dd></div><div><dt>같은 날짜 시연용 계산</dt><dd>{latestCalculation?.status === 'ok' ? <>{fmtNum(latestCalculation.value, metricMeta[metric].digits)} <small>{metricMeta[metric].unit}</small></> : '제공 안 함'}</dd></div><div><dt>측정 − 계산</dt><dd>{latestCalculation?.status === 'ok' ? describeChange(metric, latestPoint.value, latestCalculation.value).short : '비교 불가'}</dd></div></dl>
@@ -762,7 +772,6 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
       </section>
     </div>
 
-    <ThreeDExample day={selDay} cultivar={form.variety} metrics={modelResults} />
   </div>;
 }
 
@@ -811,13 +820,6 @@ class Boundary extends Component<{children: ReactNode}, {failed: boolean}> {
   render() { return this.state.failed ? <div className="t3d-empty">3D 예시를 표시하지 못했습니다. 입력·결과·그래프는 그대로 사용할 수 있습니다.</div> : this.props.children; }
 }
 
-function ThreeDExample({day,cultivar,metrics}:{day:number;cultivar:string;metrics:Record<MetricId,ModelResult>}) {
-  const [open,setOpen]=useState(false);
-  return <details className="qt-3d" onToggle={e=>setOpen((e.target as HTMLDetailsElement).open)}>
-    <summary><ChevronDown size={16} />3D 외관 예시 <span className="kind k-example">설명용 외관 시각화</span></summary>
-    {open && <div className="qt-3d-body"><Boundary><QualityAppleViewer day={day} cultivar={cultivar} metrics={metrics} /></Boundary></div>}
-  </details>;
-}
 
 
 /** 한눈에 고르는 선택 버튼 묶음. 실제 라디오 입력이라 화살표 키로도 바꿀 수 있습니다. */

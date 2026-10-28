@@ -4,6 +4,7 @@ import {useEffect, useRef, useState} from 'react';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {Minus, Plus, RotateCcw, Rotate3D, AlertTriangle} from 'lucide-react';
 import {APPLE_APPEARANCE_CONFIG, appleAppearance, positionChecksum, wrinkleApplePoint, type AppleAppearance} from '@/lib/apple-appearance';
 import styles from './quality-apple-viewer.module.css';
@@ -26,6 +27,8 @@ export type QualityAppleViewerProps = {
   metrics: Record<'firmness' | 'brix' | 'acidity' | 'loss', AppearanceMetric>;
   /** Allows deployments/tests to choose another actual model or exercise load failure. */
   modelUrl?: string;
+  /** 결과 화면 메인용: 수치 표는 숨기고(결과 화면이 따로 보여 줌) 설명·한계는 접어 둡니다. */
+  compact?: boolean;
 };
 
 const bytesCache = new Map<string, Promise<ArrayBuffer>>();
@@ -64,7 +67,7 @@ type MutableBody = {geometry: THREE.BufferGeometry; original: Float32Array; cent
 type ViewerApi = {controls: OrbitControls; camera: THREE.PerspectiveCamera; group: THREE.Group; bodies: MutableBody[]; update: (appearance: AppleAppearance) => void};
 
 /** The downloaded GLB is immutable; this viewer owns its parsed GPU resources. */
-export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '/models/apple-web.glb'}: QualityAppleViewerProps) {
+export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '/models/apple-web.glb', compact = false}: QualityAppleViewerProps) {
   const mount = useRef<HTMLDivElement>(null), api = useRef<ViewerApi | null>(null);
   const loss = metrics.loss.ok && metrics.loss.value !== null ? metrics.loss.value : null;
   const appearance = appleAppearance(loss), appearanceRef = useRef(appearance);
@@ -92,6 +95,9 @@ export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '
     renderer.domElement.setAttribute('aria-hidden', 'true');
     host.appendChild(renderer.domElement);
     const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(36, 1, 0.05, 40);
+    // 껍질 광택(clearcoat·specular)이 보이도록 실내 반사 환경을 씁니다.
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture; pmrem.dispose();
     camera.position.set(0, 0.28, 4.7);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 0, 0); controls.enableDamping = true; controls.enablePan = false;
@@ -150,7 +156,8 @@ export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '
       const bounds = new THREE.Box3().setFromObject(original), size = bounds.getSize(new THREE.Vector3()), centre = bounds.getCenter(new THREE.Vector3());
       if (!Number.isFinite(size.length()) || size.length() === 0) {disposeScene(original); throw new Error('빈 3D 모델입니다.');}
       const scale = 2 / Math.max(size.x, size.y, size.z);
-      const normalize = new THREE.Matrix4().makeScale(scale, scale, scale).multiply(new THREE.Matrix4().makeTranslation(-centre.x, -centre.y, -centre.z));
+      // 붉은 면이 정면에 오도록 처음 방향만 돌려 둡니다(형상·변형 계산은 그대로).
+      const normalize = new THREE.Matrix4().makeRotationY(2.7).multiply(new THREE.Matrix4().makeScale(scale, scale, scale)).multiply(new THREE.Matrix4().makeTranslation(-centre.x, -centre.y, -centre.z));
       const originals = new Set<THREE.BufferGeometry>();
       const meshCandidates: THREE.Mesh[] = [];
       original.traverse(object => {
@@ -180,7 +187,7 @@ export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '
     return () => {
       disposed = true; cancelAnimationFrame(frame); observer.disconnect(); controls.dispose();
       renderer.domElement.removeEventListener('webglcontextlost', contextLost);
-      disposeScene(scene); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
+      scene.environment?.dispose(); disposeScene(scene); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
       api.current = null;
     };
   }, [modelUrl, retry]);
@@ -195,9 +202,10 @@ export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '
   };
   const reset = () => {const current = api.current; if (current) {current.group.rotation.set(0, 0, 0); current.controls.reset();}};
   const metricInfo = {firmness: ['경도', 1], brix: ['당도', 1], acidity: ['산도', 3], loss: ['감모율', 3]} as const;
-  return <section className={styles.viewer} data-testid="quality-apple-viewer" data-day={day} data-load-state={loadState}>
-    <div className={styles.heading}><span>설명용 외관 시각화</span><b>저장 {Number.isFinite(day) ? day : '—'}일차</b></div>
-    <p className={styles.modelNote}>공통 설명용 사과 모델 · {isHongro ? '홍로' : '후지'}의 실측 외형이 아닙니다. 정밀 스캔이 아니며 실제 크기는 확인되지 않았습니다.</p>
+  const modelNote = <>공통 설명용 사과 모델 · {isHongro ? '홍로' : '후지'}의 실측 외형이 아닙니다. 정밀 스캔이 아니며 실제 크기는 확인되지 않았습니다.</>;
+  return <section className={styles.viewer + (compact ? ' ' + styles.compact : '')} data-testid="quality-apple-viewer" data-day={day} data-load-state={loadState}>
+    <div className={styles.heading}><span>{compact ? '설명용 3D · 실측 외형 아님' : '설명용 외관 시각화'}</span><b>저장 {Number.isFinite(day) ? day : '—'}일차</b></div>
+    {!compact && <p className={styles.modelNote}>공통 설명용 사과 모델 · {isHongro ? '홍로' : '후지'}의 실측 외형이 아닙니다. 정밀 스캔이 아니며 실제 크기는 확인되지 않았습니다.</p>}
     <div className={styles.stage}>
       <div className={styles.canvas} ref={mount} role="img" aria-label="품질 계산과 연결된 사과 3D 모델. 드래그로 회전, 확대·축소 버튼으로 크기를 조절합니다." tabIndex={0}
         onKeyDown={event => {
@@ -221,6 +229,7 @@ export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '
       <small><Rotate3D size={15}/> 드래그로 회전 · 두 손가락으로 확대</small>
       <div><button type="button" disabled={loadState !== 'ready'} onClick={() => zoom(1.15)} aria-label="3D 사과 축소"><Minus size={17}/></button><button type="button" disabled={loadState !== 'ready'} onClick={() => zoom(0.85)} aria-label="3D 사과 확대"><Plus size={17}/></button><button type="button" disabled={loadState !== 'ready'} onClick={reset}><RotateCcw size={16}/>시점 초기화</button></div>
     </div>
+    {compact ? <p className={styles.compactLine} data-testid={appearance.available ? undefined : 'appearance-unavailable'}>{appearance.available ? `감모율 ${loss!.toFixed(2)}%를 크기·주름에 반영했어요${isReference ? ' (후지 기반 참고 추정)' : ''}.` : '감모율 자료가 없어 모양을 바꾸지 않았어요. 수축·주름이 없다는 뜻은 아니에요.'}</p> : <>
     <dl className={styles.metrics}>{(Object.keys(metricInfo) as Array<keyof typeof metricInfo>).map(key => {
       const metric = metrics[key], [label, digits] = metricInfo[key];
       return <div key={key}><dt>{label}</dt><dd>{metric.ok && metric.value !== null ? <>{metric.value.toLocaleString('ko-KR', {minimumFractionDigits: digits, maximumFractionDigits: digits})}<small> {metric.unit}</small></> : '계산 없음'}</dd><small>{metric.ok ? metric.kind ?? '모델 계산' : metric.reason ?? '자료 부족'}</small></div>;
@@ -228,6 +237,7 @@ export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '
     {!appearance.available ? <p className={styles.notice} data-testid="appearance-unavailable">감모율 자료가 없어 외관 변형을 계산하지 않았습니다. 표시된 기본 형태는 수축·주름이 없다는 뜻이 아닙니다.{metrics.loss.reason && <small>{metrics.loss.reason}</small>}</p> : <p className={styles.notice}>{isReference ? <strong>홍로에 대해 검증되지 않은 후지 기반 참고 추정</strong> : <strong>{metrics.loss.kind ?? '모델 계산'} 감모율로 표현한 외관 예시</strong>}감모율 {loss!.toFixed(3)}%를 사용했습니다. {isReference && '0~120일 표시 제한은 홍로에 대한 타당성을 검증하지 않습니다.'}{appearance.visuallyCapped && ` 외관 효과만 ${APPLE_APPEARANCE_CONFIG.maxVisualLossPercent}%에서 제한하며 계산값은 바꾸지 않습니다.`}</p>}
     {metrics.loss.source && metrics.loss.source.length > 0 && <p className={styles.source}>감모율 출처: {metrics.loss.source.join(' · ')}{metrics.loss.modelVersion && ` · ${metrics.loss.modelVersion}`}<br/>{metrics.loss.validation}</p>}
     {metrics.loss.warnings?.map(warning => <p key={warning} className={styles.source}>{warning}</p>)}
-    <details className={styles.explanation}><summary>외관 연결 방식과 한계</summary><p>감모율을 길이 감소율로 그대로 적용하지 않습니다. 일정 밀도·등방 수축을 가정해 길이 배율 = (1 − 감모율/100 × 수축 강도)의 세제곱근으로 나타내고, 표면 메시 좌표에 연속적인 주름 변형을 더합니다. 이 가정과 주름 강도는 실제 외관 자료로 보정되지 않은 설명용 설정입니다.</p><p>경도·당도·산도는 위 수치로 표시하며 형태 변형·껍질 색·부패를 결정하지 않습니다. 실측 사진이나 상품성·안전 보관 기간을 예측하는 모델이 아닙니다.</p><p>설정: 수축 강도 {APPLE_APPEARANCE_CONFIG.volumeLossStrength}, 주름 강도 {APPLE_APPEARANCE_CONFIG.wrinkleStrength}. 원본 GLB에는 품질 변화용 morph target이 없어 웹에서 본체 메시를 직접 변형합니다.</p></details>
+    </>}
+    <details className={styles.explanation}><summary>외관 연결 방식과 한계</summary>{compact && <p>{modelNote}</p>}{compact && metrics.loss.source && metrics.loss.source.length > 0 && <p>감모율 출처: {metrics.loss.source.join(' · ')}{metrics.loss.modelVersion && ` · ${metrics.loss.modelVersion}`} · {metrics.loss.validation}</p>}<p>감모율을 길이 감소율로 그대로 적용하지 않습니다. 일정 밀도·등방 수축을 가정해 길이 배율 = (1 − 감모율/100 × 수축 강도)의 세제곱근으로 나타내고, 표면 메시 좌표에 연속적인 주름 변형을 더합니다. 이 가정과 주름 강도는 실제 외관 자료로 보정되지 않은 설명용 설정입니다.</p><p>경도·당도·산도는 위 수치로 표시하며 형태 변형·껍질 색·부패를 결정하지 않습니다. 실측 사진이나 상품성·안전 보관 기간을 예측하는 모델이 아닙니다.</p><p>설정: 수축 강도 {APPLE_APPEARANCE_CONFIG.volumeLossStrength}, 주름 강도 {APPLE_APPEARANCE_CONFIG.wrinkleStrength}. 원본 GLB에는 품질 변화용 morph target이 없어 웹에서 본체 메시를 직접 변형합니다.</p></details>
   </section>;
 }
