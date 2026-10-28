@@ -647,16 +647,16 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
               <p className="qt2-result-label">{metricMeta[metric].label} {modelResults[metric].kind === '실측' ? '실측값' : modelResults[metric].kind === '참고 추정' ? '참고 추정값' : '계산값'}<span>{plainMeaning[metric]}</span></p>
               {selectedValue.status === 'ok' ? <>
                 <p className="qt2-result-value">{fmtNum(selectedValue.value, metricMeta[metric].digits)}<span>{displayUnit(metric)}</span></p>
-                <p className="qt2-result-change">{metric === 'firmness' ? `예: 약 ${fmtNum(selectedValue.value / 9.80665, 1)} kg의 무게에 해당하는 힘이에요.`
-                  : metric === 'brix' ? `예: 설탕물로 환산하면 100 g당 약 ${fmtNum(selectedValue.value, 1)} g이에요.`
-                  : metric === 'acidity' ? '산 성분을 나타내는 값이에요. 처음 값과 비교해 보세요.'
-                  : `예: 처음 100 kg에서 약 ${fmtNum(selectedValue.value, 2)} kg 줄어든 비율이에요.`}</p>
+                <p className="qt2-result-change">{metric === 'firmness' ? `예: 1L 생수 약 ${fmtNum(selectedValue.value / 9.80665, 1)}병의 물 무게로 누르는 힘과 비슷해요.`
+                  : metric === 'brix' ? `예: 설탕물 100g 속 설탕은 5g짜리 약 ${fmtNum(selectedValue.value / 5, 1)}봉지 분량이에요.`
+                  : metric === 'acidity' ? anchors.acidity && anchors.acidity.value > 0 ? `예: ${anchors.acidity.source === 'latest' ? '최근 측정' : '처음'}의 산도를 100으로 보면 지금은 약 ${Math.round(selectedValue.value / anchors.acidity.value * 100)}이에요.` : '예: 같은 방식으로 잰 사과의 처음 산도와 비교해 보세요.'
+                  : Math.abs(selectedValue.value) <= 100 ? (selectedValue.value === 0 ? '예: 사과 10kg의 무게가 그대로인 셈이에요.' : `예: 사과 10kg의 무게가 약 ${fmtNum(Math.abs(selectedValue.value) * 100, 0)}g ${selectedValue.value > 0 ? '줄어든' : '늘어난'} 셈이에요.`) : '처음 무게와 비교한 변화 비율이에요.'}</p>
                 <details className="qt2-fold">
                   <summary>이 수치 자세히 보기<Plus size={16} /></summary>
-                  <p className="qt-help">{metric === 'firmness' ? '경도는 측정기로 과육을 누를 때 필요한 힘이에요. 측정 도구와 방법이 같을 때 비교하기 좋으며, 씹는 힘과 같은 값은 아니에요.'
-                    : metric === 'brix' ? '당도는 당을 포함한 가용성 고형분의 지표예요. 설탕물 예시는 단위 이해를 위한 것이며, 사과의 실제 당 함량이나 맛을 그대로 뜻하지 않아요.'
-                    : metric === 'acidity' ? '산도는 사과에 들어 있는 산 성분의 지표예요. 같은 측정 기준에서 처음 값과 비교하면 변화를 살필 수 있어요.'
-                    : '감모율은 처음 무게에 비해 줄어든 무게의 비율이에요. 같은 표본을 측정했는지, 모델로 계산했는지 함께 확인해 주세요.'}</p>
+                  <p className="qt-help">{metric === 'firmness' ? '경도는 측정기 끝으로 과육을 누를 때 필요한 힘이에요. 생수 예시는 힘의 크기를 떠올리기 위한 것으로, 사과를 씹는 힘이나 식감과 같다는 뜻은 아니에요.'
+                    : metric === 'brix' ? '당도는 당을 포함한 가용성 고형분의 지표예요. 설탕물 예시는 같은 농도를 나타낸 것으로, 사과의 실제 설탕 양이나 맛과 같다는 뜻은 아니에요.'
+                    : metric === 'acidity' ? '산도는 사과에 들어 있는 산 성분의 지표예요. 같은 방법으로 잰 기준값과 비교한 수치이며, 신맛이 같은 비율로 변한다는 뜻은 아니에요.'
+                    : '감모율은 처음 무게에 비해 줄어든 무게의 비율이에요. 10kg 사과 상자는 이해를 위한 예시이며, 실제 중량이 아니에요. 실측과 모델 계산을 구분해 확인해 주세요.'}</p>
                   <p className="qt-help">품종과 측정 조건에 따라 해석이 달라지며, 이 값만으로 맛이나 출하·안전 여부를 판단할 수 없어요.</p>
                 </details>
                 {resultLines.map(t => <p key={t} className="qt2-result-change">{t}</p>)}
