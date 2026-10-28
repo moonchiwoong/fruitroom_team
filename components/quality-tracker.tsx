@@ -334,6 +334,9 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     const relativeText = relative === null ? '' : relative < 0.1 ? ' (약 0.1% 미만)' : ` (약 ${fmtNum(relative, 1)}%)`;
     return `${initialLabel} ${fmtNum(firstValue, metricMeta[metric].digits)} ${displayUnit(metric)}보다 ${change.text}${relativeText}`;
   })();
+  const hasDisplayedChange = selectedValue.status === 'ok' && (metric === 'loss'
+    ? describeChange('loss', selectedValue.value, 0).diff !== 0
+    : firstValue !== null && Number.isFinite(firstValue) && !initialMeasuredAfterAsOf && selDay >= t0 && describeChange(metric, selectedValue.value, firstValue).diff !== 0);
   const latestBrix = hongro ? null : measured.brix.at(-1) ?? null;
   /** 결과값 아래에 나누어 보여 줄 해석 줄 (실제 선택 상태와 계산 결과에서 만듭니다) */
   const resultLines: string[] = (() => {
@@ -646,13 +649,15 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         {stale && <div className="qt-banner warn qt3-stale-banner" role="status"><AlertTriangle size={16} /><span>입력이 바뀌었어요. 아래 결과는 바뀐 입력으로 다시 계산 중이니, <b>입력·예측 조건 확인</b>을 눌러 지원 여부를 다시 확인해 주세요.</span><button className="btn btn-ghost" onClick={checkConditions}>다시 확인</button></div>}
         <div className="qt2-when">
           <span className="qt2-when-q">언제의 상태를 볼까요?</span>
-          <div className="qt2-chips" role="group" aria-label="볼 날짜">
-            {([['오늘', asOfDay], ['30일 후', asOfDay + 30], ['60일 후', asOfDay + 60]] as const).map(([t, d]) => { const ok = startOk && d >= 0 && d <= maxDays;
-              return <button key={t} className={selDay === d ? 'active' : ''} aria-pressed={selDay === d} disabled={!ok} onClick={() => setSelectedDay(d)}>{t}</button>; })}
-            <label className="qt2-datepick" htmlFor="qt-selected-date"><CalendarDays size={18} /><span>날짜 선택</span>
-              <input id="qt-selected-date" type="date" value={selDate} disabled={!startOk} min={startDate} max={startOk ? addDays(startDate, maxDays) : undefined}
-                onChange={e => { if (!e.target.value) setSelectedDay(Number.NaN); else if (startOk && isDate(e.target.value)) setSelectedDay(daysBetween(startDate,e.target.value)); }} /></label>
+          <div className="qt2-chips"><button type="button" className={selDay === asOfDay ? 'active' : ''} aria-pressed={selDay === asOfDay} disabled={!startOk || asOfDay < 0 || asOfDay > maxDays} onClick={() => setSelectedDay(asOfDay)}>오늘</button></div>
+          <div className="qt-range-control" style={{flex: '1 1 300px', minWidth: 0}}>
+            <label htmlFor="qt-selected-day">저장 기간 <strong>{selectedDayLabel}</strong></label>
+            <input id="qt-selected-day" className="qt-slider" type="range" min={0} max={maxDays} value={Number.isFinite(selDay) ? Math.max(0, Math.min(maxDays, selDay)) : 0} disabled={!startOk} aria-valuetext={Number.isFinite(selDay) && isDate(selDate) ? `저장 ${selDay}일차, ${fmtDate(selDate)}` : '날짜를 선택해 주세요'} onChange={e => setSelectedDay(+e.target.value)} />
+            <div className="qt-range-ends"><span>저장 시작 · 0일</span><span>{maxDays}일</span></div>
           </div>
+          <label className="qt2-datepick" htmlFor="qt-selected-date"><CalendarDays size={18} /><span>날짜 선택</span>
+            <input id="qt-selected-date" type="date" value={selDate} disabled={!startOk} min={startDate} max={startOk ? addDays(startDate, maxDays) : undefined}
+              onChange={e => { if (!e.target.value) setSelectedDay(Number.NaN); else if (startOk && isDate(e.target.value)) setSelectedDay(daysBetween(startDate,e.target.value)); }} /></label>
         </div>
         {hongro && <><p className="qt-help">홍로 · {form.storage} · {form.temperature || '미입력'}℃ · 1-MCP {form.mcp} · 저장 {selectedDayLabel} · 초기품질 출처: {sourceLabel}{exampleMode ? ' · 예시 데이터' : ''}</p><div className="qt-latest-values">{(['weight', 'diameter'] as const).map(m => <div key={m}><dt>{m === 'weight' ? '중량' : '횡경'} · 초기값만 제공</dt><dd>{hongroResult?.initial[m] === undefined ? '미입력' : `${fmtNum(hongroResult.initial[m]!, 1)} ${HONGRO_UNITS[m]}`}</dd></div>)}</div><p className="qt-help">중량·횡경의 저장 중 변화와 홍로 자체 감모율은 자료 부족입니다. 당도는 S(t)=S0로, 저장 중 변화를 반영하지 않습니다.</p></>}
         <div className="qt4-top">
@@ -663,7 +668,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
               <p className="qt2-result-label">{metricMeta[metric].label} {modelResults[metric].kind === '실측' ? '실측값' : modelResults[metric].kind === '참고 추정' ? '참고 추정값' : '계산값'}<span>{plainMeaning[metric]}</span></p>
               {selectedValue.status === 'ok' ? <>
                 <p className="qt2-result-value">{fmtNum(selectedValue.value, metricMeta[metric].digits)}<span>{displayUnit(metric)}</span></p>
-                <p className="qt2-result-change">{initialComparison}</p>
+                <p className="qt2-result-change" style={hasDisplayedChange ? {background: '#edf6ef', color: '#205e3b', borderLeft: '3px solid #3f8a5e', borderRadius: 8, padding: '10px 12px', fontWeight: 600} : undefined}>{initialComparison}</p>
                 <details className="qt2-fold">
                   <summary>이 수치 자세히 보기<Plus size={16} /></summary>
                   <p className="qt-help">{metric === 'firmness' ? '경도는 측정기로 과육을 누를 때 필요한 힘이에요. 처음 입력값과 계산값의 차이로, 식감을 직접 판정하지 않아요.'
@@ -708,9 +713,6 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
             : <div className="qt-empty">저장 시작일(또는 입고일)을 입력하면 그래프가 나타납니다. <button className="linkbtn" onClick={() => focus('tf-intake_date')}>입고일 입력하기</button></div>}
           {startOk && !series[metric].ok && <div className="qt-chart-note"><AlertTriangle size={14} />{(series[metric] as {reason: string}).reason}{!anchors[metric] && metric !== 'loss' && <button className="linkbtn" onClick={() => focus('tf-' + metric)}>입력하기</button>}</div>}
           {metric === 'loss' && !exampleMode ? <p className="qt-help">점: 동일 표본 실측 감모율 · 선: 품종·온도별 감모율 식으로 계산한 예측. 실측 중량 사이를 보간한 선이 아닙니다.</p> : <ChartLegend exampleMode={exampleMode} hasMeasured={true} initialSource={hongro ? sourceLabel : undefined} hasBaseline={hongro ? !!hongroResult && showConditions : !!baseline && compatible && !sameAsBaseline} baselineLabel={hongro ? num(form.temperature)===0?'4℃ 저온저장':'0℃ 저온저장' : baseline ? `${baseline.label} (회색 점선)` : ''} />}
-          <div className="qt-date-control">
-            <div className="qt-range-control"><label htmlFor="qt-selected-day">저장 경과일 <strong>{selectedDayLabel}</strong></label><input id="qt-selected-day" className="qt-slider" type="range" min={0} max={maxDays} value={Number.isFinite(selDay) ? Math.max(0,Math.min(maxDays,selDay)) : 0} disabled={!startOk} onChange={e => setSelectedDay(+e.target.value)} /><div className="qt-range-ends"><span>0일 · 저장 시작</span><span>{maxDays}일</span></div></div>
-          </div>
           {hongro && <><label className="qt-field">저장일수 직접 입력<input aria-label="홍로 저장일수" type="number" min={0} max={120} step={1} value={Number.isFinite(selDay) ? selDay : ''} onChange={e => setSelectedDay(e.target.value === '' ? Number.NaN : Number(e.target.value))} /></label>{!modelResults[metric].ok && <p className="auth-error" role="alert">{modelResults[metric].reason}</p>}<p className="qt-help">저장 시작일을 0일로 유지합니다. 분석 기준일·최근 측정일로 계산을 다시 시작하지 않습니다.</p></>}
           <p className="qt-help">분석 기준일 {fmtDate(asOf)}{startOk ? ` · 저장 ${asOfDay}일차` : ''} / 그래프 표시 범위 0~{maxDays}일은 검증된 적용 기간이 아닙니다.</p>
           {startOk && t0 > 0 && <p className="qt-help">초기 측정은 저장 {t0}일차입니다. 계산도 그날부터 시작하며 이전 날짜를 채우지 않습니다.</p>}
