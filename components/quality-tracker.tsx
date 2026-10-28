@@ -666,7 +666,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
                 <p className="qt2-result-change">{initialComparison}</p>
                 <details className="qt2-fold">
                   <summary>이 수치 자세히 보기<Plus size={16} /></summary>
-                  <p className="qt-help">{metric === 'firmness' ? '경도는 측정기로 과육을 누를 때 필요한 힘이에요. 비교한 값은 같은 조건으로 측정한 입력값과 계산값이며, 식감을 직접 판정하지 않아요.'
+                  <p className="qt-help">{metric === 'firmness' ? '경도는 측정기로 과육을 누를 때 필요한 힘이에요. 처음 입력값과 계산값의 차이로, 식감을 직접 판정하지 않아요.'
                     : metric === 'brix' ? '당도는 당을 포함한 가용성 고형분의 지표예요. 처음 값 대비 변화가 실제 단맛의 변화와 같다는 뜻은 아니에요.'
                     : metric === 'acidity' ? '산도는 산 성분의 지표예요. %p는 산도 수치의 차이이고, 괄호 안 %는 처음 값에 대한 상대 변화예요.'
                     : '실측 감모율은 같은 표본의 첫 중량 측정을 기준으로 하며, 모델 감모율은 저장 시작일을 기준으로 해요.'}</p>
