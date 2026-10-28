@@ -318,6 +318,22 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const firstInput = mode === 'real' && !activeLot;
   const whenLabel = !Number.isFinite(selDay) ? '선택한 날' : selDay === asOfDay ? '오늘' : selDay > asOfDay ? `${selDay - asOfDay}일 후` : `${asOfDay - selDay}일 전`;
   const firstValue = initialValue(metric);
+  const initialComparison = (() => {
+    if (selectedValue.status !== 'ok') return '';
+    const value = selectedValue.value, isMeasured = modelResults[metric].kind === '실측';
+    if (metric === 'loss') {
+      const basis = isMeasured ? '첫 중량 측정 대비' : '저장 시작일 기준 계산상';
+      if (value === 0) return `${basis} 무게 변화가 없어요.`;
+      return `${basis} 무게가 ${fmtNum(Math.abs(value), metricMeta.loss.digits)}% ${value > 0 ? '줄었어요' : '늘었어요'}.`;
+    }
+    if (firstValue === null || !Number.isFinite(firstValue) || initialMeasuredAfterAsOf || selDay < t0) return '처음 값이 없어 변화를 비교할 수 없어요.';
+    const change = describeChange(metric, value, firstValue);
+    const initialLabel = weatherMode ? '처음 추정값' : '처음 입력값';
+    if (change.diff === 0) return `${initialLabel} ${fmtNum(firstValue, metricMeta[metric].digits)} ${displayUnit(metric)}과 같아요.`;
+    const relative = firstValue !== 0 ? Math.abs(change.diff / firstValue * 100) : null;
+    const relativeText = relative === null ? '' : relative < 0.1 ? ' (약 0.1% 미만)' : ` (약 ${fmtNum(relative, 1)}%)`;
+    return `${initialLabel} ${fmtNum(firstValue, metricMeta[metric].digits)} ${displayUnit(metric)}보다 ${change.text}${relativeText}`;
+  })();
   const latestBrix = hongro ? null : measured.brix.at(-1) ?? null;
   /** 결과값 아래에 나누어 보여 줄 해석 줄 (실제 선택 상태와 계산 결과에서 만듭니다) */
   const resultLines: string[] = (() => {
@@ -331,7 +347,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
       else out.push('비교 기준의 값이 없어 차이를 계산하지 않았어요.');
     } else {
       const an = anchors[metric];
-      if (an) { const c = describeChange(metric, v.value, an.value); const from = an.source === 'latest' ? `계산 시작점(${fmtDate(an.date)} 측정값)` : '초기값'; out.push(c.diff === 0 ? `${from}과 같습니다.` : `${from}보다 ${c.text}.`); }
+      if (an?.source === 'latest') { const c = describeChange(metric, v.value, an.value); const from = `계산 시작점(${fmtDate(an.date)} 측정값)`; out.push(c.diff === 0 ? `${from}과 같습니다.` : `${from}보다 ${c.text}.`); }
     }
     const today = measured[metric].find(p => p.day === selDay);
     if (today) out.push(`같은 날 ${exampleMode ? '예시 측정' : '실제 측정'}값은 ${fmtNum(today.value, meta.digits)} ${unit}이에요.`);
@@ -647,17 +663,14 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
               <p className="qt2-result-label">{metricMeta[metric].label} {modelResults[metric].kind === '실측' ? '실측값' : modelResults[metric].kind === '참고 추정' ? '참고 추정값' : '계산값'}<span>{plainMeaning[metric]}</span></p>
               {selectedValue.status === 'ok' ? <>
                 <p className="qt2-result-value">{fmtNum(selectedValue.value, metricMeta[metric].digits)}<span>{displayUnit(metric)}</span></p>
-                <p className="qt2-result-change">{metric === 'firmness' ? `예: 1L 생수 약 ${fmtNum(selectedValue.value / 9.80665, 1)}병의 물 무게로 누르는 힘과 비슷해요.`
-                  : metric === 'brix' ? `예: 설탕물 100g 속 설탕은 5g짜리 약 ${fmtNum(selectedValue.value / 5, 1)}봉지 분량이에요.`
-                  : metric === 'acidity' ? anchors.acidity && anchors.acidity.value > 0 ? `예: ${anchors.acidity.source === 'latest' ? '최근 측정' : '처음'}의 산도를 100으로 보면 지금은 약 ${Math.round(selectedValue.value / anchors.acidity.value * 100)}이에요.` : '예: 같은 방식으로 잰 사과의 처음 산도와 비교해 보세요.'
-                  : Math.abs(selectedValue.value) <= 100 ? (selectedValue.value === 0 ? '예: 사과 10kg의 무게가 그대로인 셈이에요.' : `예: 사과 10kg의 무게가 약 ${fmtNum(Math.abs(selectedValue.value) * 100, 0)}g ${selectedValue.value > 0 ? '줄어든' : '늘어난'} 셈이에요.`) : '처음 무게와 비교한 변화 비율이에요.'}</p>
+                <p className="qt2-result-change">{initialComparison}</p>
                 <details className="qt2-fold">
                   <summary>이 수치 자세히 보기<Plus size={16} /></summary>
-                  <p className="qt-help">{metric === 'firmness' ? '경도는 측정기 끝으로 과육을 누를 때 필요한 힘이에요. 생수 예시는 힘의 크기를 떠올리기 위한 것으로, 사과를 씹는 힘이나 식감과 같다는 뜻은 아니에요.'
-                    : metric === 'brix' ? '당도는 당을 포함한 가용성 고형분의 지표예요. 설탕물 예시는 같은 농도를 나타낸 것으로, 사과의 실제 설탕 양이나 맛과 같다는 뜻은 아니에요.'
-                    : metric === 'acidity' ? '산도는 사과에 들어 있는 산 성분의 지표예요. 같은 방법으로 잰 기준값과 비교한 수치이며, 신맛이 같은 비율로 변한다는 뜻은 아니에요.'
-                    : '감모율은 처음 무게에 비해 줄어든 무게의 비율이에요. 10kg 사과 상자는 이해를 위한 예시이며, 실제 중량이 아니에요. 실측과 모델 계산을 구분해 확인해 주세요.'}</p>
-                  <p className="qt-help">품종과 측정 조건에 따라 해석이 달라지며, 이 값만으로 맛이나 출하·안전 여부를 판단할 수 없어요.</p>
+                  <p className="qt-help">{metric === 'firmness' ? '경도는 측정기로 과육을 누를 때 필요한 힘이에요. 비교한 값은 같은 조건으로 측정한 입력값과 계산값이며, 식감을 직접 판정하지 않아요.'
+                    : metric === 'brix' ? '당도는 당을 포함한 가용성 고형분의 지표예요. 처음 값 대비 변화가 실제 단맛의 변화와 같다는 뜻은 아니에요.'
+                    : metric === 'acidity' ? '산도는 산 성분의 지표예요. %p는 산도 수치의 차이이고, 괄호 안 %는 처음 값에 대한 상대 변화예요.'
+                    : '실측 감모율은 같은 표본의 첫 중량 측정을 기준으로 하며, 모델 감모율은 저장 시작일을 기준으로 해요.'}</p>
+                  <p className="qt-help">계산값은 모델에 따른 결과예요. 비슷한 사과의 평균과 비교한 값이나 출하·안전 판정은 아니에요.</p>
                 </details>
                 {resultLines.map(t => <p key={t} className="qt2-result-change">{t}</p>)}
               </> : <div className="qt2-result-na"><b>이 날짜의 값을 표시할 수 없어요</b><p>{selectedValue.reason}</p><button className="linkbtn" onClick={() => focus(hongro ? `tf-hongro-initial-${metric}` : 'tf-' + (metric === 'loss' ? 'tracked_sample_id' : metric))}>필요한 입력 확인하기</button></div>}
