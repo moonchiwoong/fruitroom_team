@@ -7,11 +7,10 @@ import {useTeamSession} from '@/components/team-auth';
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog';
 import {requestJson} from '@/components/lot-forms';
 import type {TrackerRequest} from '@/components/quality-tracker';
+import type {ModelInfoContext} from '@/components/model-info';
 import {clearDraft, HANDOFF_KEY, loadDraft, saveDraft, type TrackerHandoff} from '@/lib/tracker-form';
 import AIAssistant, {type AssistantContext} from '@/components/ai-assistant';
 import type {Lot} from '@/lib/lot-types';
-import type {StorageId} from '@/lib/initial-quality';
-import type {MetricId} from '@/lib/tracker';
 import {fmtNum, daysBetween, todayKST} from '@/lib/tracker';
 
 const QualityTracker = dynamic(() => import('@/components/quality-tracker'), {ssr: false, loading: () => <div className="loading-strip">화면을 준비하고 있어요…</div>});
@@ -33,8 +32,9 @@ const legacy: Record<string, Page> = {predict: 'model', overview: 'lots', enviro
 export default function Home() {
   const session = useTeamSession();
   const [aiContext, setAIContext] = useState<AssistantContext | null>(null);
-  const [modelContext, setModelContext] = useState<{modelId: StorageId | null; metric: MetricId} | undefined>();
+  const [modelContext, setModelContext] = useState<ModelInfoContext | undefined>();
   const [tab, setTabState] = useState<Page>('home'), [menu, setMenu] = useState(false);
+  const [trackerVisited, setTrackerVisited] = useState(false);
   const [lots, setLots] = useState<Lot[]>([]), [lotsError, setLotsError] = useState(''), [lotsLoaded, setLotsLoaded] = useState(false);
   const [trackReq, setTrackReq] = useState<TrackerRequest | null>(null), [lotFocus, setLotFocus] = useState<string | null>(null);
   const reload = useCallback(async () => {
@@ -43,11 +43,15 @@ export default function Home() {
     finally { setLotsLoaded(true); }
   }, []);
   useEffect(() => { void reload(); }, [reload]);
-  const setTab = useCallback((p: Page) => { setTabState(p); setMenu(false); history.replaceState(null, '', '/#' + p); window.scrollTo({top: 0, behavior: 'smooth'}); }, []);
+  const setTab = useCallback((p: Page, keepResultContext = false) => {
+    if (p === 'model' && !keepResultContext) setModelContext(undefined);
+    if (p === 'track') setTrackerVisited(true);
+    setTabState(p); setMenu(false); history.replaceState(null, '', '/#' + p); window.scrollTo({top: 0, behavior: 'smooth'});
+  }, []);
   const openTracker = useCallback((mode: 'real' | 'example', lotId?: string) => { setTrackReq(r => ({mode, lotId, n: (r?.n ?? 0) + 1})); setTab('track'); }, [setTab]);
   useEffect(() => {
     const h = window.location.hash.slice(1); const p = (legacy[h] ?? h) as Page;
-    if (pages.some(x => x.id === p)) setTabState(p);
+    if (pages.some(x => x.id === p)) { if (p === 'track') setTrackerVisited(true); setTabState(p); }
   }, [openTracker]);
   // 소개·체험 화면에서 ‘실측값 입력’·‘예시로 체험’을 누르고 로그인한 경우
   const sessionUser = session?.userId;
@@ -68,7 +72,6 @@ export default function Home() {
       }
     } catch { /* 무시 */ }
   }, [sessionUser]); // eslint-disable-line react-hooks/exhaustive-deps
-  const current = pages.find(p => p.id === tab)!;
 
   return <div className="site">
     <SiteHeader tab={tab} setTab={setTab} menu={menu} setMenu={setMenu} />
@@ -77,11 +80,11 @@ export default function Home() {
       {tab === 'track' && <PageHead title="사과 품질을 확인해 보세요" desc="보관 조건을 기록하고, 초기 품질 입력 방식을 골라 주세요." />}
       {tab === 'lots' && <PageHead title={<>저장한 사과,<br />기록을 이어가세요.</>} desc={<>사과별 측정 기록을<br />한곳에서 확인하세요.</>} action={<button className="btn btn-primary btn-lg" onClick={() => openTracker('real', 'new')}>+ 새 사과 등록</button>} />}
       {tab === 'account' && <PageHead title="내 정보" desc="이름·소속·주 산지를 관리합니다." />}
-      {tab === 'model' && <PageHead title={current.title} desc={current.desc} />}
+      {tab === 'model' && <PageHead title="계산 근거" />}
       <div className="page-body">
-        {tab === 'track' && <QualityTracker lots={lots} onLotsChanged={reload} request={trackReq} onAskAI={setAIContext} openModelInfo={context => {setModelContext(context); setTab('model');}} openLot={id => { setLotFocus(id); setTab('lots'); }} />}
+        {trackerVisited && <div hidden={tab !== 'track'}><QualityTracker lots={lots} onLotsChanged={reload} request={trackReq} onAskAI={setAIContext} openModelInfo={context => {setModelContext(context); setTab('model', true);}} openLot={id => { setLotFocus(id); setTab('lots'); }} /></div>}
         {tab === 'lots' && (lotsLoaded ? <LotsPage lots={lots} loadError={lotsError} reload={reload} openTracker={openTracker} focusId={lotFocus} onAskAI={id => setAIContext({mode:'real',scope:'lot',lotId:id})} /> : <div className="loading-strip">물량을 불러오는 중…</div>)}
-        {tab === 'model' && <ModelInfo {...modelContext} />}
+        {tab === 'model' && <ModelInfo context={modelContext} />}
         {tab === 'account' && <Account onOpenPredict={() => { setTab('model'); }} />}
       </div>
     </main>
