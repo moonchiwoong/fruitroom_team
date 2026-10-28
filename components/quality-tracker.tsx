@@ -14,6 +14,7 @@ import {
 } from '@/lib/tracker';
 import {HANDOFF_KEY, firmnessToN, suggestName, type TrackerHandoff, clearDraft, emptyForm, exampleForm, formFromLot, loadDraft, loadPref, payloadFromForm, saveDraft, savePref, signature, validateForm, type Draft, type TrackerForm} from '@/lib/tracker-form';
 import type {StorageId} from '@/lib/initial-quality';
+import type {ModelInfoContext} from '@/components/model-info';
 import {measurementCompatibility, observationFingerprint} from '@/lib/ai/context';
 import {isHongroVariety} from '@/lib/cultivar';
 import {calculateHongroForm, emptyHongroForm, exampleHongroForm} from '@/lib/hongro-tracker';
@@ -36,7 +37,7 @@ export type TrackerRequest = {mode: Mode; lotId?: string; cultivar?: 'fuji' | 'h
 
 export type TrackerAIContext = {mode: Mode; scope: 'prediction'; lotId: string | null; metric: MetricId; selectedDate: string; asOf: string; form: TrackerForm; future: StorageId | 'same'; useLatest: boolean; modelVersion: string; baseline: {label: string; conditionLabel: string; createdAt: string; asOf: string; modelVersion: string; future: StorageId | null; form: TrackerForm; useLatest: boolean; observationsFingerprint: string} | null};
 export default function QualityTracker({lots, onLotsChanged, request, openModelInfo, openLot, guest = false, onRequireLogin, onModeChange}: {
-  lots: Lot[]; onLotsChanged: () => Promise<Lot[]> | void; request?: TrackerRequest | null; openModelInfo: (context?: {modelId: StorageId | null; metric: MetricId}) => void; openLot: (id: string) => void; onAskAI?: (context: TrackerAIContext) => void;
+  lots: Lot[]; onLotsChanged: () => Promise<Lot[]> | void; request?: TrackerRequest | null; openModelInfo: (context?: ModelInfoContext) => void; openLot: (id: string) => void; onAskAI?: (context: TrackerAIContext) => void;
   /** 비회원 체험: 서버 기록을 읽거나 쓰지 않고, 저장할 때 로그인으로 안내합니다. */
   guest?: boolean; onRequireLogin?: () => void; onModeChange?: (mode: Mode) => void;
 }) {
@@ -172,7 +173,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     catch (error) { return {result: null, error: error instanceof Error ? error.message : '홍로의 초기품질 입력을 확인해 주세요.'}; }
   }, [hongro, form.hongro, startOk, selDay, errors.storage_start_date, errors.intake_date]);
   const hongroResult = hongroCalculation.result;
-  const sourceLabel = hongro && form.hongro.source === 'weather' ? '날씨 기반 추정' : '실측';
+  const sourceLabel = hongro && form.hongro.source === 'weather' ? (mode === 'example' ? '예시 날씨 기반 추정' : '날씨 기반 추정') : mode === 'example' ? '예시 초기값' : '실측';
   const displayUnit = (m: MetricId) => hongro && m !== 'loss' ? HONGRO_UNITS[m] : metricMeta[m].unit;
 
   // ── 조건과 모델 ──
@@ -337,6 +338,26 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const hasDisplayedChange = selectedValue.status === 'ok' && (metric === 'loss'
     ? describeChange('loss', selectedValue.value, 0).diff !== 0
     : firstValue !== null && Number.isFinite(firstValue) && !initialMeasuredAfterAsOf && selDay >= t0 && describeChange(metric, selectedValue.value, firstValue).diff !== 0);
+  const futureResult = !hongro && selDay > asOfDay && !!future.id;
+  const currentStorage = futureResult ? (future.id === 'ca' ? 'CA' : '일반 저온') : form.storage;
+  const currentMcp = futureResult ? (future.id === 'mcp' ? '처리' : '미처리') : form.mcp;
+  // 최근 측정을 계산 시작점으로 선택해도 ‘처음 대비’ 비교에는 날씨 추정 초기값이 남아 있습니다.
+  const usesWeatherInitial = weatherMode && metric !== 'loss' && firstValue !== null;
+  const weatherUnitWarning = usesWeatherInitial && metric === 'firmness';
+  const changedScenario = futureResult && future.id !== recorded.id && modelResults[metric].ok;
+  const priorResult = changedScenario ? predictQuality(modelInput(metric, asOfDay)) : undefined;
+  const recordedConditions = `${form.storage} · ${form.temperature ? `${form.temperature}℃` : '온도 미기록'} · 1-MCP ${form.mcp}`;
+  const futureConditions = `${currentStorage} · ${form.temperature ? `${form.temperature}℃` : '온도 미기록'} · 1-MCP ${currentMcp}`;
+  const weatherInitialInfo = usesWeatherInitial ? `거창 날씨 선택값: ${HONGRO_WEATHER_FIELDS.map(field => `${field.label} ${form.hongro.weather[field.key]} ${field.unit}`).join(' · ')}. 선택값으로 초기 품질을 추정하며 실제 기상 관측을 자동 조회하지 않습니다.` : undefined;
+  const basisContext: ModelInfoContext = {
+    modelId: selDay <= asOfDay ? recorded.id : future.id,
+    metric, cultivar: form.variety, storage: currentStorage, temperature: form.temperature, mcp: currentMcp,
+    initialSource: metric === 'loss' ? '저장 경과일' : anchors[metric]?.source === 'latest' ? (usesWeatherInitial ? '선택한 최근 측정값 (처음 대비 비교에는 날씨 추정값 사용)' : '선택한 최근 측정값') : usesWeatherInitial ? (exampleMode ? '예시 날씨 기반 추정' : '날씨 기반 추정') : exampleMode ? '예시 초기값' : '입력한 초기 측정값',
+    result: modelResults[metric],
+    priorResult, weatherInitialInfo, weatherUnitWarning,
+    contextNote: changedScenario ? `조건 변경 시나리오: 분석 기준일(${fmtDate(asOf)})까지 ${recordedConditions}, 이후 ${futureConditions}. 두 구간의 식을 이어 붙였으며 실제 저장 방식 전환 효과는 검증되지 않았습니다.` : undefined,
+    technicalNote: weatherUnitWarning ? HONGRO_UNITS_CONFLICT : undefined,
+  };
   const latestBrix = hongro ? null : measured.brix.at(-1) ?? null;
   /** 결과값 아래에 나누어 보여 줄 해석 줄 (실제 선택 상태와 계산 결과에서 만듭니다) */
   const resultLines: string[] = (() => {
@@ -400,7 +421,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
       const iv = initialValue(m), label = `${metricMeta[m].label} 변화 예측`;
       if (!startOk) rows.push({key: m, label, ok: false, text: '저장을 시작한 날을 입력해 주세요.'});
       else if (iv === null && !r.ok) rows.push({key: m, label, ok: false, text: weatherMode ? '날씨 추정값이 생기면 계산할 수 있어요.' : (m === 'firmness' || m === 'brix') && form.missing[m] ? '미측정으로 기록했어요. 이 항목은 예측하지 않아요.' : `처음 측정한 ${metricMeta[m].label} 값을 넣으면 계산할 수 있어요.`});
-      else rows.push({key: m, label, ok: r.ok, text: r.ok ? `예측 가능 · ${r.modelId ?? ''}` : (r.reason ?? '적용식 확인 필요').replace(/^적용 모델 없음:\s*/, '이 조건에 적용할 예측식이 확인되지 않았어요. ')});
+      else rows.push({key: m, label, ok: r.ok, text: r.ok ? '계산 가능' : (r.reason ?? '적용식 확인 필요').replace(/^적용 모델 없음:\s*/, '이 조건에 적용할 예측식이 확인되지 않았어요. ')});
     }
     rows.push({key: 'loss', label: '앞으로의 감모율 예측', ok: modelResults.loss.ok, text: lossPlan});
     rows.push({key: 'measured-loss', label: '실측 감모율', ok: measuredLossRows.length > 0, text: measuredLossRows.length ? `${measuredLossRows.length}건 계산됨 (같은 표본·같은 개수 기록)` : '같은 표본의 초기·후속 중량이 쌓이면 계산해요.'});
@@ -647,6 +668,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
       {/* 가운데: 요약 · 지표 탭 · 그래프 · 비교 */}
       <section className={'qt-main' + (stale ? ' qt3-stale' : '')} aria-label="품질 예측 결과" ref={resultsRef} tabIndex={-1} hidden={!showResults || !!loadError}>
         {stale && <div className="qt-banner warn qt3-stale-banner" role="status"><AlertTriangle size={16} /><span>입력이 바뀌었어요. 아래 결과는 바뀐 입력으로 다시 계산 중이니, <b>입력·예측 조건 확인</b>을 눌러 지원 여부를 다시 확인해 주세요.</span><button className="btn btn-ghost" onClick={checkConditions}>다시 확인</button></div>}
+        <div className="qt3-note info" role="note"><Info size={16} /><div>현재는 측정 기록과 계산 결과를 비교해 보는 체험 단계입니다. 예측 정확도와 오차 범위는 아직 검증되지 않았으며, 출하·안전 여부를 판정하지 않습니다.</div></div>
         <div className="qt2-when">
           <span className="qt2-when-q">언제의 상태를 볼까요?</span>
           <div className="qt2-chips"><button type="button" className={selDay === asOfDay ? 'active' : ''} aria-pressed={selDay === asOfDay} disabled={!startOk || asOfDay < 0 || asOfDay > maxDays} onClick={() => setSelectedDay(asOfDay)}>오늘</button></div>
@@ -659,7 +681,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
             <input id="qt-selected-date" type="date" value={selDate} disabled={!startOk} min={startDate} max={startOk ? addDays(startDate, maxDays) : undefined}
               onChange={e => { if (!e.target.value) setSelectedDay(Number.NaN); else if (startOk && isDate(e.target.value)) setSelectedDay(daysBetween(startDate,e.target.value)); }} /></label>
         </div>
-        {hongro && <><p className="qt-help">홍로 · {form.storage} · {form.temperature || '미입력'}℃ · 1-MCP {form.mcp} · 저장 {selectedDayLabel} · 초기품질 출처: {sourceLabel}{exampleMode ? ' · 예시 데이터' : ''}</p><div className="qt-latest-values">{(['weight', 'diameter'] as const).map(m => <div key={m}><dt>{m === 'weight' ? '중량' : '횡경'} · 초기값만 제공</dt><dd>{hongroResult?.initial[m] === undefined ? '미입력' : `${fmtNum(hongroResult.initial[m]!, 1)} ${HONGRO_UNITS[m]}`}</dd></div>)}</div><p className="qt-help">중량·횡경의 저장 중 변화와 홍로 자체 감모율은 자료 부족입니다. 당도는 S(t)=S0로, 저장 중 변화를 반영하지 않습니다.</p></>}
+        {hongro && <><p className="qt-help">홍로 · {form.storage} · {form.temperature || '미입력'}℃ · 1-MCP {form.mcp} · 저장 {selectedDayLabel} · 초기품질 출처: {sourceLabel}{exampleMode ? ' · 예시 데이터' : ''}</p><div className="qt-latest-values">{(['weight', 'diameter'] as const).map(m => <div key={m}><dt>{m === 'weight' ? '중량' : '횡경'} · 초기값만 제공</dt><dd>{hongroResult?.initial[m] === undefined ? '미입력' : `${fmtNum(hongroResult.initial[m]!, 1)} ${HONGRO_UNITS[m]}`}</dd></div>)}</div><p className="qt-help">중량·횡경의 저장 중 변화 자료는 없습니다. 홍로 감모율은 일반 저온 0℃·4℃, 1-MCP 미처리 조건에서 계산하며 검증은 미완료입니다. 당도는 제공된 식에 따라 처음 값을 유지합니다.</p></>}
         <div className="qt4-top">
           <div className="qt4-apple"><Boundary><QualityAppleViewer compact day={selDay} cultivar={form.variety} metrics={modelResults} /></Boundary></div>
           <aside id="qt-metric-result" role="tabpanel" aria-labelledby={'qt-tab-' + metric} className="qt2-result qt4-summary">
@@ -680,7 +702,16 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
                 {resultLines.map(t => <p key={t} className="qt2-result-change">{t}</p>)}
               </> : <div className="qt2-result-na"><b>이 날짜의 값을 표시할 수 없어요</b><p>{selectedValue.reason}</p><button className="linkbtn" onClick={() => focus(hongro ? `tf-hongro-initial-${metric}` : 'tf-' + (metric === 'loss' ? 'tracked_sample_id' : metric))}>필요한 입력 확인하기</button></div>}
             </div>
-            <p className="qt2-result-note">{exampleMode ? '예시 데이터로 계산한 시연 결과이며, 실제 측정값과 다를 수 있어요.' : modelResults[metric].kind === '실측' ? '같은 추적 표본의 실측 중량으로 계산했어요. 품질 판정이 아닙니다.' : modelResults[metric].kind === '참고 추정' ? '홍로 미검증 · 후지 기반 참고 추정 — 실제 측정값과 다를 수 있으며, 출하·안전 판정이 아닙니다.' : '모델 계산 · 검증 미확인 — 실제 측정값과 다를 수 있으며, 출하·안전 판정이 아닙니다.'}</p>
+            <div className="qt-result-basis-summary" aria-label="이 결과의 적용 조건과 검증 수준">
+              <p><b>이 결과에 사용한 조건</b> · {basisContext.cultivar} · {basisContext.storage} · {basisContext.temperature ? `${basisContext.temperature}℃` : '온도 미기록'} · 1-MCP {basisContext.mcp}</p>
+              <p>{!modelResults[metric].ok ? `계산할 수 없음 · ${modelResults[metric].reason || '입력과 조건을 확인해 주세요.'}` : modelResults[metric].kind === '실측' ? '같은 표본의 중량 기록에서 계산한 실측 감모율입니다.' : '모델 계산값 · 예측 정확도와 오차 범위는 검증되지 않았습니다.'}</p>
+              {!hongro && modelResults[metric].modelId && <p>후지 자료에 저장 온도가 없어 선택한 온도에서의 적용 타당성은 확인되지 않았습니다.</p>}
+              {(modelResults[metric].modelId === 'fuji-mcp-firmness' || priorResult?.modelId === 'fuji-mcp-firmness') && <p>후지 1-MCP 경도 자료의 수식과 설명이 서로 달라 정확성은 확인되지 않았습니다.</p>}
+              {hongro && metric === 'brix' && modelResults[metric].modelId && <p>홍로 당도 자료의 수식과 감소 설명이 서로 달라 실제 변화를 확인할 수 없습니다.</p>}
+              {weatherUnitWarning && <p>날씨로 추정한 초기 경도와 저장 모델의 경도 단위가 달라, 변환 없이 연결하거나 비교한 결과의 신뢰도는 확인되지 않았습니다.</p>}
+              {basisContext.contextNote && <p>{basisContext.contextNote}</p>}
+              <button type="button" className="linkbtn" onClick={() => openModelInfo(basisContext)}>이 결과의 계산 근거 <ArrowRight size={15} /></button>
+            </div>
             {latestPoint && latestPoint.day !== selDay && <p className="qt4-line">최근 {exampleMode ? '예시 측정' : '실측'}({shortDate(latestPoint.date)}) {fmtNum(latestPoint.value, metricMeta[metric].digits)} {displayUnit(metric)}{firstValue !== null && latestPoint.day > t0 ? ` — 처음보다 ${describeChange(metric, latestPoint.value, firstValue).text}` : ''}</p>}
             {staleDays !== null && staleDays >= 14 && <p className="qt4-line warn">마지막 측정이 {staleDays}일 전이에요. 오늘 측정값을 기록하면 최근 상태로 다시 계산할 수 있어요.</p>}
             <div className="qt4-summary-actions">
@@ -784,11 +815,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           </>}
           </section>}
         </details>
-        <details className="qt-basis qt2-fold"><summary>계산 근거 보기<Plus size={16} /></summary><div>
-          {!hongro && future.id!==recorded.id && <p className="qt-help">조건 변경 시나리오: {asOf} (저장 {asOfDay}일차)까지 {form.storage} · 1-MCP {form.mcp}, 이후 {futureLabel}. 전환 효과는 연구로 검증되지 않았습니다.</p>}
-          <ModelBasis result={modelResults[metric]} metric={metric} cultivar={form.variety} storage={!hongro && selDay>asOfDay && future.id ? (future.id==='ca'?'CA':'일반 저온') : form.storage} temperature={form.temperature} mcp={!hongro && selDay>asOfDay && future.id ? (future.id==='mcp'?'처리':'미처리') : form.mcp} />
-          {hongro && form.hongro.source==='weather' && <p className="qt-help">{HONGRO_UNITS_CONFLICT}</p>}
-          <button className="linkbtn" onClick={()=>openModelInfo({modelId:selDay<=asOfDay?recorded.id:future.id,metric})}>전체 모델 정보 보기</button>
+
         </div></details>
         </div>
       </section>
@@ -884,7 +911,7 @@ function WeatherChoices({form, setForm, errors, estimate}: {form: TrackerForm; s
     })}</div>
     <p className="qt3-help">‘보통’도 직접 선택해 주세요. 기억나지 않는 항목은 비워 두고 기록할 수 있어요.</p>
     <div className="qt3-note info"><Info size={16} /><div><span>선택한 날씨는 초기 품질을 추정하기 위한 입력이에요. 실측값과 구분해 기록하며, 자동으로 조회한 기상자료가 아닙니다. 선택값은 모델 참고 범위 기준이고 거창의 실제 평년값이 아니에요.</span></div></div>
-    {estimate ? <p className="qt3-estimate"><span className="qt3-tag">날씨 기반 추정</span>경도 {fmtNum(estimate.firmness, 1)} N · 당도 {fmtNum(estimate.brix, 1)} °Brix · 산도 {fmtNum(estimate.acidity, 2)} %</p>
+    {estimate ? <><p className="qt3-estimate"><span className="qt3-tag">날씨 기반 추정</span>경도 {fmtNum(estimate.firmness, 1)} N · 당도 {fmtNum(estimate.brix, 1)} °Brix · 산도 {fmtNum(estimate.acidity, 2)} %</p><p>경도 추정식의 원단위(N/mm)와 저장 모델 단위(N)가 같게 쓰일 수 있는지 확인되지 않았습니다. 현재 변환 없이 연결하므로 경도 결과의 신뢰도는 미확인입니다.</p></>
       : picked === HONGRO_WEATHER_FIELDS.length ? null : <p className="qt3-help">{HONGRO_WEATHER_FIELDS.length - picked}개 항목을 더 고르면 초기 품질을 추정해요.</p>}
     <details className="qt3-more" open={custom || undefined}>
       <summary>기상 값을 숫자로 입력 <small>자료가 있을 때</small></summary>
@@ -904,18 +931,6 @@ function predictionSeries(input:ModelInput,asOfDay:number,maxDays:number):Series
   const failed=values.find(r=>!r.ok);
   if(failed)return {ok:false,reason:failed.reason || '적용 모델 없음'};
   return {ok:true,startDay:from,endDay:maxDays,asOfDay,past:'cold',future:'cold',points:values.map(r=>({day:r.day,value:r.value!,segment:r.day<=asOfDay?'past':'future',result:r}))};
-}
-
-function ModelBasis({result,metric,cultivar,storage,temperature,mcp}:{result:ModelResult;metric:MetricId;cultivar:string;storage:string;temperature:string;mcp:string}) {
-  return <><h3>{cultivar} · {metricMeta[metric].label} · {result.kind}</h3><dl className="mi-dl">
-    <div><dt>저장 조건</dt><dd>{storage} · {temperature || '미기록'}℃ · 1-MCP {mcp}</dd></div>
-    <div><dt>모델 / 버전</dt><dd>{result.modelId || '적용 모델 없음'} / {result.modelVersion || '없음'}</dd></div>
-    <div><dt>수식 / 단위</dt><dd><code>{result.formula || '자료 부족'}</code> · {result.unit}</dd></div>
-    <div><dt>출처</dt><dd>{result.source.join(' · ') || '확인된 자료 없음'}</dd></div>
-    <div><dt>적용 표시 범위</dt><dd>{result.range ? `${result.range.min}~${result.range.max}일` : '없음'} · 상품성·안전 보관 기간을 보장하지 않습니다.</dd></div>
-    <div><dt>검증 상태</dt><dd>{result.validation}</dd></div>
-    {!result.ok && <div><dt>계산하지 못한 이유</dt><dd>{result.reason}</dd></div>}
-  </dl>{result.warnings.map(w=><p className="qt-help" key={w}>{w}</p>)}<p className="qt-help">t는 저장 시작일부터의 경과일입니다. 늦은 측정값은 변화량 모델 g(t)−g(t0), 비율 모델 g(t)/g(t0)로 연결하며 측정일을 새 0일로 바꾸지 않습니다. 산지는 저장 계수를 바꾸지 않습니다.</p></>;
 }
 
 function SharedHongroComparison({input,day}:{input:(m:MetricId,day:number,temperature?:number|null)=>ModelInput;day:number}) {
