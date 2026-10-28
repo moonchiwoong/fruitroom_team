@@ -1,7 +1,7 @@
 'use client';
 import {Component, Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
 import dynamic from 'next/dynamic';
-import {AlertTriangle, ArrowRight, Info, Warehouse, ArrowUpRight, CalendarDays, Check, ChevronDown, Download, FlaskConical, Loader2, MessageCircle, Pin, PinOff, Plus, RotateCcw, Save, Thermometer, Undo2} from 'lucide-react';
+import {AlertTriangle, ArrowRight, Info, Warehouse, ArrowUpRight, CalendarDays, Check, ChevronDown, Download, FlaskConical, Loader2, Pin, PinOff, Plus, RotateCcw, Save, Thermometer, Undo2} from 'lucide-react';
 import {useTeamSession} from '@/components/team-auth';
 import {ObservationForm, requestJson} from '@/components/lot-forms';
 import {ChartLegend, HardnessConvert, KindBadge, TrackerChart} from '@/components/tracker-parts';
@@ -35,7 +35,7 @@ const num = (v: string) => v.trim() === '' || !Number.isFinite(Number(v)) ? null
 export type TrackerRequest = {mode: Mode; lotId?: string; cultivar?: 'fuji' | 'hongro'; n: number};
 
 export type TrackerAIContext = {mode: Mode; scope: 'prediction'; lotId: string | null; metric: MetricId; selectedDate: string; asOf: string; form: TrackerForm; future: StorageId | 'same'; useLatest: boolean; modelVersion: string; baseline: {label: string; conditionLabel: string; createdAt: string; asOf: string; modelVersion: string; future: StorageId | null; form: TrackerForm; useLatest: boolean; observationsFingerprint: string} | null};
-export default function QualityTracker({lots, onLotsChanged, request, openModelInfo, openLot, onAskAI, guest = false, onRequireLogin, onModeChange}: {
+export default function QualityTracker({lots, onLotsChanged, request, openModelInfo, openLot, guest = false, onRequireLogin, onModeChange}: {
   lots: Lot[]; onLotsChanged: () => Promise<Lot[]> | void; request?: TrackerRequest | null; openModelInfo: (context?: {modelId: StorageId | null; metric: MetricId}) => void; openLot: (id: string) => void; onAskAI?: (context: TrackerAIContext) => void;
   /** 비회원 체험: 서버 기록을 읽거나 쓰지 않고, 저장할 때 로그인으로 안내합니다. */
   guest?: boolean; onRequireLogin?: () => void; onModeChange?: (mode: Mode) => void;
@@ -318,6 +318,22 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const firstInput = mode === 'real' && !activeLot;
   const whenLabel = !Number.isFinite(selDay) ? '선택한 날' : selDay === asOfDay ? '오늘' : selDay > asOfDay ? `${selDay - asOfDay}일 후` : `${asOfDay - selDay}일 전`;
   const firstValue = initialValue(metric);
+  const initialComparison = (() => {
+    if (selectedValue.status !== 'ok') return '';
+    const value = selectedValue.value, isMeasured = modelResults[metric].kind === '실측';
+    if (metric === 'loss') {
+      const basis = isMeasured ? '첫 중량 측정 대비' : '저장 시작일 기준 계산상';
+      if (value === 0) return `${basis} 무게 변화가 없어요.`;
+      return `${basis} 무게가 ${fmtNum(Math.abs(value), metricMeta.loss.digits)}% ${value > 0 ? '줄었어요' : '늘었어요'}.`;
+    }
+    if (firstValue === null || !Number.isFinite(firstValue) || initialMeasuredAfterAsOf || selDay < t0) return '처음 값이 없어 변화를 비교할 수 없어요.';
+    const change = describeChange(metric, value, firstValue);
+    const initialLabel = weatherMode ? '처음 추정값' : '처음 입력값';
+    if (change.diff === 0) return `${initialLabel} ${fmtNum(firstValue, metricMeta[metric].digits)} ${displayUnit(metric)}과 같아요.`;
+    const relative = firstValue !== 0 ? Math.abs(change.diff / firstValue * 100) : null;
+    const relativeText = relative === null ? '' : relative < 0.1 ? ' (약 0.1% 미만)' : ` (약 ${fmtNum(relative, 1)}%)`;
+    return `${initialLabel} ${fmtNum(firstValue, metricMeta[metric].digits)} ${displayUnit(metric)}보다 ${change.text}${relativeText}`;
+  })();
   const latestBrix = hongro ? null : measured.brix.at(-1) ?? null;
   /** 결과값 아래에 나누어 보여 줄 해석 줄 (실제 선택 상태와 계산 결과에서 만듭니다) */
   const resultLines: string[] = (() => {
@@ -331,7 +347,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
       else out.push('비교 기준의 값이 없어 차이를 계산하지 않았어요.');
     } else {
       const an = anchors[metric];
-      if (an) { const c = describeChange(metric, v.value, an.value); const from = an.source === 'latest' ? `계산 시작점(${fmtDate(an.date)} 측정값)` : '초기값'; out.push(c.diff === 0 ? `${from}과 같습니다.` : `${from}보다 ${c.text}.`); }
+      if (an?.source === 'latest') { const c = describeChange(metric, v.value, an.value); const from = `계산 시작점(${fmtDate(an.date)} 측정값)`; out.push(c.diff === 0 ? `${from}과 같습니다.` : `${from}보다 ${c.text}.`); }
     }
     const today = measured[metric].find(p => p.day === selDay);
     if (today) out.push(`같은 날 ${exampleMode ? '예시 측정' : '실제 측정'}값은 ${fmtNum(today.value, meta.digits)} ${unit}이에요.`);
@@ -413,10 +429,6 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     }
     setInputNotice(''); setShowResults(true); setEditing(false);
     requestAnimationFrame(() => resultsRef.current?.scrollIntoView({behavior: 'smooth', block: 'start'}));
-  }
-  function askResult() {
-    onAskAI?.({mode, scope: 'prediction', lotId: exampleMode ? null : loaded.lot?.id ?? null, metric, selectedDate: selDate, asOf, form, future: futureId, useLatest, modelVersion: MODEL_VERSION,
-      baseline: baseline && compatible ? {label: baseline.label, conditionLabel: baseline.conditionLabel, createdAt: baseline.createdAt, asOf: baseline.asOf, modelVersion: baseline.modelVersion, future: baseline.future, form: baseline.form, useLatest: baseline.useLatest, observationsFingerprint: baseline.observationsFingerprint} : null});
   }
 
   if (!formReady) return <section className="qt-context-loading" role="status" aria-live="polite"><Loader2 className="spin" size={22} /><h2>사과 기록을 불러오는 중이에요</h2><p>저장된 입력값과 측정 기록을 가져오고 있어요.</p></section>;
@@ -651,6 +663,15 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
               <p className="qt2-result-label">{metricMeta[metric].label} {modelResults[metric].kind === '실측' ? '실측값' : modelResults[metric].kind === '참고 추정' ? '참고 추정값' : '계산값'}<span>{plainMeaning[metric]}</span></p>
               {selectedValue.status === 'ok' ? <>
                 <p className="qt2-result-value">{fmtNum(selectedValue.value, metricMeta[metric].digits)}<span>{displayUnit(metric)}</span></p>
+                <p className="qt2-result-change">{initialComparison}</p>
+                <details className="qt2-fold">
+                  <summary>이 수치 자세히 보기<Plus size={16} /></summary>
+                  <p className="qt-help">{metric === 'firmness' ? '경도는 측정기로 과육을 누를 때 필요한 힘이에요. 처음 입력값과 계산값의 차이로, 식감을 직접 판정하지 않아요.'
+                    : metric === 'brix' ? '당도는 당을 포함한 가용성 고형분의 지표예요. 처음 값 대비 변화가 실제 단맛의 변화와 같다는 뜻은 아니에요.'
+                    : metric === 'acidity' ? '산도는 산 성분의 지표예요. %p는 산도 수치의 차이이고, 괄호 안 %는 처음 값에 대한 상대 변화예요.'
+                    : '실측 감모율은 같은 표본의 첫 중량 측정을 기준으로 하며, 모델 감모율은 저장 시작일을 기준으로 해요.'}</p>
+                  <p className="qt-help">계산값은 모델에 따른 결과예요. 비슷한 사과의 평균과 비교한 값이나 출하·안전 판정은 아니에요.</p>
+                </details>
                 {resultLines.map(t => <p key={t} className="qt2-result-change">{t}</p>)}
               </> : <div className="qt2-result-na"><b>이 날짜의 값을 표시할 수 없어요</b><p>{selectedValue.reason}</p><button className="linkbtn" onClick={() => focus(hongro ? `tf-hongro-initial-${metric}` : 'tf-' + (metric === 'loss' ? 'tracked_sample_id' : metric))}>필요한 입력 확인하기</button></div>}
             </div>
@@ -722,7 +743,6 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
 
         <div className="qt-actions qt-result-actions qt2-actions">
           {guest && !exampleMode && <button className="btn btn-primary" onClick={handoffToLogin}><Save size={16} />로그인하고 저장하기</button>}
-          {onAskAI && !hongro && <button className="btn btn-outline" data-ai-return onClick={askResult} disabled={!startOk || !!loadError}><MessageCircle size={16} />이 결과 물어보기</button>}
           <button className="btn btn-ghost" onClick={() => exportUnifiedCsv({mode,lotName,form,startDate,selDate,selDay,asOf,asOfDay,futureLabel,futureId,series,modelResults,measured,anchors,baseline:compatible?baseline:null})} disabled={!startOk}><Download size={15} />결과 내보내기</button>
         </div>
 
