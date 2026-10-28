@@ -1,7 +1,7 @@
 'use client';
 import {Component, Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
 import dynamic from 'next/dynamic';
-import {AlertTriangle, ArrowRight, Info, Warehouse, ArrowUpRight, CalendarDays, Check, ChevronDown, Download, FlaskConical, Loader2, MessageCircle, Pin, PinOff, Plus, RotateCcw, Save, Thermometer, Undo2} from 'lucide-react';
+import {AlertTriangle, ArrowRight, Info, Warehouse, ArrowUpRight, CalendarDays, Check, ChevronDown, Download, FlaskConical, Loader2, Pin, PinOff, Plus, RotateCcw, Save, Thermometer, Undo2} from 'lucide-react';
 import {useTeamSession} from '@/components/team-auth';
 import {ObservationForm, requestJson} from '@/components/lot-forms';
 import {ChartLegend, HardnessConvert, KindBadge, TrackerChart} from '@/components/tracker-parts';
@@ -35,7 +35,7 @@ const num = (v: string) => v.trim() === '' || !Number.isFinite(Number(v)) ? null
 export type TrackerRequest = {mode: Mode; lotId?: string; cultivar?: 'fuji' | 'hongro'; n: number};
 
 export type TrackerAIContext = {mode: Mode; scope: 'prediction'; lotId: string | null; metric: MetricId; selectedDate: string; asOf: string; form: TrackerForm; future: StorageId | 'same'; useLatest: boolean; modelVersion: string; baseline: {label: string; conditionLabel: string; createdAt: string; asOf: string; modelVersion: string; future: StorageId | null; form: TrackerForm; useLatest: boolean; observationsFingerprint: string} | null};
-export default function QualityTracker({lots, onLotsChanged, request, openModelInfo, openLot, onAskAI, guest = false, onRequireLogin, onModeChange}: {
+export default function QualityTracker({lots, onLotsChanged, request, openModelInfo, openLot, guest = false, onRequireLogin, onModeChange}: {
   lots: Lot[]; onLotsChanged: () => Promise<Lot[]> | void; request?: TrackerRequest | null; openModelInfo: (context?: {modelId: StorageId | null; metric: MetricId}) => void; openLot: (id: string) => void; onAskAI?: (context: TrackerAIContext) => void;
   /** 비회원 체험: 서버 기록을 읽거나 쓰지 않고, 저장할 때 로그인으로 안내합니다. */
   guest?: boolean; onRequireLogin?: () => void; onModeChange?: (mode: Mode) => void;
@@ -414,10 +414,6 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     setInputNotice(''); setShowResults(true); setEditing(false);
     requestAnimationFrame(() => resultsRef.current?.scrollIntoView({behavior: 'smooth', block: 'start'}));
   }
-  function askResult() {
-    onAskAI?.({mode, scope: 'prediction', lotId: exampleMode ? null : loaded.lot?.id ?? null, metric, selectedDate: selDate, asOf, form, future: futureId, useLatest, modelVersion: MODEL_VERSION,
-      baseline: baseline && compatible ? {label: baseline.label, conditionLabel: baseline.conditionLabel, createdAt: baseline.createdAt, asOf: baseline.asOf, modelVersion: baseline.modelVersion, future: baseline.future, form: baseline.form, useLatest: baseline.useLatest, observationsFingerprint: baseline.observationsFingerprint} : null});
-  }
 
   if (!formReady) return <section className="qt-context-loading" role="status" aria-live="polite"><Loader2 className="spin" size={22} /><h2>사과 기록을 불러오는 중이에요</h2><p>저장된 입력값과 측정 기록을 가져오고 있어요.</p></section>;
 
@@ -651,6 +647,18 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
               <p className="qt2-result-label">{metricMeta[metric].label} {modelResults[metric].kind === '실측' ? '실측값' : modelResults[metric].kind === '참고 추정' ? '참고 추정값' : '계산값'}<span>{plainMeaning[metric]}</span></p>
               {selectedValue.status === 'ok' ? <>
                 <p className="qt2-result-value">{fmtNum(selectedValue.value, metricMeta[metric].digits)}<span>{displayUnit(metric)}</span></p>
+                <p className="qt2-result-change">{metric === 'firmness' ? `예: 약 ${fmtNum(selectedValue.value / 9.80665, 1)} kg의 무게에 해당하는 힘이에요.`
+                  : metric === 'brix' ? `예: 설탕물로 환산하면 100 g당 약 ${fmtNum(selectedValue.value, 1)} g이에요.`
+                  : metric === 'acidity' ? '산 성분을 나타내는 값이에요. 처음 값과 비교해 보세요.'
+                  : `예: 처음 100 kg에서 약 ${fmtNum(selectedValue.value, 2)} kg 줄어든 비율이에요.`}</p>
+                <details className="qt2-fold">
+                  <summary>이 수치 자세히 보기<Plus size={16} /></summary>
+                  <p className="qt-help">{metric === 'firmness' ? '경도는 측정기로 과육을 누를 때 필요한 힘이에요. 측정 도구와 방법이 같을 때 비교하기 좋으며, 씹는 힘과 같은 값은 아니에요.'
+                    : metric === 'brix' ? '당도는 당을 포함한 가용성 고형분의 지표예요. 설탕물 예시는 단위 이해를 위한 것이며, 사과의 실제 당 함량이나 맛을 그대로 뜻하지 않아요.'
+                    : metric === 'acidity' ? '산도는 사과에 들어 있는 산 성분의 지표예요. 같은 측정 기준에서 처음 값과 비교하면 변화를 살필 수 있어요.'
+                    : '감모율은 처음 무게에 비해 줄어든 무게의 비율이에요. 같은 표본을 측정했는지, 모델로 계산했는지 함께 확인해 주세요.'}</p>
+                  <p className="qt-help">품종과 측정 조건에 따라 해석이 달라지며, 이 값만으로 맛이나 출하·안전 여부를 판단할 수 없어요.</p>
+                </details>
                 {resultLines.map(t => <p key={t} className="qt2-result-change">{t}</p>)}
               </> : <div className="qt2-result-na"><b>이 날짜의 값을 표시할 수 없어요</b><p>{selectedValue.reason}</p><button className="linkbtn" onClick={() => focus(hongro ? `tf-hongro-initial-${metric}` : 'tf-' + (metric === 'loss' ? 'tracked_sample_id' : metric))}>필요한 입력 확인하기</button></div>}
             </div>
@@ -722,7 +730,6 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
 
         <div className="qt-actions qt-result-actions qt2-actions">
           {guest && !exampleMode && <button className="btn btn-primary" onClick={handoffToLogin}><Save size={16} />로그인하고 저장하기</button>}
-          {onAskAI && !hongro && <button className="btn btn-outline" data-ai-return onClick={askResult} disabled={!startOk || !!loadError}><MessageCircle size={16} />이 결과 물어보기</button>}
           <button className="btn btn-ghost" onClick={() => exportUnifiedCsv({mode,lotName,form,startDate,selDate,selDay,asOf,asOfDay,futureLabel,futureId,series,modelResults,measured,anchors,baseline:compatible?baseline:null})} disabled={!startOk}><Download size={15} />결과 내보내기</button>
         </div>
 
