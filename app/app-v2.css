@@ -382,6 +382,10 @@ html body,button,input,select,textarea,.btn{font-family:var(--font-sans)}
 .qt3-pill-select select{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;font-size:16px}
 .qt3-pill-select:focus-within{outline:2px solid var(--ds-brand);outline-offset:2px}
 .qt3-example{font-size:15px}
+.qt3-minibtn{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:6px 12px;border:1px solid var(--app-line);border-radius:10px;background:#fff;color:var(--ds-brand);font:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap}
+.qt3-minibtn:hover{background:var(--ds-brand-soft);border-color:var(--ds-brand)}
+.qt3-minibtn:focus-visible{outline:2px solid var(--ds-brand);outline-offset:2px}
+.qt3-minibtn svg{flex:none}
 .qt3-example-note{display:flex;align-items:center;gap:8px;margin:0;padding:10px 12px;border-radius:10px;background:var(--ds-warn-bg);color:var(--ds-warn-text);font-size:15px}
 .qt3-namehead,.qt3-q-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .qt3-namehead label,.qt3-q-head>label,legend.qt3-q-head{font-size:15px;font-weight:700;color:var(--app-ink)}
@@ -477,6 +481,7 @@ legend.qt3-q-head{padding:0;margin-bottom:8px;width:100%;display:flex}
 .qt3-stale-banner{margin:16px 0 0}
 @media(max-width:760px){
   .qt3-card{padding:16px}
+.qt3-sections{padding:0}
   .qt3-sec{padding:18px 16px}
   .qt3-grid2,.qt3-cards{grid-template-columns:1fr}
   .qt3-actions{padding:16px 16px 0;flex-wrap:wrap}

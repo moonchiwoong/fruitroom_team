@@ -1,7 +1,7 @@
 'use client';
 import {Component, Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
 import dynamic from 'next/dynamic';
-import {AlertTriangle, ArrowRight, Info, ArrowUpRight, CalendarDays, Check, ChevronDown, Download, FlaskConical, Loader2, MessageCircle, Pin, PinOff, Plus, RotateCcw, Save, Thermometer, Undo2} from 'lucide-react';
+import {AlertTriangle, ArrowRight, Info, Warehouse, ArrowUpRight, CalendarDays, Check, ChevronDown, Download, FlaskConical, Loader2, MessageCircle, Pin, PinOff, Plus, RotateCcw, Save, Thermometer, Undo2} from 'lucide-react';
 import {useTeamSession} from '@/components/team-auth';
 import {ObservationForm, requestJson} from '@/components/lot-forms';
 import {ChartLegend, HardnessConvert, KindBadge, TrackerChart} from '@/components/tracker-parts';
@@ -342,6 +342,10 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   // ── 입력 화면: 물량 전환 · 저장고 조건 불러오기 · 조건 판별 · 입력·예측 조건 확인 ──
   const [storeOpen, setStoreOpen] = useState(false), [storeFrom, setStoreFrom] = useState('');
   const [checkShown, setCheckShown] = useState(false), [checkedSig, setCheckedSig] = useState<string | null>(null);
+  /** 새 물량에서는 1-MCP를 아직 고르지 않은 상태로 보여 줍니다(값은 ‘미확인’으로 유지해 처리 안 함으로 계산하지 않음). */
+  const [mcpTouched, setMcpTouched] = useState(false);
+  useEffect(() => { setMcpTouched(false); }, [lotKey, mode]);
+  const mcpChosen = mcpTouched || exampleMode || lotKey !== 'new' || form.mcp !== '미확인';
   const checkRef = useRef<HTMLElement>(null);
   useEffect(() => { setStoreOpen(false); setStoreFrom(''); setCheckShown(false); setCheckedSig(null); }, [scope]);
   function startNewLot() { if (exampleMode) changeMode('real'); setLotKey('new'); setBaseline(null); setSelectedDay(null); }
@@ -431,13 +435,13 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
                 {lots.map(l => <option key={l.id} value={l.id}>{l.name}{l.name.includes(l.variety) ? '' : ` · ${l.variety}`}{l.team_shared ? ' · 팀 공유' : ''}</option>)}
               </select></label>}
         </div>
-        <button type="button" className="ah-textlink qt3-example" onClick={() => changeMode(exampleMode ? 'real' : 'example')}>{exampleMode ? '내 측정값 입력하기' : '예시로 채워보기'}</button>
+        <button type="button" className="qt3-minibtn qt3-example" onClick={() => changeMode(exampleMode ? 'real' : 'example')}><FlaskConical size={15} aria-hidden="true" />{exampleMode ? '내 측정값 입력하기' : '예시로 채워보기'}</button>
       </div>
       {exampleMode ? <p className="qt3-example-note"><FlaskConical size={16} /><b>예시 데이터 · 실제 측정 기록이 아니며 저장되지 않아요</b></p> : <>
-        <div className="qt3-namehead"><label htmlFor="tf-name">물량 이름</label>{form.name_auto && !activeLot && <span className="qt3-tag">자동 이름</span>}</div>
+        <div className="qt3-namehead"><label htmlFor="tf-name">물량 이름</label></div>
         <input id="tf-name" className="qt3-input" value={form.name_auto && !form.name.trim() ? suggestName(form) : form.name} maxLength={120}
           onChange={e => setForm(f => ({...f, name: e.target.value, name_auto: e.target.value.trim() === ''}))} aria-describedby="tf-name-help" />
-        {saveErrors.name ? <span className="qf-err" role="alert">{saveErrors.name}</span> : <p id="tf-name-help" className="qt3-help">쉽게 구분할 수 있도록 이름은 바꿔도 좋아요.</p>}
+        {saveErrors.name ? <span className="qf-err" role="alert">{saveErrors.name}</span> : <p id="tf-name-help" className="qt3-help">{form.name_auto && !activeLot ? '품종과 저장 시작일로 자동으로 지은 이름이에요. 바꿔도 좋아요.' : '쉽게 구분할 수 있도록 이름은 바꿔도 좋아요.'}</p>}
         {session?.isTeam && !activeLot && <label className="qt-check"><input type="checkbox" checked={form.team_shared} onChange={e => set('team_shared', e.target.checked)} />팀과 공유 (선택하지 않으면 나만 볼 수 있어요)</label>}
       </>}
       {loadError && <div className="qt-banner warn" role="alert"><AlertTriangle size={16} /><span>사과 기록을 불러오지 못했어요. {loadError}</span><button className="btn btn-ghost" onClick={() => { void onLotsChanged(); setReload(r => r + 1); }}>다시 불러오기</button></div>}
@@ -458,7 +462,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         {/* ① 사과와 실제 보관 조건 */}
         <section className="qt3-sec" aria-labelledby="qt3-s1">
           <div className="qt3-sec-head"><h2 id="qt3-s1"><span className="qt3-num">1</span>사과와 실제 보관 조건</h2>
-            {!guest && !exampleMode && <button type="button" className="ah-textlink" aria-expanded={storeOpen} onClick={() => setStoreOpen(v => !v)}>저장고 조건 불러오기</button>}</div>
+            {!guest && !exampleMode && <button type="button" className="qt3-minibtn" aria-expanded={storeOpen} onClick={() => setStoreOpen(v => !v)}><Warehouse size={15} aria-hidden="true" />저장고 조건 불러오기</button>}</div>
           {storeOpen && <div className="qt3-import">
             <label htmlFor="qt3-store-src">조건을 가져올 기존 물량</label>
             <select id="qt3-store-src" defaultValue="" onChange={e => importStore(e.target.value)}>
@@ -471,28 +475,29 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           <div className="qt3-grid2">
             <Seg id="tf-variety" legend="어떤 품종인가요?" value={hongro ? '홍로' : '후지'} options={[{value: '후지', label: '후지'}, {value: '홍로', label: '홍로'}]} onChange={v => switchCultivar(v)} err={saveErrors.variety} />
             <Seg id="tf-storage" legend="어떻게 보관하나요?" value={form.storage} options={[{value: '일반 저온', label: '일반 저온'}, {value: 'CA', label: 'CA'}, {value: '기타', label: '기타'}]} onChange={v => set('storage', v)} />
-            <Seg id="tf-mcp" legend={<>1-MCP 처리를 했나요?<span className="qt3-hint" title="1-MCP는 사과의 숙성을 늦추는 처리예요. 처리 기록(처리일·제품)을 확인해 주세요.">무엇인가요?</span></>} value={form.mcp}
-              options={[{value: '처리', label: '처리함'}, {value: '미처리', label: '처리 안 함'}, {value: '미확인', label: '미확인'}]} onChange={v => set('mcp', v)} />
+            <Seg id="tf-mcp" legend={<>1-MCP 처리를 했나요?<span className="qt3-hint" title="1-MCP는 사과의 숙성을 늦추는 처리예요. 처리 기록(처리일·제품)을 확인해 주세요.">무엇인가요?</span></>} value={mcpChosen ? form.mcp : ''}
+              options={[{value: '처리', label: '처리함'}, {value: '미처리', label: '처리 안 함'}, {value: '미확인', label: '미확인'}]} onChange={v => { setMcpTouched(true); set('mcp', v); }} />
             <div className="qt3-q">
-              <div className="qt3-q-head"><label htmlFor="tf-temperature">실제 저장고 온도</label><span className="qt3-tag muted">보관 기록</span></div>
+              <div className="qt3-q-head"><label htmlFor="tf-temperature">실제 저장고 온도</label></div>
               <div className="qt3-unit-input"><input id="tf-temperature" className="qt3-input" type="number" step="any" inputMode="decimal" placeholder="실제로 보관한 온도" value={form.temperature}
                 onChange={e => setForm(f => ({...f, temperature: e.target.value, hongro: {...f.hongro, storage: e.target.value === '0' ? 'cold0' : e.target.value === '4' ? 'cold4' : f.hongro.storage}}))} /><span>℃</span></div>
               {errors.temperature ? <span className="qf-err" role="alert">{errors.temperature}</span> : <p className="qt3-help">{hongro ? '기록한 온도를 0℃·4℃에 맞춰 바꾸지 않아요. 홍로 식은 정확히 0℃·4℃에만 있어요.' : '후지 식에는 저장 온도가 정해져 있지 않아, 온도는 기록으로만 남아요.'}</p>}
             </div>
             <div className="qt3-q">
-              <div className="qt3-q-head"><label htmlFor="tf-storage_start_date">저장을 시작한 날</label><span className="qt3-tag muted">예측 기준</span></div>
-              <input id="tf-storage_start_date" className="qt3-input" type="date" max={today} value={form.sameStart ? form.intake_date : form.storage_start_date} disabled={form.sameStart} onChange={e => set('storage_start_date', e.target.value)} />
-              {errors.storage_start_date || saveErrors.storage_start_date ? <span className="qf-err" role="alert">{errors.storage_start_date || saveErrors.storage_start_date}</span>
-                : <p className={'qt3-help' + (form.sameStart && !form.intake_date ? ' warn' : '')}>{form.sameStart ? form.intake_date ? '입고일과 같은 날로 계산해요. 이 날이 저장 0일차예요.' : '입고일을 먼저 입력해 주세요. 입력하면 저장 시작일도 같은 날이 돼요.' : '실제로 저장고에 넣어 보관을 시작한 날짜예요.'}</p>}
-            </div>
-            <div className="qt3-q">
-              <div className="qt3-q-head"><label htmlFor="tf-intake_date">입고일</label><span className="qt3-tag muted">기록 저장에 필요</span></div>
+              <div className="qt3-q-head"><label htmlFor="tf-intake_date">입고일</label></div>
               <input id="tf-intake_date" className="qt3-input" type="date" max={today} value={form.intake_date} onChange={e => set('intake_date', e.target.value)} />
               {(saveErrors.intake_date || errors.intake_date) && <span className="qf-err" role="alert">{saveErrors.intake_date || errors.intake_date}</span>}
               <label className="qt-check" htmlFor="tf-sameStart"><input id="tf-sameStart" type="checkbox" checked={form.sameStart} onChange={e => toggleSameStart(e.target.checked)} /><span>입고일을 저장 시작일로 사용</span></label>
             </div>
+            <div className="qt3-q">
+              <div className="qt3-q-head"><label htmlFor="tf-storage_start_date">저장을 시작한 날</label></div>
+              <input id="tf-storage_start_date" className="qt3-input" type="date" max={today} value={form.sameStart ? form.intake_date : form.storage_start_date} disabled={form.sameStart} onChange={e => set('storage_start_date', e.target.value)} />
+              {errors.storage_start_date || saveErrors.storage_start_date ? <span className="qf-err" role="alert">{errors.storage_start_date || saveErrors.storage_start_date}</span>
+                : <p className={'qt3-help' + (form.sameStart && !form.intake_date ? ' warn' : '')}>{form.sameStart ? form.intake_date ? '입고일과 같은 날로 계산해요. 이 날이 저장 0일차예요.' : '입고일을 먼저 입력해 주세요. 입력하면 저장 시작일도 같은 날이 돼요.' : '실제로 저장고에 넣어 보관을 시작한 날짜예요.'}</p>}
+            </div>
           </div>
-          {form.mcp === '미확인' ? <div className="qt3-note warn" role="note"><AlertTriangle size={16} /><div><b>처리 여부를 확인해야 이 조건의 품질 변화를 예측할 수 있어요.</b><span>지금은 기록을 남길 수 있어요. 1-MCP 미확인을 ‘처리 안 함’으로 계산하지 않아요.</span></div></div>
+          {form.mcp === '미확인' && !mcpChosen && !checkShown ? <div className="qt3-note info" role="note"><Info size={16} /><div><b>1-MCP 처리 여부를 고르면 적용할 예측식을 알려 드려요.</b><span>잘 모르면 ‘미확인’을 골라도 기록은 저장할 수 있어요.</span></div></div>
+          : form.mcp === '미확인' ? <div className="qt3-note warn" role="note"><AlertTriangle size={16} /><div><b>처리 여부를 확인해야 이 조건의 품질 변화를 예측할 수 있어요.</b><span>지금은 기록을 남길 수 있어요. 1-MCP 미확인을 ‘처리 안 함’으로 계산하지 않아요.</span></div></div>
             : <div className={'qt3-note ' + (condition.ok ? 'ok' : 'warn')} role="status">{condition.ok ? <Check size={16} /> : <AlertTriangle size={16} />}<div><b>{condition.title}</b>{condition.detail && <span>{condition.detail}</span>}</div></div>}
           {form.mcp === '처리' && <details className="qt3-more">
             <summary>1-MCP 처리 기록 <small>선택</small></summary>
