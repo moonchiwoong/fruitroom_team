@@ -1,5 +1,5 @@
 'use client';
-import {useCallback, useEffect, useState, type ReactNode} from 'react';
+import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react';
 import dynamic from 'next/dynamic';
 import {Apple, ArrowRight, ArrowUpRight, BookOpen, ClipboardList, Home as HomeIcon, Info, LineChart, LogOut, Menu, MessageCircle, ShieldCheck, UserRound, X} from 'lucide-react';
 import {applePhoto} from '@/lib/photos';
@@ -7,11 +7,13 @@ import {useTeamSession} from '@/components/team-auth';
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog';
 import {requestJson} from '@/components/lot-forms';
 import type {TrackerRequest} from '@/components/quality-tracker';
+import type {LotsFocus} from '@/components/lots-page';
 import type {ModelInfoContext} from '@/components/model-info';
 import {clearDraft, HANDOFF_KEY, loadDraft, saveDraft, type TrackerHandoff} from '@/lib/tracker-form';
 import AIAssistant, {type AssistantContext} from '@/components/ai-assistant';
 import type {Lot} from '@/lib/lot-types';
 import {fmtNum, daysBetween, todayKST} from '@/lib/tracker';
+import {quantityUnit, storageStart} from '@/lib/lot-readiness';
 
 const QualityTracker = dynamic(() => import('@/components/quality-tracker'), {ssr: false, loading: () => <div className="loading-strip">화면을 준비하고 있어요…</div>});
 const LotsPage = dynamic(() => import('@/components/lots-page'), {ssr: false, loading: () => <div className="loading-strip">물량을 불러오는 중…</div>});
@@ -34,9 +36,11 @@ export default function Home() {
   const [aiContext, setAIContext] = useState<AssistantContext | null>(null);
   const [modelContext, setModelContext] = useState<ModelInfoContext | undefined>();
   const [tab, setTabState] = useState<Page>('home'), [menu, setMenu] = useState(false);
-  const [trackerVisited, setTrackerVisited] = useState(false);
+  const [trackerVisited, setTrackerVisited] = useState(false), [lotsVisited, setLotsVisited] = useState(false);
+  const scrollMemo = useRef<Partial<Record<Page, number>>>({}), tabRef = useRef<Page>('home');
   const [lots, setLots] = useState<Lot[]>([]), [lotsError, setLotsError] = useState(''), [lotsLoaded, setLotsLoaded] = useState(false);
-  const [trackReq, setTrackReq] = useState<TrackerRequest | null>(null), [lotFocus, setLotFocus] = useState<string | null>(null);
+  const [trackReq, setTrackReq] = useState<TrackerRequest | null>(null), [lotFocus, setLotFocusState] = useState<LotsFocus | null>(null);
+  const setLotFocus = useCallback((id: string | null, create = false) => setLotFocusState(f => ({id, create, n: (f?.n ?? 0) + 1})), []);
   const reload = useCallback(async () => {
     try { const d = await requestJson<{lots: Lot[]}>('/api/lots'); setLots(d.lots); setLotsError(''); return d.lots; }
     catch (e) { setLotsError((e as Error).message); return [] as Lot[]; }
@@ -46,12 +50,15 @@ export default function Home() {
   const setTab = useCallback((p: Page, keepResultContext = false) => {
     if (p === 'model' && !keepResultContext) setModelContext(undefined);
     if (p === 'track') setTrackerVisited(true);
-    setTabState(p); setMenu(false); history.replaceState(null, '', '/#' + p); window.scrollTo({top: 0, behavior: 'smooth'});
+    if (p === 'lots') setLotsVisited(true);
+    // 물량 관리는 화면을 유지하므로, 돌아올 때 목록 스크롤 위치도 되살립니다.
+    scrollMemo.current[tabRef.current] = window.scrollY; const back = p === 'lots' ? scrollMemo.current.lots ?? 0 : 0; tabRef.current = p;
+    setTabState(p); setMenu(false); history.replaceState(null, '', '/#' + p); requestAnimationFrame(() => window.scrollTo({top: back}));
   }, []);
   const openTracker = useCallback((mode: 'real' | 'example', lotId?: string) => { setTrackReq(r => ({mode, lotId, n: (r?.n ?? 0) + 1})); setTab('track'); }, [setTab]);
   useEffect(() => {
     const h = window.location.hash.slice(1); const p = (legacy[h] ?? h) as Page;
-    if (pages.some(x => x.id === p)) { if (p === 'track') setTrackerVisited(true); setTabState(p); }
+    if (pages.some(x => x.id === p)) { if (p === 'track') setTrackerVisited(true); if (p === 'lots') setLotsVisited(true); tabRef.current = p; setTabState(p); }
   }, [openTracker]);
   // 소개·체험 화면에서 ‘실측값 입력’·‘예시로 체험’을 누르고 로그인한 경우
   const sessionUser = session?.userId;
@@ -75,15 +82,14 @@ export default function Home() {
 
   return <div className="site">
     <SiteHeader tab={tab} setTab={setTab} menu={menu} setMenu={setMenu} />
-    <main className="site-main">
-      {tab === 'home' && <HomePage lots={lots} loaded={lotsLoaded} error={lotsError} retry={reload} openTracker={openTracker} setTab={setTab} openLot={id => { setLotFocus(id); setTab('lots'); }} onAskAI={() => setAIContext({mode:'real',scope:'all'})} />}
+    <main className={'site-main tab-' + tab}>
+      {tab === 'home' && <HomePage lots={lots} loaded={lotsLoaded} error={lotsError} retry={reload} openTracker={openTracker} setTab={setTab} openLot={id => { setLotFocus(id); setTab('lots'); }} newLot={() => { setLotFocus(null, true); setTab('lots'); }} onAskAI={() => setAIContext({mode:'real',scope:'all'})} />}
       {tab === 'track' && <PageHead title="사과 품질을 확인해 보세요" desc="보관 조건을 기록하고, 초기 품질 입력 방식을 골라 주세요." />}
-      {tab === 'lots' && <PageHead title={<>저장한 사과,<br />기록을 이어가세요.</>} desc={<>사과별 측정 기록을<br />한곳에서 확인하세요.</>} action={<button className="btn btn-primary btn-lg" onClick={() => openTracker('real', 'new')}>+ 새 사과 등록</button>} />}
       {tab === 'account' && <PageHead title="내 정보" desc="이름·소속·주 산지를 관리합니다." />}
       {tab === 'model' && <PageHead title="계산 근거" />}
       <div className="page-body">
         {trackerVisited && <div hidden={tab !== 'track'}><QualityTracker lots={lots} onLotsChanged={reload} request={trackReq} onAskAI={setAIContext} openModelInfo={context => {setModelContext(context); setTab('model', true);}} openLot={id => { setLotFocus(id); setTab('lots'); }} /></div>}
-        {tab === 'lots' && (lotsLoaded ? <LotsPage lots={lots} loadError={lotsError} reload={reload} openTracker={openTracker} focusId={lotFocus} onAskAI={id => setAIContext({mode:'real',scope:'lot',lotId:id})} /> : <div className="loading-strip">물량을 불러오는 중…</div>)}
+        {lotsVisited && <div hidden={tab !== 'lots'}>{lotsLoaded ? <LotsPage lots={lots} loadError={lotsError} reload={reload} openTracker={openTracker} focus={lotFocus} onAskAI={id => setAIContext({mode:'real',scope:'lot',lotId:id})} /> : <div className="loading-strip">물량을 불러오는 중…</div>}</div>}
         {tab === 'model' && <ModelInfo context={modelContext} />}
         {tab === 'account' && <Account onOpenPredict={() => { setTab('model'); }} />}
       </div>
@@ -132,17 +138,18 @@ function PageHead({title, desc, action}: {title: ReactNode; desc?: ReactNode; ac
   </div></div>;
 }
 
-const storageDays = (l: Lot) => Math.max(0, daysBetween(l.storage_start_date || l.intake_date, todayKST()));
+const storageDays = (l: Lot) => Math.max(0, daysBetween(storageStart(l), todayKST()));
 const shortDate = (d: string) => { const [, m, day] = d.split('-').map(Number); return `${m}월 ${day}일`; };
 
-function HomePage({lots, loaded, error, retry, openTracker, setTab, onAskAI, openLot}: {lots: Lot[]; loaded: boolean; error: string; retry: () => void; onAskAI: () => void; openTracker: (m: 'real' | 'example', lotId?: string) => void; setTab: (p: Page) => void; openLot: (id: string) => void}) {
+function HomePage({lots, loaded, error, retry, openTracker, setTab, onAskAI, openLot, newLot}: {lots: Lot[]; loaded: boolean; error: string; retry: () => void; onAskAI: () => void; openTracker: (m: 'real' | 'example', lotId?: string) => void; setTab: (p: Page) => void; openLot: (id: string) => void; newLot: () => void}) {
+  const session = useTeamSession();
   return <div className="app-home">
     <section className="ah-hero">
       <div className="ah-hero-copy">
         <h1 className="app-title">저장한 사과,<br />변화를 살피세요.</h1>
         <p className="app-lead">측정한 값을 기록하고, 저장 중 품질 변화를 확인하세요.</p>
         <div className="ah-actions">
-          <button className="btn btn-primary btn-lg" onClick={() => openTracker('real', 'new')}>새 사과 등록하기<ArrowUpRight size={18} /></button>
+          <button className="btn btn-primary btn-lg" onClick={newLot}>새 물량 등록하기<ArrowUpRight size={18} /></button>
           <button className="ah-textlink" onClick={() => openTracker('example')}>처음이라면 예시로 체험하기<ArrowRight size={17} /></button>
         </div>
       </div>
@@ -154,20 +161,19 @@ function HomePage({lots, loaded, error, retry, openTracker, setTab, onAskAI, ope
         {lots.length > 0 && <button className="ah-textlink" onClick={() => setTab('lots')}>전체 보기<ArrowUpRight size={16} /></button>}</div>
       {!loaded ? <div className="loading-strip" role="status">내 사과를 불러오는 중입니다.</div>
         : error ? <div className="error-box" role="alert">{error}<button onClick={retry}>다시 불러오기</button></div>
-        : lots.length ? <ul className="ah-lots">{lots.slice(0, 4).map(l => { const o = l.latest_observation; const brix = o?.brix ?? null;
+        : lots.length ? <ul className="ah-lots">{[...lots].sort((a, b) => storageStart(b).localeCompare(storageStart(a)) || (b.created_at ?? '').localeCompare(a.created_at ?? '')).slice(0, 4).map(l => { const o = l.latest_observation; const brix = o?.brix ?? null; const shared = !!l.owner_id && !!session?.userId && l.owner_id !== session.userId;
           return <li key={l.id} className="ah-lot">
             <img className="ah-lot-photo" src={applePhoto(l.id)} alt="" loading="lazy" />
-            <div className="ah-lot-name"><b>{l.name}{!l.name.includes(l.variety) && <> · {l.variety}</>}</b><span>저장 {storageDays(l)}일째</span></div>
+            <div className="ah-lot-name"><button type="button" className="ah-lot-link" onClick={() => openLot(l.id)}><b>{l.name}{!l.name.includes(l.variety) && <> · {l.variety}</>}</b></button>{shared && <em className="lm-tag">공유받음</em>}<span>{l.location || '저장고 미입력'} · {typeof l.quantity === 'number' ? `${l.quantity.toLocaleString('ko-KR')}${quantityUnit(l)}` : '수량 미입력'} · 저장 {storageDays(l)}일째</span></div>
             <dl className="ah-lot-meta">
-              <div><dt>최근 측정</dt><dd>{o ? shortDate(o.date) : '아직 기록 없음'}</dd></div>
-              <div><dt>당도</dt><dd>{brix !== null ? `${fmtNum(brix, 1)} °Brix` : l.brix !== null && !o ? <>{fmtNum(l.brix, 1)} °Brix <small>처음 측정</small></> : '미측정'}</dd></div>
+              <div><dt>최근 측정</dt><dd>{o ? `${shortDate(o.date)} · ${l.observation_count ?? 1}회` : '아직 기록 없음'}</dd></div>
+              <div><dt>당도</dt><dd>{o ? (brix !== null ? `${fmtNum(brix, 1)} °Brix` : <>— <small>이번 기록에서 미측정</small></>) : l.brix !== null ? <>{fmtNum(l.brix, 1)} °Brix <small>초기 측정</small></> : '미측정'}</dd></div>
             </dl>
-            <div className="ah-lot-action">{o || l.firmness !== null || l.brix !== null
-              ? <button className="ah-textlink" onClick={() => openTracker('real', l.id)}>변화 보기<ArrowUpRight size={16} /></button>
-              : <button className="btn btn-outline" onClick={() => openLot(l.id)}>측정값 기록<ArrowUpRight size={16} /></button>}</div>
+            <div className="ah-lot-action"><button className="ah-textlink" onClick={() => openTracker('real', l.id)}>품질 변화 보기<ArrowUpRight size={16} /></button>
+              <button className="btn btn-outline" onClick={() => openLot(l.id)}>기록 보기</button></div>
           </li>; })}</ul>
         : <div className="ah-empty"><img src={applePhoto('empty')} alt="" /><div><b>아직 등록한 사과가 없어요.</b><p>저장을 시작한 사과를 등록하고, 측정한 값을 기록해 보세요.</p></div>
-          <button className="btn btn-primary" onClick={() => openTracker('real', 'new')}>새 사과 등록하기</button></div>}
+          <button className="btn btn-primary" onClick={newLot}>새 물량 등록하기</button></div>}
     </section>
 
     <section className="ah-section ah-steps" aria-labelledby="ah-how">

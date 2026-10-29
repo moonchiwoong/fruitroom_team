@@ -109,8 +109,11 @@ test('legacy Hongro records keep their measurements but do not invent dedicated 
   const legacy:Lot={...demoLots()[0],variety:'홍로',firmness:72,brix:14.2,acidity:0.38,weight:285,details:{}};
   const f=formFromLot(legacy);
   assert.equal(f.firmness,'72');assert.equal(f.brix,'14.2');assert.equal(f.acidity,'0.38');assert.equal(f.weight,'285');
-  assert.deepEqual(f.hongro,emptyHongroForm());
-  assert.throws(()=>calculateHongroForm(f.hongro,0),/입력/);
+  // 저장된 실측 초기값은 예측 입력으로 그대로 연결하되(물량 관리와 같은 값), 전용 모델 출처는 만들지 않습니다.
+  assert.equal(f.legacyHongro,true);
+  assert.deepEqual(f.hongro.initial,{firmness:'72',brix:'14.2',acidity:'0.38',weight:'285',diameter:''});
+  assert.equal(f.hongro.source,'measured');
+  assert.equal('hongro' in payloadFromForm(f).details,false);
 });
 
 test('AI request validation accepts current Fuji forms and upgrades older forms without Hongro fields',()=>{
