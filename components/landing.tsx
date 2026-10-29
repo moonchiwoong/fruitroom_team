@@ -59,36 +59,16 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
 
   const d = (i: number) => ({'data-reveal': '', style: {'--d': `${i * 90}ms`} as React.CSSProperties});
   return <div ref={rootRef} className={'landing landing-v2' + (motion ? ' lv-motion' : '')}>
-    <Hero onJoin={goJoin} />
+    <Hero onJoin={goJoin} animate={motion} />
 
     <main>
-      <div id="service-intro">
-      {story ? <AppleSplitStory onFail={storyFail} intro={<div className="lv-hero-copy as-intro-copy">
-          <p className="lv-kicker">사과 품질 예측·저장 관리</p>
-          <h2 id="lv-title"><span className="lv-line">초기 품질부터</span><span className="lv-line">저장 중 변화까지</span></h2>
-          <p className="lv-lead">초기 품질을 입력하고, 저장 기간에 따른 변화를 예측해 실제 측정값과 비교하세요.</p>
-          <div className="lv-actions">
-            <a className="btn btn-primary btn-lg" href="/try">예시로 체험하기<ArrowRight size={18} /></a>
-            <a className="btn btn-soft btn-lg" href="/try?mode=real">내 측정값 입력하기</a>
-          </div>
-          <p className="lv-note">가입하지 않아도 바로 볼 수 있어요. 기록으로 저장할 때만 로그인합니다.</p>
-        </div>} /> :
-      <section className="lv-hero" aria-labelledby="lv-title">
-        <div className="lv-hero-copy">
-          <p className="lv-kicker" {...d(0)}>사과 품질 예측·저장 관리</p>
-          <h2 id="lv-title"><span className="lv-line" {...d(1)}>초기 품질부터</span><span className="lv-line" {...d(2)}>저장 중 변화까지</span></h2>
-          <p className="lv-lead" {...d(3)}>초기 품질을 입력하고, 저장 기간에 따른 변화를 예측해 실제 측정값과 비교하세요.</p>
-          <div className="lv-actions" {...d(4)}>
-            <a className="btn btn-primary btn-lg" href="/try">예시로 체험하기<ArrowRight size={18} /></a>
-            <a className="btn btn-soft btn-lg" href="/try?mode=real">내 측정값 입력하기</a>
-          </div>
-          <p className="lv-note" {...d(5)}>가입하지 않아도 바로 볼 수 있어요. 기록으로 저장할 때만 로그인합니다.</p>
-        </div>
-        <div className="lv-preview-wrap" {...d(4)}><ServicePreview animate={motion} /></div>
-      </section>}
-      </div>
+      {story && <AppleSplitStory onFail={storyFail} intro={<div className="lv-hero-copy as-intro-copy">
+        <p className="lv-kicker">사과 품질을 데이터로</p>
+        <h2>사과 한 알에서<br />시작되는 기록</h2>
+        <p className="lv-lead">측정값과 저장 조건으로 사과의 변화를 살펴보세요.</p>
+      </div>} />}
 
-      <section className="lv-section" aria-labelledby="lv-how">
+      <section id="service-guide" className="lv-section" aria-labelledby="lv-how">
         <h2 id="lv-how" {...d(0)}>세 단계면 충분해요</h2>
         <ol className="lv-steps">
           <li {...d(1)}><span>1</span><div><b>초기 품질 입력</b><p>측정일, 표본 수와 경도(N)·당도(°Brix)·산도(%)를 넣어요. 한 항목만 있어도 됩니다.</p></div></li>
@@ -134,125 +114,113 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
   </div>;
 }
 
-// 첫 화면 문구와 배경을 한곳에서 수정할 수 있습니다. video에 영상 경로를 넣으면 image가 포스터가 됩니다.
-const HERO = {
-  brand: '애플트랙',
-  subtitle: '사과 품질 예측부터 저장 관리까지',
-  titleFirst: '사과의 시간을',
-  titleLast: '읽다',
-  accent: '#3264FF',
-  image: '/assets/photos/hero.webp',
-  position: 'center center',
-  video: '',
-};
+// 첫 화면 이미지 경로는 이곳에서 변경합니다.
+const HERO = { image: '/assets/photos/hero-orchard.svg', position: 'center center' };
 
-function Hero({onJoin}: {onJoin: (mode: Mode) => void}) {
+function Hero({onJoin, animate}: {onJoin: (mode: Mode) => void; animate: boolean}) {
   const [open, setOpen] = useState(false);
-  const [active, setActive] = useState('hero');
-  const [allowVideo, setAllowVideo] = useState(false);
-  const menuButton = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const update = () => setAllowVideo(!media.matches);
-    update(); media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
+  const toggle = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setOpen(false); menuButton.current?.focus(); } };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { setOpen(false); toggle.current?.focus(); }
+    };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [open]);
-  useEffect(() => {
-    const update = () => {
-      const ids = ['hero', 'service-intro', 'join'];
-      const current = ids.reduce((found, id) => {
-        const el = document.getElementById(id);
-        return el && el.getBoundingClientRect().top <= window.innerHeight * .45 ? id : found;
-      }, 'hero');
-      setActive(current);
-    };
-    update(); window.addEventListener('scroll', update, {passive: true});
-    window.addEventListener('resize', update);
-    return () => { window.removeEventListener('scroll', update); window.removeEventListener('resize', update); };
-  }, []);
-  const scrollTo = (id: string) => {
+  const guide = () => {
     setOpen(false);
-    document.getElementById(id)?.scrollIntoView({block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+    document.getElementById('service-guide')?.scrollIntoView({block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
   };
   return <>
-    <section id="hero" className="hero-full" aria-labelledby="hero-title" style={{'--hero-accent': HERO.accent, backgroundImage: `linear-gradient(rgba(0,0,0,.48), rgba(0,0,0,.48)), url("${HERO.image}")`, backgroundPosition: HERO.position} as React.CSSProperties}>
-      {HERO.video && allowVideo ? <><video className="hero-video" style={{objectPosition: HERO.position}} autoPlay muted loop playsInline poster={HERO.image} aria-hidden="true"><source src={HERO.video} /></video><div className="hero-video-shade" aria-hidden="true" /></> : null}
-      <header className="hero-header">
-        <a className="hero-logo" href="#hero" onClick={e => {e.preventDefault(); scrollTo('hero');}} aria-label="애플트랙 첫 화면"><Apple size={26} aria-hidden="true" /><span>애플트랙<small>by FarmBridge</small></span></a>
-        <div className="hero-menu-wrap">
-          <button ref={menuButton} className="hero-menu-toggle" type="button" aria-label={open ? '메뉴 닫기' : '메뉴 열기'} aria-expanded={open} aria-controls="hero-menu" onClick={() => setOpen(!open)}><span /><span /><span /></button>
-          <nav id="hero-menu" className="hero-menu" aria-label="계정 메뉴" hidden={!open}>
-            <a href="/try">예시 체험</a>
-            <button type="button" onClick={() => { setOpen(false); onJoin('login'); }}>로그인</button>
-            <button type="button" onClick={() => { setOpen(false); onJoin('signup'); }}>가입하기</button>
-          </nav>
-        </div>
-      </header>
-      <div className="hero-copy">
-        <p className="hero-brand">{HERO.brand}</p>
-        <p className="hero-subtitle">{HERO.subtitle}</p>
-        <h1 id="hero-title"><span className="hero-title-line"><span>{HERO.titleFirst}</span>{' '}<span className="hero-title-last">{HERO.titleLast}</span></span></h1>
+    <header className="shot-header">
+      <div className="shot-header-inner">
+        <a className="shot-logo" href="/" aria-label="애플트랙 첫 화면"><span className="shot-logo-mark"><Apple size={25} aria-hidden="true" /></span><span>애플트랙<small>by FarmBridge</small></span></a>
+        <button ref={toggle} className="shot-menu-toggle" type="button" aria-label={open ? '메뉴 닫기' : '메뉴 열기'} aria-expanded={open} aria-controls="shot-nav" onClick={() => setOpen(!open)}><span /><span /><span /></button>
+        <nav id="shot-nav" className={'shot-nav' + (open ? ' is-open' : '')} aria-label="주요 메뉴">
+          <button type="button" onClick={guide}>이용 가이드</button>
+          <a href="/try">예시 체험</a>
+          <button type="button" onClick={() => { setOpen(false); onJoin('login'); }}>로그인</button>
+          <button type="button" className="shot-signup" onClick={() => { setOpen(false); onJoin('signup'); }}>가입하기</button>
+        </nav>
       </div>
-      <button className="hero-scroll" type="button" onClick={() => scrollTo('service-intro')} aria-label="다음 콘텐츠로 이동"><span className="hero-mouse" aria-hidden="true" /><span>SCROLL</span></button>
+    </header>
+    <section className="shot-hero" aria-labelledby="shot-title">
+      <div className="shot-copy">
+        <p className="shot-kicker">사과 품질 예측·저장 관리</p>
+        <h1 id="shot-title">초기 품질부터<br />저장 중 변화까지</h1>
+        <p className="shot-lead">초기 품질을 입력하고, 저장 기간에 따른 변화를<br className="shot-desktop-break" /> 예측해 실제 측정값과 비교하세요.</p>
+        <div className="shot-actions">
+          <a className="shot-action shot-primary" href="/try">예시로 체험하기 <ArrowRight size={18} aria-hidden="true" /></a>
+          <a className="shot-action shot-secondary" href="/try?mode=real">내 측정값 입력하기</a>
+        </div>
+        <p className="shot-note">가입하지 않아도 바로 볼 수 있어요.<br />기록으로 저장할 때만 로그인합니다.</p>
+      </div>
+      <div className="shot-visual">
+        <img className="shot-photo" src={HERO.image} alt="" style={{objectPosition: HERO.position}} />
+        <div className="shot-card"><ServicePreview animate={animate} /></div>
+      </div>
     </section>
-    <nav className="hero-dots" aria-label="페이지 섹션 이동">
-      {[['hero', '첫 화면'], ['service-intro', '서비스 소개'], ['join', '가입 및 로그인']].map(([id, label]) => <button type="button" key={id} aria-label={label} aria-current={active === id ? 'location' : undefined} onClick={() => scrollTo(id)}><span /></button>)}
-    </nav>
     <style jsx>{`
-      :global(.lv-hero h2), :global(.as-intro-copy h2) {font-size:clamp(34px,4.2vw,54px); line-height:1.23; font-weight:700; letter-spacing:-1.2px; color:var(--ds-text); margin:0}
-      :global(.lv-hero h2 .lv-line), :global(.as-intro-copy h2 .lv-line) {display:block; color:inherit; background:none; -webkit-text-fill-color:currentColor}
-      .hero-full {position:relative; isolation:isolate; width:100%; min-height:100vh; min-height:100svh; display:grid; place-items:center; padding:120px 60px 120px; background-size:cover; background-repeat:no-repeat; background-color:#263b2d; color:#fff; overflow:hidden}
-      .hero-video, .hero-video-shade {position:absolute; inset:0; width:100%; height:100%; z-index:-1}
-      .hero-video {object-fit:cover; object-position:center}
-      .hero-video-shade {background:rgba(0,0,0,.48)}
-      .hero-header {position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:center; padding:32px 52px; z-index:3}
-      .hero-logo {display:inline-flex; align-items:center; gap:9px; color:#fff; font-size:21px; font-weight:800; line-height:1; text-decoration:none}
-      .hero-logo small {display:block; font-size:9px; font-weight:500; letter-spacing:.06em; margin-top:5px}
-      .hero-menu-wrap {position:relative}
-      .hero-menu-toggle {width:48px; height:48px; border:0; padding:11px 7px; background:transparent; display:flex; flex-direction:column; justify-content:space-between; color:#fff}
-      .hero-menu-toggle span {display:block; height:2px; width:100%; background:currentColor}
-      .hero-menu {position:absolute; right:0; top:56px; width:190px; background:#fff; color:#17231b; box-shadow:0 12px 35px #0004; padding:8px; border-radius:8px}
-      .hero-menu[hidden] {display:none}
-      .hero-menu a,.hero-menu button {display:block; width:100%; text-align:left; background:none; border:0; border-radius:5px; padding:13px; color:inherit; font-weight:600; font-size:15px; text-decoration:none}
-      .hero-menu a:hover,.hero-menu button:hover {background:#edf2ef}
-      .hero-copy {position:relative; z-index:1; width:100%; text-align:center; word-break:keep-all; animation:hero-in .8s ease-out both}
-      .hero-brand {font-size:clamp(15px,1.4vw,21px); font-weight:700; margin:0 0 18px; letter-spacing:.05em}
-      .hero-subtitle {font-size:clamp(18px,2.3vw,32px); font-weight:500; line-height:1.5; margin:0 0 19px}
-      .hero-copy h1 {font-size:clamp(44px,8.5vw,128px); line-height:1.18; letter-spacing:-.065em; font-weight:900; color:#fff; margin:0; word-break:keep-all}
-      .hero-title-line {display:inline-block; color:#fff; border-bottom:clamp(7px,1vw,15px) solid var(--hero-accent); padding-bottom:.04em}
-      .hero-copy h1 span {color:#fff}
-      .hero-scroll {position:absolute; bottom:32px; left:50%; transform:translateX(-50%); background:none; border:0; color:#fff; display:flex; align-items:center; flex-direction:column; gap:9px; font-size:10px; font-weight:700; letter-spacing:.18em; padding:8px; z-index:2}
-      .hero-scroll:active {transform:translateX(-50%)}
-      .hero-mouse {display:block; width:20px; height:32px; border:1.5px solid #fff; border-radius:12px; position:relative}
-      .hero-mouse:after {content:''; position:absolute; top:6px; left:50%; width:2px; height:6px; background:#fff; transform:translateX(-50%); border-radius:2px}
-      .hero-dots {position:fixed; z-index:15; left:27px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; align-items:center; gap:3px; padding:5px; border-radius:30px; background:rgba(0,0,0,.23)}
-      .hero-dots button {width:26px; height:26px; border:0; border-radius:50%; padding:0; background:none; display:grid; place-items:center}
-      .hero-dots button[aria-current] {background:rgba(255,255,255,.3)}
-      .hero-dots button span {width:6px; height:6px; border-radius:50%; background:#fff}
-      .hero-full :focus-visible,.hero-dots :focus-visible {outline:2px solid #fff; outline-offset:3px}
-      @keyframes hero-in {from {opacity:0; transform:translateY(18px)} to {opacity:1; transform:none}}
-      @media (max-width:700px) {
-        :global(.lv-hero h2), :global(.as-intro-copy h2) {font-size:32px; letter-spacing:-1px}
-        .hero-full {padding:110px 24px 120px}
-        .hero-header {padding:20px}
-        .hero-logo {font-size:18px}
-        .hero-copy h1 {font-size:clamp(38px,10vw,58px); line-height:1.25; letter-spacing:-.06em}
-        .hero-title-line {border:0; padding:0}
-        .hero-title-line > span {display:block}
-        .hero-title-last {display:table!important; margin:0 auto; border-bottom:8px solid var(--hero-accent); padding-bottom:.04em}
-        .hero-brand {margin-bottom:14px}
-        .hero-subtitle {font-size:16px; margin-bottom:17px}
-        .hero-scroll {bottom:22px}
-        .hero-dots {left:4px; padding:2px; gap:0}
-        .hero-dots button {width:22px; height:22px}
+      :global(.as-intro-copy h2) {font-size:clamp(34px,4.2vw,54px); line-height:1.22; font-weight:700; letter-spacing:-1.4px; color:var(--ds-text); margin:0}
+      .shot-header {background:#fff}
+      .shot-header-inner {max-width:1440px; margin:0 auto; padding:26px 40px; min-height:98px; display:flex; align-items:center; justify-content:space-between; gap:24px; border-bottom:1px solid #e8eeea}
+      .shot-logo {display:inline-flex; align-items:center; gap:12px; color:#18241e; text-decoration:none; font-size:22px; font-weight:800; line-height:1.1; white-space:nowrap}
+      .shot-logo-mark {width:52px; height:52px; display:grid; place-items:center; border-radius:15px; background:#bc423a; color:white}
+      .shot-logo small {display:block; margin-top:4px; font-size:13px; font-weight:500; color:#71847b; letter-spacing:.01em}
+      .shot-nav {display:flex; align-items:center; gap:14px}
+      .shot-nav a,.shot-nav button {font:inherit; font-size:16px; font-weight:600; color:#20372d; text-decoration:none; background:transparent; border:0; border-radius:9px; padding:12px 14px; min-height:46px; white-space:nowrap; cursor:pointer}
+      .shot-nav a:hover,.shot-nav button:hover {background:#eef4ef}
+      .shot-nav .shot-signup {background:#225c41; color:#fff; padding:12px 22px}
+      .shot-nav .shot-signup:hover {background:#184a33}
+      .shot-menu-toggle {display:none}
+      .shot-hero {max-width:1440px; margin:0 auto; padding:72px 40px 100px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:clamp(44px,7vw,110px); align-items:center; min-height:650px}
+      .shot-copy {min-width:0; word-break:keep-all}
+      .shot-kicker {font-size:16px; color:#2d6b47; font-weight:700; margin:0 0 30px}
+      .shot-kicker:before {content:''; display:inline-block; width:9px; height:9px; border-radius:50%; background:#4e865c; vertical-align:middle; margin-right:10px}
+      .shot-copy h1 {margin:0; font-size:clamp(42px,4.7vw,70px); line-height:1.24; font-weight:900; letter-spacing:-.055em; color:#18241e}
+      .shot-lead {color:#65796e; font-size:18px; line-height:1.85; margin:30px 0 0}
+      .shot-actions {display:flex; flex-wrap:wrap; gap:12px; margin-top:34px}
+      .shot-action {min-height:56px; padding:0 23px; border-radius:9px; display:inline-flex; gap:18px; align-items:center; justify-content:center; text-decoration:none; font-size:16px; font-weight:700}
+      .shot-primary {background:#225c41; color:white}.shot-primary:hover {background:#184a33}
+      .shot-secondary {background:#eaf3ed; color:#225c41}.shot-secondary:hover {background:#dcebe1}
+      .shot-note {color:#87978e; font-size:14px; line-height:1.8; margin:24px 0 0}
+      .shot-visual {position:relative; min-width:0; padding:0 0 74px 36px}
+      .shot-photo {display:block; width:100%; aspect-ratio:1.03; object-fit:cover; border-radius:20px; background:#e8eee9}
+      .shot-card {position:absolute; width:min(83%,440px); bottom:0; left:0; filter:drop-shadow(0 16px 28px rgba(25,59,42,.12))}
+      .shot-card :global(.lv-preview) {background:#fff; border:1px solid #e8eeea; border-radius:18px; box-shadow:none; padding:20px; gap:10px}
+      .shot-card :global(.lv-preview-values > div) {background:#f6f9f6}
+      .shot-header :global(:focus-visible),.shot-hero :global(:focus-visible) {outline:3px solid #3264ff; outline-offset:3px}
+      @media(max-width:950px) {
+        .shot-hero {gap:35px; padding:50px 26px 80px; min-height:0}
+        .shot-header-inner {padding:20px 26px}
+        .shot-copy h1 {font-size:clamp(36px,5.4vw,55px)}
+        .shot-card {width:88%}
       }
-      @media (prefers-reduced-motion:reduce) {.hero-copy {animation:none}}
+      @media(max-width:700px) {
+        .shot-header-inner {padding:16px 20px; min-height:76px; position:relative; flex-wrap:wrap}
+        .shot-logo {font-size:19px}.shot-logo-mark {width:44px; height:44px; border-radius:12px}.shot-logo small {font-size:11px}
+        .shot-menu-toggle {display:flex; flex-direction:column; justify-content:center; gap:5px; width:44px; height:44px; padding:9px; background:transparent; border:0; cursor:pointer}
+        .shot-menu-toggle span {display:block; width:100%; height:2px; background:#1e392b}
+        .shot-nav {display:none; width:100%; flex-direction:column; align-items:stretch; gap:2px; padding-bottom:5px}
+        .shot-nav.is-open {display:flex}
+        .shot-nav a,.shot-nav button {text-align:left; padding:11px 12px; width:100%}
+        .shot-nav .shot-signup {text-align:center}
+        .shot-hero {display:flex; flex-direction:column; align-items:stretch; gap:38px; padding:52px 20px 65px}
+        .shot-kicker {margin-bottom:20px; font-size:14px}
+        .shot-copy h1 {font-size:clamp(35px,9vw,49px); letter-spacing:-.05em}
+        .shot-lead {font-size:16px; margin-top:22px; line-height:1.75}
+        .shot-desktop-break {display:none}
+        .shot-actions {margin-top:25px; gap:10px}
+        .shot-action {min-height:52px; font-size:15px; padding:0 17px}
+        .shot-note {margin-top:20px; font-size:13px}
+        .shot-visual {padding-left:14px; padding-bottom:58px}
+        .shot-photo {aspect-ratio:1.08; border-radius:16px}
+        .shot-card {width:min(90%,390px)}
+        .shot-card :global(.lv-preview) {padding:14px; gap:7px}
+      }
+      @media(max-width:380px) {.shot-actions {flex-direction:column}.shot-action {width:100%}}
+      @media(prefers-reduced-motion:reduce) {.shot-header *, .shot-hero * {transition:none!important; animation:none!important}}
     `}</style>
   </>;
 }
