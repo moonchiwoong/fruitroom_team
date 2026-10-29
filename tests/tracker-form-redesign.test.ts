@@ -47,6 +47,10 @@ test('old saved records without a measurement date are not silently linked to th
   assert.equal(f.initialSameStart, false);
   assert.equal(effectiveInitialMeasuredOn(f), '');
   assert.equal(payloadFromForm(f).initial_measured_on, null);
+  assert.equal(f.mcp, '미확인');
+  assert.equal(payloadFromForm(f).mcp, '미확인');
+  f.mcp = '미처리';
+  assert.equal(payloadFromForm(f).mcp, '미처리');
 });
 
 test('drafts preserve new flags and older drafts gain safe defaults', () => {
