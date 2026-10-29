@@ -1,7 +1,7 @@
 // 현재 사과 상태 요약 — 외부 AI 없이, 저장된 기록과 기존 계산 엔진(lib/quality-models.ts)만으로 문장을 만듭니다.
 // 없는 값은 만들지 않고, 실측·계산·날씨 기반 추정을 구분해 표시합니다. 출하·안전 판정이 아닙니다.
 import type {Lot, Observation, Stats} from './lot-types';
-import {formFromLot, firmnessToN, type TrackerForm} from './tracker-form';
+import {formFromLot, firmnessToN, effectiveInitialMeasuredOn, type TrackerForm} from './tracker-form';
 import {isHongroVariety} from './cultivar';
 import {calculateHongroForm} from './hongro-tracker';
 import {predictQuality, type QualityInput} from './quality-models';
@@ -42,8 +42,11 @@ export function summarizeForm(form: TrackerForm, observations: Observation[], to
   const sub = day >= 0 ? `저장 ${day}일째 · ${cond}` : `저장 시작 ${-day}일 전 · ${cond}`;
 
   // ── 초기값: 실측 입력 또는 날씨 기반 추정. 미측정·빈칸은 비워 둡니다.
-  const measuredOn = isDate(form.initial_measured_on) ? form.initial_measured_on : start;
+  // 초기 측정일이 없으면 저장 시작일로 가정하지 않습니다(품질 예측 화면과 같은 규칙).
+  const measuredOn = effectiveInitialMeasuredOn(form);
+  const initialDateMissing = !isDate(measuredOn);
   const initial: Partial<Record<MetricId, Point>> = {};
+  const undated: string[] = [];
   if (hongro && form.hongro.source === 'weather') {
     try {
       const r = calculateHongroForm(form.hongro, 0);
@@ -54,7 +57,7 @@ export function summarizeForm(form: TrackerForm, observations: Observation[], to
       if ((m === 'firmness' || m === 'brix') && form.missing[m]) continue;
       const raw = hongro ? form.hongro.initial[m as 'firmness' | 'brix' | 'acidity'] : form[m as 'firmness' | 'brix' | 'acidity'];
       const v = m === 'firmness' ? firmnessToN(raw, form.firmness_unit) : num(raw);
-      if (v !== null) initial[m] = {value: v, date: measuredOn, kind: '실측'};
+      if (v !== null) { if (initialDateMissing) undated.push(`${label(m)} ${val(m, v)}`); else initial[m] = {value: v, date: measuredOn, kind: '실측'}; }
     }
   }
 
@@ -82,7 +85,7 @@ export function summarizeForm(form: TrackerForm, observations: Observation[], to
       now.push({tone: 'info', text: `${label(m)} ${val(m, first.value)} (${krDate(first.date)} ${first.kind === '실측' ? '초기 실측' : '날씨 기반 추정'}) — 입고 뒤 다시 잰 기록은 없어요.`});
     }
   }
-  if (!now.length) now.push({tone: 'warn', text: '경도·당도·산도 값이 아직 하나도 없어요. 초기값이나 오늘 측정값을 기록하면 상태를 알려 드릴 수 있어요.'});
+  if (!now.length) now.push(undated.length ? {tone: 'warn', text: `초기 측정값(${undated.join(', ')})은 있지만 측정일이 기록되지 않았어요.`} : {tone: 'warn', text: '경도·당도·산도 값이 아직 하나도 없어요. 초기값이나 오늘 측정값을 기록하면 상태를 알려 드릴 수 있어요.'});
 
   // 2) 오늘 계산값 / 3) 30일 뒤 계산값 — 가장 최근 값에서 이어서 계산합니다.
   if (day >= 0) {
@@ -117,6 +120,7 @@ export function summarizeForm(form: TrackerForm, observations: Observation[], to
       if (lastObs.defects && !['없음', '미확인'].includes(lastObs.defects)) check.push({tone: 'warn', text: `${krDate(lastObs.date)} 외관 관찰: ${lastObs.defects}. 해당 표본을 한 번 더 살펴보세요.`});
     }
   }
+  if (undated.length) check.push({tone: 'warn', text: `초기 측정값(${undated.join(', ')})의 측정일이 없어 계산에 쓰지 않았어요. 물량 관리에서 초기 측정일을 입력해 주세요.`});
   const notMeasured = (['firmness', 'brix'] as const).filter(m => form.missing[m] && !latest[m]).map(label);
   if (notMeasured.length) check.push({tone: 'info', text: `${notMeasured.join('·')}은(는) 미측정으로 기록돼 계산하지 않았어요.`});
   if (stats) {

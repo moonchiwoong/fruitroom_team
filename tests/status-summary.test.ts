@@ -12,7 +12,7 @@ const obs = (date: string, firmness: number | null, defects = '없음'): Observa
 function fuji() {
   const f = emptyForm();
   f.name = '1번 저장고'; f.variety = '후지'; f.intake_date = '2026-09-01'; f.sameStart = true;
-  f.storage = '일반 저온'; f.mcp = '미처리'; f.firmness = '70'; f.brix = '14'; f.acidity = '0.4';
+  f.storage = '일반 저온'; f.mcp = '미처리'; f.firmness = '70'; f.brix = '14'; f.acidity = '0.4'; f.initialSameStart = true;
   return f;
 }
 
@@ -40,7 +40,7 @@ test('missing values are not invented and unsupported conditions are explained i
 test('Hongro uses only supported temperatures and flags defects', () => {
   const f = emptyForm();
   f.name = '홍로'; f.variety = '홍로'; f.intake_date = '2026-09-10'; f.sameStart = true; f.storage = '일반 저온'; f.mcp = '미처리'; f.temperature = '2';
-  f.hongro.initial = {firmness: '68', brix: '14', acidity: '0.3', weight: '', diameter: ''};
+  f.hongro.initial = {firmness: '68', brix: '14', acidity: '0.3', weight: '', diameter: ''}; f.initialSameStart = true;
   const t2 = text(summarizeForm(f, [obs('2026-10-20', 62, '주름')], '2026-10-27'));
   assert.match(t2, /정확히 0℃·4℃만/);
   assert.match(t2, /외관 관찰: 주름/);
@@ -57,4 +57,12 @@ test('all-lot summary only restates stored values and names stale lots', () => {
   assert.match(t, /물량1 .*입고 후 측정 기록 없음/);
   assert.match(t, /14일 넘게 측정 기록이 없어요: 물량1/);
   assert.ok(summarizeLot(lots[0], [], '2026-10-27').title.startsWith('물량0'));
+});
+
+test('initial values without a measurement date are shown as a gap, not assumed to be the storage start', () => {
+  const f = fuji(); f.initialSameStart = false; f.initial_measured_on = '';
+  const t = text(summarizeForm(f, [], '2026-10-27'));
+  assert.match(t, /측정일이 없어 계산에 쓰지 않았어요/);
+  assert.match(t, /측정일이 기록되지 않았어요/);
+  assert.doesNotMatch(t, /경도 [\d.]+ N \(/);
 });

@@ -71,6 +71,12 @@ export function formFromLot(l: Lot): TrackerForm {
   const fin = d.firmness_input, nm = d.not_measured ?? [];
   const unit: 'N' | 'kgf' = fin?.unit === 'kgf' ? 'kgf' : 'N';
   if (unit === 'kgf' && fin?.value != null) { if (h) hongro.initial.firmness = s(fin.value); }
+  // 전용 모델 정보가 없는 이전 홍로 기록: 물량에 저장된 실측 초기값을 그대로 계산 입력으로 씁니다.
+  // (물량 관리에는 보이는데 예측 화면에서는 ‘초기값 없음’으로 나오던 연결 문제) 출처 정보를 새로 만들지는 않습니다.
+  if (isHongroVariety(l.variety) && !h) {
+    hongro.initial = {firmness: unit === 'kgf' && fin?.value != null ? s(fin.value) : s(l.firmness), brix: s(l.brix), acidity: s(l.acidity), weight: s(l.weight), diameter: ''};
+    const t = d.storage_temperature; if (t === 4) hongro.storage = 'cold4';
+  }
   return {
     name: l.name ?? '', variety: l.variety ?? '', harvest_date: s(l.harvest_date), intake_date: s(l.intake_date),
     sameStart: !l.storage_start_date || l.storage_start_date === l.intake_date, storage_start_date: s(l.storage_start_date),

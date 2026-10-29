@@ -1,7 +1,7 @@
 'use client';
 import {Component, Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
 import dynamic from 'next/dynamic';
-import {AlertTriangle, ArrowRight, Info, Warehouse, ArrowUpRight, CalendarDays, Check, ChevronDown, Download, FlaskConical, Loader2, Pin, PinOff, Plus, RotateCcw, Save, Thermometer, Undo2} from 'lucide-react';
+import {AlertTriangle, ArrowLeft, ArrowRight, Info, Warehouse, ArrowUpRight, CalendarDays, Check, ChevronDown, Download, FlaskConical, Loader2, Pin, PinOff, Plus, RotateCcw, Save, Thermometer, Undo2} from 'lucide-react';
 import {useTeamSession} from '@/components/team-auth';
 import {ObservationForm, requestJson} from '@/components/lot-forms';
 import {ChartLegend, HardnessConvert, KindBadge, TrackerChart} from '@/components/tracker-parts';
@@ -573,6 +573,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
 
   return <div className={'qt qt-refresh qt-v2' + (editing ? ' is-editing' : '') + (exampleMode ? ' is-example' : '') + (firstInput && !showResults ? ' is-first-input' : '')}>
 
+    {!guest && !exampleMode && activeLot && <div className="qt-backbar"><button type="button" className="qt3-minibtn" onClick={() => openLot(activeLot.id)}><ArrowLeft size={15} aria-hidden="true" />‘{activeLot.name}’ 물량 상세로 돌아가기</button><span>예측 기준: {activeLot.initial_measured_on ? `${activeLot.initial_measured_on} 초기 측정` : activeLot.details?.hongro?.source === 'weather' ? '날씨 기반 추정 초기값' : '초기 측정일 미기록'} · 측정 기록 {activeLot.observation_count ?? 0}건</span></div>}
     {/* ── 상단: 물량 선택 · 이름 ── */}
     <section className="qt3-card qt3-lotbar" aria-label="물량 선택">
       <div className="qt3-lotbar-top">
