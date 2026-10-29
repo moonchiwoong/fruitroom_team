@@ -35,9 +35,9 @@ test('Hongro form rejects missing active inputs and dates outside the 120-day mo
   f.hongro.initial.acidity='';
   assert.equal(validateHongroForm(f.hongro)['hongro.initial.acidity'],undefined);
   assert.throws(()=>calculateHongroForm(f.hongro,0),/초기 산도/);
-  // 저장할 때 경도·당도 빈칸은 ‘미측정’을 고르도록 안내하고, 미측정이면 통과합니다.
+  // 기록 저장에는 모든 지표의 입력이나 미측정 선택을 강제하지 않습니다.
   f.hongro.initial.brix='';
-  assert.ok(validateForm(f,true)['hongro.initial.brix']);
+  assert.equal(validateForm(f,true)['hongro.initial.brix'],undefined);
   f.missing.brix=true;
   assert.equal(validateForm(f,true)['hongro.initial.brix'],undefined);
   // 날씨 추정: 고르지 않은 항목은 기록 가능, 계산은 하지 않음.

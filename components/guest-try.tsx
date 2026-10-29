@@ -1,7 +1,6 @@
 'use client';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import dynamic from 'next/dynamic';
-import {Apple} from 'lucide-react';
 import type {TrackerRequest} from '@/components/quality-tracker';
 import type {ModelInfoContext} from '@/components/model-info';
 
@@ -49,7 +48,7 @@ export default function GuestTry() {
 
   return <div className="site guest">
     <header className="site-header2"><div className="site-header-inner">
-      <a className="brand2" href="/" aria-label="애플트랙 첫 화면"><span className="brand-mark2"><Apple size={20} /></span><span className="brand-text">애플트랙<small>by FarmBridge</small></span></a>
+      <a className="brand2" href="/" aria-label="애플트랙 첫 화면"><img src="/assets/appletrack-logo.svg" alt="" width={170} height={42} style={{display:'block', width:'clamp(132px, 16vw, 170px)', height:'auto'}} /></a>
       <nav className="guest-nav" aria-label="체험 메뉴">
         <button className={'nav-link' + (view === 'track' ? ' active' : '')} aria-current={view === 'track' ? 'page' : undefined} onClick={() => go({view: 'track'})}>품질 예측 체험</button>
         <button className={'nav-link' + (view === 'basis' ? ' active' : '')} aria-current={view === 'basis' ? 'page' : undefined} onClick={() => {setModelContext(undefined); go({view: 'basis'});}}>계산 근거</button>

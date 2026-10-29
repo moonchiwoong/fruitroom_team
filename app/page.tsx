@@ -94,8 +94,7 @@ export default function Home() {
 }
 
 function Brand({onClick}: {onClick: () => void}) {
-  return <button className="brand2" onClick={onClick} aria-label="애플트랙 홈"><span className="brand-mark2"><Apple size={20} /></span>
-    <span className="brand-text">애플트랙<small>by FarmBridge</small></span></button>;
+  return <button className="brand2" onClick={onClick} aria-label="애플트랙 홈"><img src="/assets/appletrack-logo.svg" alt="" width={170} height={42} style={{display:'block', width:'clamp(132px, 16vw, 170px)', height:'auto'}} /></button>;
 }
 
 function ProjectGuide() {
@@ -182,7 +181,7 @@ function HomePage({lots, loaded, error, retry, openTracker, setTab, onAskAI, ope
 
 function SiteFooter({setTab}: {setTab: (p: Page) => void}) {
   return <footer className="site-footer"><div className="site-footer-inner">
-    <div className="footer-brand"><span className="brand-mark2"><Apple size={18} /></span><div><strong>애플트랙 <span className="by">by FarmBridge</span></strong><p>초기 품질부터 저장 중 변화까지. 실측·모델 계산·예시·미측정을 구분해 표시하며, 계산값은 출하·안전 판정을 대신하지 않습니다.</p></div></div>
+    <div className="footer-brand"><div><img src="/assets/appletrack-logo.svg" alt="애플트랙" width={170} height={42} style={{display:'block', width:'clamp(132px, 16vw, 170px)', height:'auto'}} /><p>초기 품질부터 저장 중 변화까지. 실측·모델 계산·예시·미측정을 구분해 표시하며, 계산값은 출하·안전 판정을 대신하지 않습니다.</p></div></div>
     <nav aria-label="하단 메뉴">{pages.map(p => <button key={p.id} onClick={() => setTab(p.id)}>{p.id === 'model' ? '전체 모델 정보' : p.label}</button>)}</nav>
   </div><div className="site-footer-bottom"><ShieldCheck size={14} />사과 품질 예측·저장 관리 · FarmBridge</div></footer>;
 }

@@ -1,6 +1,6 @@
 import {computeSeries, daysBetween, describeChange, fmtNum, isDate, measuredPoints, metricMeta, MODEL_RANGE, MODEL_VERSION, resolveModel, STORAGE_MODEL_VERIFIED, todayKST, valueAt, type Anchor} from '../tracker';
 import {parseOptionalNumber, PRESSURE_REASON, QUALITY_POLICY_VERSION, TRACKED_LOSS_REASON} from '../quality-policy';
-import {validateForm} from '../tracker-form';
+import {effectiveInitialMeasuredOn, firmnessToN, validateForm} from '../tracker-form';
 import {AIError,type PredictionInput} from './contracts';
 import {measurementCompatibility} from './context';
 import {isHongroVariety} from '../cultivar';
@@ -25,37 +25,41 @@ export function evaluatePrediction(input:PredictionInput){
   if(relevant.length)throw new AIError('invalid_input','입력 조건을 확인해 주세요. '+relevant.join(' '));
   const start=form.sameStart?form.intake_date:form.storage_start_date;
   if(!isDate(start)||!isDate(asOf)||!isDate(selectedDate)||asOf<start||asOf>todayKST())throw new AIError('invalid_dates','저장 시작일·분석 기준일·선택 날짜를 확인해 주세요.');
-  const measuredOn=form.initial_measured_on||start;
-  if(!isDate(measuredOn))throw new AIError('invalid_dates','초기 측정일을 확인해 주세요.');
-  if(measuredOn>asOf && metric!=='loss')throw new AIError('initial_after_analysis','초기 측정일이 분석 기준일 이후라 해당 기준일의 계산에 사용할 수 없습니다.');
-  const t0=daysBetween(start,measuredOn),asOfDay=daysBetween(start,asOf),day=daysBetween(start,selectedDate);
+  const measuredOn=effectiveInitialMeasuredOn(form);
+  if(isDate(measuredOn) && measuredOn>asOf && metric!=='loss')throw new AIError('initial_after_analysis','초기 측정일이 분석 기준일 이후라 해당 기준일의 계산에 사용할 수 없습니다.');
+  const t0=isDate(measuredOn)?daysBetween(start,measuredOn):0,asOfDay=daysBetween(start,asOf),day=daysBetween(start,selectedDate);
   const kind=mode==='example'?'예시':'실측';
   const observations=input.observations.filter(o=>o.date<=asOf);
-  const measured=measuredPoints(metric,observations,start,kind,number(form.tracked.initial_weight),{sampleId:form.tracked.sample_id,date:form.initial_measured_on});
-  const latest=input.useLatest&&metric!=='loss'?[...measured].reverse().find(p=>p.day>=t0):undefined;
-  let initial=metric==='loss'?null:number(hongro?form.hongro.initial[metric]:form[metric]);
+  const measured=measuredPoints(metric,observations,start,kind,number(form.tracked.initial_weight),{sampleId:form.tracked.sample_id,date:measuredOn});
+  const latest=input.useLatest&&metric!=='loss'&&!(hongro && form.legacyHongro)?[...measured].reverse().find(p=>p.day>=t0):undefined;
+  const raw=metric==='loss'?'':hongro?form.hongro.initial[metric]:form[metric];
+  let initial=metric==='loss'||form.missing[metric]?null:metric==='firmness'?firmnessToN(raw,form.firmness_unit):number(raw);
   let initialError:string|null=null;
   if(hongro && form.hongro.source==='weather' && metric!=='loss'){
     try{initial=estimateHongroInitial(Object.fromEntries(Object.entries(form.hongro.weather).map(([k,v])=>[k,number(v)])))[metric];}
     catch(error){initial=null;initialError=error instanceof Error?error.message:'기상 초기값을 계산하지 못했습니다.';}
   }
-  const anchor:Anchor|null=metric==='loss'?null:latest?{day:latest.day,date:latest.date,value:latest.value,kind:latest.kind,source:'latest'}:initial===null?null:{day:t0,date:measuredOn,value:initial,kind,source:'initial'};
+  if(hongro && form.legacyHongro && metric!=='loss'){
+    initial=null;initialError='기존 홍로 기록의 전용 모델 출처가 확인되지 않아 계산할 수 없습니다.';
+  }
+  const anchor:Anchor|null=metric==='loss'?null:latest?{day:latest.day,date:latest.date,value:latest.value,kind:latest.kind,source:'latest'}:initial===null||!isDate(measuredOn)?null:{day:t0,date:measuredOn,value:initial,kind,source:'initial'};
   const recorded=resolveModel({...form,temperature:number(form.temperature)}),future=input.future==='same'?recorded:{id:input.future,reason:input.future?'':'선택 조건을 확인해 주세요.'};
   const condition:QualityInput={cultivar:form.variety,storage:form.storage==='일반 저온'?'cold':form.storage==='CA'?'ca':'other',temperature:number(form.temperature),mcp:form.mcp==='처리'?'treated':form.mcp==='미처리'?'untreated':'unknown',metric,day,anchor,allowFujiReference:form.loss_reference};
   const prediction=predictQuality(condition);
   const series=computeSeries({variety:form.variety,temperature:number(form.temperature),metric,anchor,recorded:recorded.id,recordedReason:recorded.reason,future:future.id,futureReason:future.reason,asOfDay});
-  const at=hongro?(prediction.ok?{status:'ok' as const,value:prediction.value!,segment:day<=asOfDay?'past' as const:'future' as const}:{status:day>120?'out' as const:'unavailable' as const,reason:initialError??prediction.reason??'계산 불가'}):valueAt(series,day);
+  const noMeasurementDate = metric !== 'loss' && initial !== null && !latest && !isDate(measuredOn);
+  const at=noMeasurementDate?{status:'unavailable' as const,reason:'초기 측정일을 입력하거나 저장 시작일과 같음을 선택해 주세요.'}:hongro?(prediction.ok?{status:'ok' as const,value:prediction.value!,segment:day<=asOfDay?'past' as const:'future' as const}:{status:day>120?'out' as const:'unavailable' as const,reason:initialError??prediction.reason??'계산 불가'}):valueAt(series,day);
   const selectedPrediction={...(at.status==='ok' && 'result' in at && at.result ? at.result : prediction),ok:at.status==='ok',value:at.status==='ok'?at.value:null,reason:at.status==='ok'?null:at.reason};
-  const measuredLossPoints=metric==='loss'?measured:measuredPoints('loss',observations,start,kind,number(form.tracked.initial_weight),{sampleId:form.tracked.sample_id,date:form.initial_measured_on});
+  const measuredLossPoints=metric==='loss'?measured:measuredPoints('loss',observations,start,kind,number(form.tracked.initial_weight),{sampleId:form.tracked.sample_id,date:measuredOn});
   const measuredAt=measuredLossPoints.find(p=>p.date===selectedDate);
   const measuredLoss={status:measuredAt?'ok' as const:'unavailable' as const,value:measuredAt?.value??null,reason:measuredAt?null:TRACKED_LOSS_REASON,kind:'실측' as const,date:selectedDate,unit:'%'};
   const meta=metricMeta[metric],last=[...measured].reverse().find(p=>p.day>=0);
   const conditions=measurementCompatibility(form.measure,observations.find(o=>o.id===last?.id)?.details?.measure);
-  const canCompare=metric==='loss'?t0===0:conditions.comparable;
+  const canCompare=metric==='loss'?isDate(measuredOn)&&t0===0:conditions.comparable;
   const comparison=last&&canCompare?(hongro?(()=>{const p=predictQuality({...condition,day:last.day});return p.ok?{status:'ok' as const,value:p.value!}:null;})():valueAt(series,last.day)):null;
   const display=(v:number)=>fmtNum(v,meta.digits);
   return {
-    metric,label:meta.label,unit:meta.unit,date:selectedDate,storageDay:day,asOf,initialMeasuredOn:form.initial_measured_on||null,calculationStartDate:metric==='loss'?start:anchor?.date??null,
+    metric,label:meta.label,unit:meta.unit,date:selectedDate,storageDay:day,asOf,initialMeasuredOn:measuredOn||null,calculationStartDate:metric==='loss'?start:anchor?.date??null,
     status:at.status,value:at.status==='ok'?at.value:null,displayValue:at.status==='ok'?display(at.value):null,reason:at.status==='ok'?null:at.reason,
     dataKind:mode==='example'?'예시':selectedPrediction.kind,verification:selectedPrediction.validation,
     change:at.status==='ok'&&anchor?describeChange(metric,at.value,anchor.value):null,

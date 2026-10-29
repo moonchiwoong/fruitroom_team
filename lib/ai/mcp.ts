@@ -4,7 +4,7 @@ import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {WebStandardStreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import {z} from 'zod';
 import {demoAnalysis,demoLots} from '../demo-lots';
-import {formFromLot,signature} from '../tracker-form';
+import {effectiveInitialMeasuredOn, firmnessToN, formFromLot,signature} from '../tracker-form';
 import {describeChange,fmtNum,metricMeta,todayKST} from '../tracker';
 import {parseOptionalNumber} from '../quality-policy';
 import type {Lot} from '../lot-types';
@@ -12,6 +12,7 @@ import {AIError,type AIContext,type Actor,type Analysis,type DataAccess,type Evi
 import {evaluatePrediction,modelInformation} from './prediction';
 import {baselineCore,observationFingerprint,measurementCompatibility} from './context';
 import {normalizeCultivar} from '../quality-models';
+import {isHongroVariety} from '../cultivar';
 
 export const TOOL_NAMES=['list_accessible_lots','get_lot_details','get_quality_measurements','get_environment_history_summary','run_existing_quality_prediction','compare_measurement_with_prediction','get_model_information'] as const;
 export type ToolName=typeof TOOL_NAMES[number];
@@ -111,15 +112,22 @@ export function createQualityMcpServer(options:{data:DataAccess;actor:Actor;cont
     const last=rows.at(-1),metrics=['firmness','brix','acidity'] as const;
     const latestByMetric=Object.fromEntries(metrics.map(m=>[m,[...analysis.observations].reverse().find(o=>o[m]!==null&&o[m]!==undefined)]));
     const fields:EvidenceField[]=metrics.map(m=>{const row=latestByMetric[m];return {label:`최근 ${metricMeta[m].label}`,value:row?fmtNum(row[m]!,metricMeta[m].digits):null,unit:metricMeta[m].unit,date:row?.date,kind};});
+    const measuredOn=effectiveInitialMeasuredOn(f), hongro=isHongroVariety(f.variety);
+    const legacyHongro=hongro && !draft && context.mode!=='example' && !analysis.lot.details?.hongro;
+    const initialValue=(m:typeof metrics[number])=>{
+      if(f.missing[m] || (hongro && f.hongro.source==='weather'))return null;
+      const raw=hongro && !legacyHongro?f.hongro.initial[m]:f[m], parsed=parseOptionalNumber(raw);
+      return m==='firmness'?firmnessToN(raw,f.firmness_unit):parsed.status==='valid'?parsed.value:null;
+    };
     const initialChanges=metrics.map(m=>{
-      const row=latestByMetric[m],n=parseOptionalNumber(f[m]),validDate=!!f.initial_measured_on&&f.initial_measured_on<=(c?.asOf??todayKST()),conditions=measurementCompatibility(f.measure,row?.details?.measure);
-      const value=n.status==='valid'?n.value:null;
-      fields.push({label:`초기 ${metricMeta[m].label}`,value:value===null?null:fmtNum(value,metricMeta[m].digits),unit:metricMeta[m].unit,date:f.initial_measured_on||undefined,kind});
-      const change=value!==null&&validDate&&row&&row.date>=f.initial_measured_on&&conditions.comparable?describeChange(m,row[m]!,value):null;
-      return {metric:m,initialDate:f.initial_measured_on||null,latestDate:row?.date??null,change,conditions,summary:change?`${metricMeta[m].label}: 초기 ${f.initial_measured_on} 대비 최근 ${row!.date} ${kind} ${change.short}. ${conditions.reason??''}`:`${metricMeta[m].label}: ${!conditions.comparable?conditions.reason:'초기·최근 측정값과 실제 측정일이 모두 확인되지 않아 변화량을 비교하지 않습니다.'}`};
+      const row=latestByMetric[m],value=initialValue(m),validDate=!!measuredOn&&measuredOn<=(c?.asOf??todayKST()),conditions=measurementCompatibility(f.measure,row?.details?.measure);
+      fields.push({label:`초기 ${metricMeta[m].label}`,value:value===null?null:fmtNum(value,metricMeta[m].digits),unit:metricMeta[m].unit,date:measuredOn||undefined,kind});
+      const change=value!==null&&validDate&&row&&row.date>=measuredOn&&conditions.comparable?describeChange(m,row[m]!,value):null;
+      return {metric:m,initialDate:measuredOn||null,latestDate:row?.date??null,change,conditions,summary:change?`${metricMeta[m].label}: 초기 ${measuredOn} 대비 최근 ${row!.date} ${kind} ${change.short}. ${conditions.reason??''}`:`${metricMeta[m].label}: ${!conditions.comparable?conditions.reason:'초기·최근 측정값과 실제 측정일이 모두 확인되지 않아 변화량을 비교하지 않습니다.'}`};
     });
     const partial=analysis.observations.length>=1000||analysis.observations.length>rows.length;
-    return {tool:'get_quality_measurements',title:'초기·후속 측정 기록',summary:last?`${last.date} 기록이 가장 최근입니다. 각 지표는 해당 값이 있는 최근 측정일을 따로 표시합니다. ${initialChanges.map(v=>v.summary).join(' ')}${partial?' 조회 또는 반환 범위가 제한되어 일부 기록입니다.':''}`:'후속 측정 기록 없음. 없는 값을 0이나 예시값으로 채우지 않습니다.',fields,data:{lotId:id,mode:context.mode,draft,initial:{source:kind,date:f.initial_measured_on||null,firmness:f.firmness||null,brix:f.brix||null,acidity:f.acidity||null},initialChanges,records:rows,partial,asOf:c?.asOf??todayKST()}};
+    const initialText=(m:typeof metrics[number])=>{const value=initialValue(m);return value===null?null:String(value);};
+    return {tool:'get_quality_measurements',title:'초기·후속 측정 기록',summary:last?`${last.date} 기록이 가장 최근입니다. 각 지표는 해당 값이 있는 최근 측정일을 따로 표시합니다. ${initialChanges.map(v=>v.summary).join(' ')}${partial?' 조회 또는 반환 범위가 제한되어 일부 기록입니다.':''}`:'후속 측정 기록 없음. 없는 값을 0이나 예시값으로 채우지 않습니다.',fields,data:{lotId:id,mode:context.mode,draft,initial:{source:kind,date:measuredOn||null,firmness:initialText('firmness'),brix:initialText('brix'),acidity:initialText('acidity')},initialChanges,records:rows,partial,asOf:c?.asOf??todayKST()}};
   });
   register('get_environment_history_summary','온습도 이력 요약',lotArgs,async(args,current)=>{
     const {analysis,id}=await load(args,current),s=analysis.stats;
