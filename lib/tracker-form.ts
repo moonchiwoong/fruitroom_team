@@ -8,23 +8,25 @@ import {emptyHongroForm, validateHongroForm, type HongroTrackerForm} from './hon
 
 export type TrackerForm = {
   name: string; variety: string; harvest_date: string; intake_date: string;
-  sameStart: boolean; storage_start_date: string; initial_measured_on: string; initial_sample_count: string;
+  sameStart: boolean; storage_start_date: string; initialSameStart: boolean; initial_measured_on: string; initial_sample_count: string;
   firmness: string; brix: string; acidity: string; weight: string;
   packaging: string; location: string; sensor_id: string;
-  storage: '일반 저온' | 'CA' | '기타'; mcp: '미처리' | '처리' | '미확인';
+  storage: '일반 저온' | 'CA' | '기타'; mcp: '미처리' | '처리' | '미확인'; mcpSelected: boolean;
   temperature: string; loss_reference: boolean;
   measure: {probe_mm: string; peeled: '' | '껍질 제거' | '껍질 포함'; position: string; fruit_temp: string; instrument: string};
   mcpd: {treated_on: string; product: string; concentration: string; hours: string; temp: string};
   ca: {from: string; to: string; o2: string; co2: string};
   tracked: {sample_id: string; count: string; initial_weight: string};
   hongro: HongroTrackerForm;
+  /** 이전 홍로 기록에 전용 모델 출처가 없을 때 상위 실측값을 보존합니다. */
+  legacyHongro: boolean;
   team_shared: boolean;
   /** 이름을 사용자가 직접 고치기 전까지는 품종·저장 시작일로 자동 제안합니다. */
   name_auto: boolean;
   /** 경도는 기기에서 읽은 숫자와 단위 그대로 입력하고, 계산·저장은 N으로 합니다. */
   firmness_unit: 'N' | 'kgf';
   /** ‘미측정’을 직접 고른 항목. 빈칸(아직 입력 안 함)·미측정·숫자 0을 구분합니다. */
-  missing: {firmness: boolean; brix: boolean};
+  missing: {firmness: boolean; brix: boolean; acidity: boolean};
 };
 
 export const KGF_TO_N = 9.80665;
@@ -41,16 +43,20 @@ export function suggestName(f: Pick<TrackerForm, 'variety' | 'sameStart' | 'inta
 }
 export const effectiveName = (f: TrackerForm) => f.name_auto && !f.name.trim() ? suggestName(f) : f.name;
 
+/** Only an explicit checkbox links the measurement date to the storage start. */
+export const effectiveInitialMeasuredOn = (f: Pick<TrackerForm, 'initialSameStart' | 'initial_measured_on' | 'sameStart' | 'intake_date' | 'storage_start_date'>) =>
+  f.initialSameStart ? (f.sameStart ? f.intake_date : f.storage_start_date) : f.initial_measured_on;
+
 const s = (v: unknown) => v === null || v === undefined ? '' : String(v);
 
 export function emptyForm(): TrackerForm {
   return {
-    name: '', variety: '후지', harvest_date: '', intake_date: '', sameStart: false, storage_start_date: '', initial_measured_on: '', initial_sample_count: '',
-    firmness: '', brix: '', acidity: '', weight: '', packaging: '', location: '', sensor_id: '', storage: '일반 저온', mcp: '미확인', temperature: '', loss_reference: false,
+    name: '', variety: '후지', harvest_date: '', intake_date: '', sameStart: true, storage_start_date: '', initialSameStart: false, initial_measured_on: '', initial_sample_count: '',
+    firmness: '', brix: '', acidity: '', weight: '', packaging: '', location: '', sensor_id: '', storage: '일반 저온', mcp: '미확인', mcpSelected: false, temperature: '', loss_reference: false,
     measure: {probe_mm: '', peeled: '', position: '', fruit_temp: '', instrument: ''},
     mcpd: {treated_on: '', product: '', concentration: '', hours: '', temp: ''},
-    ca: {from: '', to: '', o2: '', co2: ''}, tracked: {sample_id: '', count: '', initial_weight: ''}, hongro: emptyHongroForm(), team_shared: false,
-    name_auto: true, firmness_unit: 'N', missing: {firmness: false, brix: false},
+    ca: {from: '', to: '', o2: '', co2: ''}, tracked: {sample_id: '', count: '', initial_weight: ''}, hongro: emptyHongroForm(), legacyHongro: false, team_shared: false,
+    name_auto: true, firmness_unit: 'N', missing: {firmness: false, brix: false, acidity: false},
   };
 }
 
@@ -68,18 +74,20 @@ export function formFromLot(l: Lot): TrackerForm {
   return {
     name: l.name ?? '', variety: l.variety ?? '', harvest_date: s(l.harvest_date), intake_date: s(l.intake_date),
     sameStart: !l.storage_start_date || l.storage_start_date === l.intake_date, storage_start_date: s(l.storage_start_date),
+    initialSameStart: d.initial_same_start === true && !!l.initial_measured_on && l.initial_measured_on === (l.storage_start_date || l.intake_date),
     initial_measured_on: s(l.initial_measured_on), initial_sample_count: s(l.initial_sample_count),
     firmness: unit === 'kgf' && fin?.value != null && !h ? s(fin.value) : s(l.firmness), brix: s(l.brix), acidity: s(l.acidity), weight: s(l.weight),
     packaging: s(l.packaging), location: s(l.location), sensor_id: s(l.sensor_id),
     storage: (['일반 저온', 'CA', '기타'].includes(l.storage) ? l.storage : '기타') as TrackerForm['storage'],
     mcp: (['미처리', '처리', '미확인'].includes(l.mcp) ? l.mcp : '미확인') as TrackerForm['mcp'],
+    mcpSelected: ['미처리', '처리', '미확인'].includes(l.mcp),
     measure: {probe_mm: s(d.measure?.probe_mm), peeled: (d.measure?.peeled ?? '') as TrackerForm['measure']['peeled'], position: s(d.measure?.position), fruit_temp: s(d.measure?.fruit_temp), instrument: s(d.measure?.instrument)},
     mcpd: {treated_on: s(d.mcp?.treated_on), product: s(d.mcp?.product), concentration: s(d.mcp?.concentration), hours: s(d.mcp?.hours), temp: s(d.mcp?.temp)},
     ca: {from: s(d.ca?.from), to: s(d.ca?.to), o2: s(d.ca?.o2), co2: s(d.ca?.co2)},
     tracked: {sample_id: s(d.tracked?.sample_id), count: s(d.tracked?.count), initial_weight: s(d.tracked?.initial_weight)},
     temperature: s(d.storage_temperature ?? (h ? h.storage === 'cold0' ? 0 : 4 : null)), loss_reference: d.loss_reference === true,
-    hongro, team_shared: !!l.team_shared,
-    name_auto: false, firmness_unit: unit, missing: {firmness: nm.includes('firmness'), brix: nm.includes('brix')},
+    hongro, legacyHongro: isHongroVariety(l.variety) && !h, team_shared: !!l.team_shared,
+    name_auto: false, firmness_unit: unit, missing: {firmness: nm.includes('firmness'), brix: nm.includes('brix'), acidity: nm.includes('acidity')},
   };
 }
 
@@ -88,8 +96,8 @@ export function exampleForm(): TrackerForm {
   const t = todayKST(), start = addDays(t, -28);
   return {
     ...emptyForm(), name: '예시 물량 · 후지', variety: '후지', harvest_date: addDays(t, -29), intake_date: start, sameStart: true,
-    initial_measured_on: start, initial_sample_count: '10', firmness: '72.0', brix: '14.2', acidity: '0.38', weight: '285',
-    packaging: '통기성 상자', location: '1호 저장고', storage: '일반 저온', mcp: '미처리',
+    initialSameStart: true, initial_measured_on: start, initial_sample_count: '10', firmness: '72.0', brix: '14.2', acidity: '0.38', weight: '285',
+    packaging: '통기성 상자', location: '1호 저장고', storage: '일반 저온', mcp: '미처리', mcpSelected: true,
     measure: {probe_mm: '11.1', peeled: '껍질 제거', position: '적도부 양면', fruit_temp: '1', instrument: '예시 경도계'},
     tracked: {sample_id: 'example-tracked-1', count: '10', initial_weight: '285'},
   };
@@ -106,30 +114,32 @@ export function payloadFromForm(f: TrackerForm, mode: 'real' | 'example' = 'real
   if(mode==='example')throw new Error('예시 데이터는 실제 물량 기록으로 저장할 수 없습니다.');
   const isHongro=isHongroVariety(f.variety);
   const h=f.hongro;
-  const quality=isHongro ? (h.source==='measured' ? h.initial : {firmness:'',brix:'',acidity:'',weight:''}) : f;
-  const measuredInput = !isHongro || h.source === 'measured';
+  const legacyHongro=isHongro && f.legacyHongro;
+  const quality=legacyHongro ? {firmness:h.initial.firmness.trim()||f.firmness,brix:h.initial.brix.trim()||f.brix,acidity:h.initial.acidity.trim()||f.acidity,weight:h.initial.weight.trim()||f.weight} : isHongro ? (h.source==='measured' ? h.initial : {firmness:'',brix:'',acidity:'',weight:''}) : f;
+  const measuredInput = !isHongro || legacyHongro || h.source === 'measured';
   const firmN = measuredInput && !f.missing.firmness ? firmnessToN(quality.firmness, f.firmness_unit) : null;
-  if (measuredInput && quality.firmness.trim() && firmN === null) num(quality.firmness);
+  if (measuredInput && !f.missing.firmness && quality.firmness.trim() && firmN === null) num(quality.firmness);
   return {
     record_mode: mode,
     name: effectiveName(f).trim(), variety: f.variety.trim(), intake_date: f.intake_date, harvest_date: f.harvest_date || null,
     storage_start_date: f.sameStart ? (f.intake_date || null) : (f.storage_start_date || null),
-    initial_measured_on: f.initial_measured_on || null, initial_sample_count: num(f.initial_sample_count),
-    firmness: firmN, brix: measuredInput && !f.missing.brix ? num(quality.brix) : null, acidity: num(quality.acidity), weight: num(quality.weight),
+    initial_measured_on: effectiveInitialMeasuredOn(f) || null, initial_sample_count: num(f.initial_sample_count),
+    firmness: firmN, brix: measuredInput && !f.missing.brix ? num(quality.brix) : null, acidity: measuredInput && !f.missing.acidity ? num(quality.acidity) : null, weight: num(quality.weight),
     packaging: txt(f.packaging), location: txt(f.location), sensor_id: txt(f.sensor_id),
     storage: f.storage, mcp: f.mcp, team_shared: f.team_shared,
     details: {
       storage_temperature: num(f.temperature), loss_reference: f.loss_reference === true,
-      initial_source: isHongro && h.source === 'weather' ? '날씨 기반 추정' : '실측',
-      firmness_input: (() => { const raw = isHongro ? h.initial.firmness : f.firmness; return !f.missing.firmness && firmnessToN(raw, f.firmness_unit) !== null ? {value: num(raw), unit: f.firmness_unit} : null; })(),
-      not_measured: (['firmness', 'brix'] as const).filter(k => f.missing[k]),
+      initial_same_start: f.initialSameStart === true,
+      initial_source: isHongro && !legacyHongro && h.source === 'weather' ? '날씨 기반 추정' : '실측',
+      firmness_input: (() => { const raw = quality.firmness; return !f.missing.firmness && firmnessToN(raw, f.firmness_unit) !== null ? {value: num(raw), unit: f.firmness_unit} : null; })(),
+      not_measured: (['firmness', 'brix', 'acidity'] as const).filter(k => f.missing[k]),
       measure: {probe_mm: num(f.measure.probe_mm), peeled: f.measure.peeled || null, position: txt(f.measure.position), fruit_temp: num(f.measure.fruit_temp), instrument: txt(f.measure.instrument)},
       mcp: {treated_on:f.mcpd.treated_on||null,product:txt(f.mcpd.product),concentration:txt(f.mcpd.concentration),hours:num(f.mcpd.hours),temp:num(f.mcpd.temp)},
       ca: {from:f.ca.from||null,to:f.ca.to||null,o2:num(f.ca.o2),co2:num(f.ca.co2)},
       tracked: {sample_id:txt(f.tracked.sample_id),count:num(f.tracked.count),initial_weight:num(f.tracked.initial_weight)},
-      ...(isHongro ? {hongro: {
+      ...(isHongro && !legacyHongro ? {hongro: {
         schemaVersion: 1, modelVersion: HONGRO_MODEL_VERSION, cultivar:'hongro', region:'geochang', mode:'real', source:h.source, storage:h.storage,
-        initial: {firmness:f.missing.firmness?null:firmnessToN(h.initial.firmness,f.firmness_unit),brix:f.missing.brix?null:num(h.initial.brix),acidity:num(h.initial.acidity),weight:num(h.initial.weight),diameter:num(h.initial.diameter)},
+        initial: {firmness:f.missing.firmness?null:firmnessToN(h.initial.firmness,f.firmness_unit),brix:f.missing.brix?null:num(h.initial.brix),acidity:f.missing.acidity?null:num(h.initial.acidity),weight:num(h.initial.weight),diameter:num(h.initial.diameter)},
         weather: {chang_min4:num(h.weather.chang_min4),chang_LC56:num(h.weather.chang_LC56),chang_LC78:num(h.weather.chang_LC78),chang_9rain:num(h.weather.chang_9rain)},
         units: {...HONGRO_UNITS},
       }} : {}),
@@ -142,14 +152,23 @@ export function validateForm(f: TrackerForm, forSave: boolean): Partial<Record<s
   const e: Record<string, string> = {}, today = todayKST();
   const isHongro=isHongroVariety(f.variety);
   const numCheck = (k: string, v: string, min: number, max: number, label: string) => { const p = parseOptionalNumber(v); if (p.status === 'missing') return; if (p.status === 'invalid') { e[k] = `${label}: ${p.reason}`; return; } if (p.value < min || p.value > max) e[k] = `${label}: 단위와 소수점을 확인해 주세요. 기존 시스템의 저장 허용 범위는 ${min}~${max}이며, 정상 품질이나 모델 적용 범위를 뜻하지 않습니다.`; };
-  if(isHongro)Object.assign(e,validateHongroForm(f.hongro));
+  if (isHongro) {
+    const hongroErrors = validateHongroForm(f.hongro);
+    // A measured metric may be blank or explicitly unmeasured; each forecast
+    // is assessed independently instead of requiring all three metrics.
+    if (f.hongro.source === 'measured') {
+      for (const k of ['firmness', 'brix', 'acidity'] as const) {
+        if (f.missing[k] || !f.hongro.initial[k].trim()) delete hongroErrors[`hongro.initial.${k}`];
+      }
+    }
+    Object.assign(e, hongroErrors);
+  }
   const measuredInput = !isHongro || f.hongro.source === 'measured';
   if (measuredInput) {
     const q = isHongro ? f.hongro.initial : f, pre = isHongro ? 'hongro.initial.' : '';
     if (!f.missing.firmness) { numCheck(pre + 'firmness', q.firmness, 0, f.firmness_unit === 'kgf' ? 30.6 : 300, '경도'); }
-    if (forSave) for (const k of ['firmness', 'brix'] as const) if (!f.missing[k] && !q[k].trim() && !e[pre + k]) e[pre + k] = `${k === 'firmness' ? '경도' : '당도'} 값을 입력하거나 ‘미측정’을 골라 주세요.`;
   }
-  if (!isHongro) {numCheck('brix', f.brix, 0, 40, '당도'); numCheck('acidity', f.acidity, 0, 10, '산도'); numCheck('weight', f.weight, 1, 2000, '평균 중량');}
+  if (!isHongro) {if (!f.missing.brix) numCheck('brix', f.brix, 0, 40, '당도'); if (!f.missing.acidity) numCheck('acidity', f.acidity, 0, 10, '산도'); numCheck('weight', f.weight, 1, 2000, '평균 중량');}
   numCheck('initial_sample_count', f.initial_sample_count, 1, 10000, '표본 수');
   if (f.initial_sample_count.trim() && !Number.isInteger(Number(f.initial_sample_count))) e.initial_sample_count = '표본 수는 정수로 입력해 주세요.';
   numCheck('probe_mm', f.measure.probe_mm, 0.5, 50, '탐침 직경'); numCheck('fruit_temp', f.measure.fruit_temp, -5, 40, '과실 온도');
@@ -161,10 +180,11 @@ export function validateForm(f: TrackerForm, forSave: boolean): Partial<Record<s
   if (f.tracked.sample_id.length > 80) e.tracked_sample_id = '추적 표본 ID는 80자 이내로 입력해 주세요.';
   }
   const start = f.sameStart ? f.intake_date : f.storage_start_date;
+  const measuredOn = effectiveInitialMeasuredOn(f);
   if(isHongro&&!start&&forSave)e.storage_start_date='홍로 계산에 사용할 실제 저장 시작일을 입력해 주세요.';
   if (f.harvest_date && f.intake_date && f.harvest_date > f.intake_date) e.harvest_date = '수확일이 입고일보다 늦습니다.';
-  for (const [k, v] of [['harvest_date', f.harvest_date], ['intake_date', f.intake_date], ['storage_start_date', start], ['initial_measured_on', f.initial_measured_on]] as const) if (v) { if (!isDate(v)) e[k] = '유효한 날짜를 입력해 주세요.'; else if (v > today && !e[k]) e[k] = '오늘 이후 날짜는 입력할 수 없습니다.'; }
-  if (start && f.initial_measured_on && f.initial_measured_on < start) e.initial_measured_on = '측정일이 저장 시작일보다 빠릅니다.';
+  for (const [k, v] of [['harvest_date', f.harvest_date], ['intake_date', f.intake_date], ['storage_start_date', start], ['initial_measured_on', measuredOn]] as const) if (v) { if (!isDate(v)) e[k] = '유효한 날짜를 입력해 주세요.'; else if (v > today && !e[k]) e[k] = '오늘 이후 날짜는 입력할 수 없습니다.'; }
+  if (start && measuredOn && measuredOn < start) e.initial_measured_on = '측정일이 저장 시작일보다 빠릅니다.';
   if (forSave) {
     if (!effectiveName(f).trim()) e.name = '물량 이름을 입력해 주세요.';
     if (!f.variety.trim()) e.variety = '품종을 입력해 주세요.';
@@ -179,7 +199,12 @@ export function validateForm(f: TrackerForm, forSave: boolean): Partial<Record<s
 export type Draft = {form: TrackerForm; baseSig: string; savedAt: string};
 const draftKey = (user: string, mode: string, lot: string) => `appletrack:draft:v1:${user}:${mode}:${lot}`;
 export function loadDraft(user: string, mode: string, lot: string): Draft | null {
-  try { const raw = window.localStorage.getItem(draftKey(user, mode, lot)); if (!raw) return null; const d = JSON.parse(raw), empty = emptyForm(); return d && d.form ? {...d, form: {...empty, ...d.form, measure: {...empty.measure, ...d.form.measure}, mcpd: {...empty.mcpd, ...d.form.mcpd}, ca: {...empty.ca, ...d.form.ca}, tracked: {...empty.tracked, ...d.form.tracked}, missing: {...empty.missing, ...d.form.missing}, hongro:{...empty.hongro,...d.form.hongro,initial:{...empty.hongro.initial,...d.form.hongro?.initial},weather:{...empty.hongro.weather,...d.form.hongro?.weather}}}} : null; } catch { return null; }
+  try {
+    const raw = window.localStorage.getItem(draftKey(user, mode, lot)); if (!raw) return null;
+    const d = JSON.parse(raw), empty = emptyForm(); if (!d?.form) return null;
+    const mcpSelected = typeof d.form.mcpSelected === 'boolean' ? d.form.mcpSelected : ['처리', '미처리'].includes(d.form.mcp);
+    return {...d, form: {...empty, ...d.form, mcpSelected, measure: {...empty.measure, ...d.form.measure}, mcpd: {...empty.mcpd, ...d.form.mcpd}, ca: {...empty.ca, ...d.form.ca}, tracked: {...empty.tracked, ...d.form.tracked}, missing: {...empty.missing, ...d.form.missing}, hongro:{...empty.hongro,...d.form.hongro,initial:{...empty.hongro.initial,...d.form.hongro?.initial},weather:{...empty.hongro.weather,...d.form.hongro?.weather}}}};
+  } catch { return null; }
 }
 export function saveDraft(user: string, mode: string, lot: string, d: Draft): boolean {
   try { window.localStorage.setItem(draftKey(user, mode, lot), JSON.stringify(d)); return window.localStorage.getItem(draftKey(user, mode, lot)) !== null; } catch { return false; }
