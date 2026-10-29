@@ -637,3 +637,7 @@ legend.qt3-q-head{padding:0;margin-bottom:8px;width:100%;display:flex}
   .qt5-apple{padding:12px 16px}
   .qt5-guide{grid-template-columns:minmax(0,1fr);gap:14px;padding:16px}
 }
+
+.qt5-main.qt5-main-full{grid-template-columns:minmax(0,1fr)}
+.qt5-main.qt5-main-full .qt4-chart{border-right:0!important}
+.qt5-apple-fold{padding:12px 0 16px;max-width:560px}

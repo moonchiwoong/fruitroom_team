@@ -709,7 +709,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
                 <span className="qt4-tile-note">{!ok ? (r.reason ?? '자료 부족').replace(/^적용 모델 없음:\s*/, '') : m === 'loss' ? (actualLoss ? `실측 ${fmtNum(actualLoss.value, 2)} %` : `${r.kind} · 저장일수로 계산`) : an ? `${an.source === 'latest' ? '계산 시작점' : '처음'}보다 ${describeChange(m, r.value!, an.value).short}` : r.kind}</span>
               </button>; })}
           </div>
-          <div className="qt5-main">
+          <div className="qt5-main qt5-main-full">
           <div className="qt2-chart qt4-chart">
           <div className="qt-chartbox">
           <div className="qt2-chart-head"><h2>{metricMeta[metric].label} 변화</h2>
@@ -732,7 +732,6 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         </div>
 
           </div>
-            <div className="qt5-apple"><Boundary><QualityAppleViewer compact day={selDay} cultivar={form.variety} metrics={modelResults} /></Boundary></div>
           </div>
           <section id="qt-metric-result" role="tabpanel" aria-labelledby={'qt-tab-' + metric} className="qt5-guide">
             <div className="qt5-guide-main">
@@ -779,6 +778,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           </section>
         </div>
         <div className="qt2-more">
+        <Apple3DFold day={selDay} cultivar={form.variety} metrics={modelResults} />
         {hongro && <details className="qt2-fold"><summary>홍로 조건·중량·횡경 초기값<Plus size={16} /></summary><p className="qt-help">홍로 · {form.storage} · {form.temperature || '미입력'}℃ · 1-MCP {form.mcp} · 저장 {selectedDayLabel} · 초기품질 출처: {sourceLabel}{exampleMode ? ' · 예시 데이터' : ''}</p><div className="qt-latest-values">{(['weight', 'diameter'] as const).map(m => <div key={m}><dt>{m === 'weight' ? '중량' : '횡경'} · 초기값만 제공</dt><dd>{hongroResult?.initial[m] === undefined ? '미입력' : `${fmtNum(hongroResult.initial[m]!, 1)} ${HONGRO_UNITS[m]}`}</dd></div>)}</div><p className="qt-help">중량·횡경의 저장 중 변화 자료는 없습니다. 홍로 감모율은 일반 저온 0℃·4℃, 1-MCP 미처리 조건에서 계산하며 검증은 미완료입니다. 당도는 제공된 식에 따라 처음 값을 유지합니다.</p></details>}
         <details className="qt2-fold"><summary>감모율 실측·예측 구분<Plus size={16} /></summary>
         <section className="qt-loss-sources" aria-label="감모율 자료 구분">
@@ -894,6 +894,15 @@ class Boundary extends Component<{children: ReactNode}, {failed: boolean}> {
 }
 
 
+
+/** 3D 외관은 기본 화면에서 빼고, 펼칠 때만 불러옵니다(모델 파일 약 3MB). */
+function Apple3DFold({day, cultivar, metrics}: {day: number; cultivar: string; metrics: Record<MetricId, ModelResult>}) {
+  const [open, setOpen] = useState(false);
+  return <details className="qt2-fold" onToggle={e => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
+    <summary>3D 외관 예시 보기<Plus size={16} /></summary>
+    {open && <div className="qt5-apple-fold"><Boundary><QualityAppleViewer compact day={day} cultivar={cultivar} metrics={metrics} /></Boundary></div>}
+  </details>;
+}
 
 /** 한눈에 고르는 선택 버튼 묶음. 실제 라디오 입력이라 화살표 키로도 바꿀 수 있습니다. */
 function Seg<T extends string>({id, legend, value, options, onChange, err}: {id: string; legend: ReactNode; value: T | ''; options: {value: T; label: string}[]; onChange: (v: T) => void; err?: string}) {
