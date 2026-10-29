@@ -388,10 +388,6 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   // ── 입력 화면: 물량 전환 · 저장고 조건 불러오기 · 조건 판별 · 입력·예측 조건 확인 ──
   const [storeOpen, setStoreOpen] = useState(false), [storeFrom, setStoreFrom] = useState('');
   const [checkShown, setCheckShown] = useState(false), [checkedSig, setCheckedSig] = useState<string | null>(null);
-  /** 새 물량에서는 1-MCP를 아직 고르지 않은 상태로 보여 줍니다(값은 ‘미확인’으로 유지해 처리 안 함으로 계산하지 않음). */
-  const [mcpTouched, setMcpTouched] = useState(false);
-  useEffect(() => { setMcpTouched(false); }, [lotKey, mode]);
-  const mcpChosen = mcpTouched || exampleMode || lotKey !== 'new' || form.mcp !== '미확인';
   const checkRef = useRef<HTMLElement>(null);
   useEffect(() => { setStoreOpen(false); setStoreFrom(''); setCheckShown(false); setCheckedSig(null); }, [scope]);
   function startNewLot() { if (exampleMode) changeMode('real'); setLotKey('new'); setBaseline(null); setSelectedDay(null); }
@@ -517,8 +513,8 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           <div className="qt3-grid2">
             <Seg id="tf-variety" legend="어떤 품종인가요?" value={hongro ? '홍로' : '후지'} options={[{value: '후지', label: '후지'}, {value: '홍로', label: '홍로'}]} onChange={v => switchCultivar(v)} err={saveErrors.variety} />
             <Seg id="tf-storage" legend="어떻게 보관하나요?" value={form.storage} options={[{value: '일반 저온', label: '일반 저온'}, {value: 'CA', label: 'CA'}, {value: '기타', label: '기타'}]} onChange={v => set('storage', v)} />
-            <Seg id="tf-mcp" legend={<>1-MCP 처리를 했나요?<span className="qt3-hint" title="1-MCP는 사과의 숙성을 늦추는 처리예요. 처리 기록(처리일·제품)을 확인해 주세요.">무엇인가요?</span></>} value={mcpChosen ? form.mcp : ''}
-              options={[{value: '처리', label: '처리함'}, {value: '미처리', label: '처리 안 함'}, {value: '미확인', label: '미확인'}]} onChange={v => { setMcpTouched(true); set('mcp', v); }} />
+            <Seg id="tf-mcp" legend={<>1-MCP 처리를 했나요?<span className="qt3-hint" title="1-MCP는 사과의 숙성을 늦추는 처리예요. 처리 기록(처리일·제품)을 확인해 주세요.">무엇인가요?</span></>} value={form.mcp === '미확인' ? '' : form.mcp}
+              options={[{value: '처리', label: '처리함'}, {value: '미처리', label: '처리 안 함'}]} onChange={v => set('mcp', v)} />
             <div className="qt3-q">
               <div className="qt3-q-head"><label htmlFor="tf-temperature">실제 저장고 온도</label></div>
               <div className="qt3-unit-input"><input id="tf-temperature" className="qt3-input" type="number" step="any" inputMode="decimal" placeholder="실제로 보관한 온도" value={form.temperature}
@@ -538,8 +534,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
                 : <p className={'qt3-help' + (form.sameStart && !form.intake_date ? ' warn' : '')}>{form.sameStart ? form.intake_date ? '입고일과 같은 날로 계산해요. 이 날이 저장 0일차예요.' : '입고일을 먼저 입력해 주세요. 입력하면 저장 시작일도 같은 날이 돼요.' : '실제로 저장고에 넣어 보관을 시작한 날짜예요.'}</p>}
             </div>
           </div>
-          {form.mcp === '미확인' && !mcpChosen && !checkShown ? <div className="qt3-note info" role="note"><Info size={16} /><div><b>1-MCP 처리 여부를 고르면 적용할 예측식을 알려 드려요.</b><span>잘 모르면 ‘미확인’을 골라도 기록은 저장할 수 있어요.</span></div></div>
-          : form.mcp === '미확인' ? <div className="qt3-note warn" role="note"><AlertTriangle size={16} /><div><b>처리 여부를 확인해야 이 조건의 품질 변화를 예측할 수 있어요.</b><span>지금은 기록을 남길 수 있어요. 1-MCP 미확인을 ‘처리 안 함’으로 계산하지 않아요.</span></div></div>
+          {form.mcp === '미확인' ? <div className="qt3-note info" role="note"><Info size={16} /><div><b>1-MCP 처리 여부를 선택해 주세요.</b><span>선택하기 전에는 예측하지 않으며, 기록은 저장할 수 있어요.</span></div></div>
             : <div className={'qt3-note ' + (condition.ok ? 'ok' : 'warn')} role="status">{condition.ok ? <Check size={16} /> : <AlertTriangle size={16} />}<div><b>{condition.title}</b>{condition.detail && <span>{condition.detail}</span>}</div></div>}
           {form.mcp === '처리' && <details className="qt3-more">
             <summary>1-MCP 처리 기록 <small>선택</small></summary>
