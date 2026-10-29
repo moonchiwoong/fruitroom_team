@@ -2,7 +2,7 @@
 import {useCallback, useEffect, useState, type ReactNode} from 'react';
 import dynamic from 'next/dynamic';
 import {Apple, ArrowRight, ArrowUpRight, BookOpen, ClipboardList, Home as HomeIcon, Info, LineChart, LogOut, Menu, MessageCircle, ShieldCheck, UserRound, X} from 'lucide-react';
-import {applePhoto, PHOTOS} from '@/lib/photos';
+import {applePhoto} from '@/lib/photos';
 import {useTeamSession} from '@/components/team-auth';
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog';
 import {requestJson} from '@/components/lot-forms';
@@ -147,7 +147,7 @@ function HomePage({lots, loaded, error, retry, openTracker, setTab, onAskAI, ope
           <button className="ah-textlink" onClick={() => openTracker('example')}>처음이라면 예시로 체험하기<ArrowRight size={17} /></button>
         </div>
       </div>
-      <figure className="ah-hero-photo"><img src={PHOTOS.hero} alt="나무 상자에 담긴 사과를 표현한 3D 그래픽" /><figcaption>3D 그래픽 · 실제 저장고 사진이 아닙니다</figcaption></figure>
+      <figure className="ah-hero-photo"><img src="/assets/photos/hero-orchard.svg" alt="나무 상자에서 사과를 고르는 손" /><figcaption>AI 생성 이미지 · 실제 저장고 사진이 아닙니다</figcaption></figure>
     </section>
 
     <section className="ah-section" aria-labelledby="ah-my">
