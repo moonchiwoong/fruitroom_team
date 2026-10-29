@@ -55,47 +55,20 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
     try { setHandoff(!!sessionStorage.getItem(HANDOFF_KEY)); } catch { /* 무시 */ }
     if (window.location.hash === '#join') requestAnimationFrame(() => goJoin());
   }, [recovery]);
-  function goJoin(m?: Mode) { if (m) setMode(m); document.getElementById('join')?.scrollIntoView({block: 'start'}); }
+  function goJoin(m?: Mode) { if (m) setMode(m); document.getElementById('join')?.scrollIntoView({block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'}); }
 
   const d = (i: number) => ({'data-reveal': '', style: {'--d': `${i * 90}ms`} as React.CSSProperties});
   return <div ref={rootRef} className={'landing landing-v2' + (motion ? ' lv-motion' : '')}>
-    <header className="landing-nav">
-      <div className="landing-nav-inner">
-        <a className="brand2" href="/" aria-label="애플트랙 첫 화면"><span className="brand-mark2"><Apple size={20} /></span><span className="brand-text">애플트랙<small>by FarmBridge</small></span></a>
-        <nav aria-label="계정 메뉴" className="landing-account">
-          <a className="landing-link" href="/try">예시 체험</a>
-          <button className="landing-link" onClick={() => goJoin('login')}>로그인</button>
-          <button className="btn btn-primary btn-sm" onClick={() => goJoin('signup')}>가입하기</button>
-        </nav>
-      </div>
-    </header>
+    <Hero onJoin={goJoin} animate={motion} />
 
     <main>
-      {story ? <AppleSplitStory onFail={storyFail} intro={<div className="lv-hero-copy as-intro-copy">
-          <p className="lv-kicker">사과 품질 예측·저장 관리</p>
-          <h1 id="lv-title"><span className="lv-line">초기 품질부터</span><span className="lv-line">저장 중 변화까지</span></h1>
-          <p className="lv-lead">초기 품질을 입력하고, 저장 기간에 따른 변화를 예측해 실제 측정값과 비교하세요.</p>
-          <div className="lv-actions">
-            <a className="btn btn-primary btn-lg" href="/try">예시로 체험하기<ArrowRight size={18} /></a>
-            <a className="btn btn-soft btn-lg" href="/try?mode=real">내 측정값 입력하기</a>
-          </div>
-          <p className="lv-note">가입하지 않아도 바로 볼 수 있어요. 기록으로 저장할 때만 로그인합니다.</p>
-        </div>} /> :
-      <section className="lv-hero" aria-labelledby="lv-title">
-        <div className="lv-hero-copy">
-          <p className="lv-kicker" {...d(0)}>사과 품질 예측·저장 관리</p>
-          <h1 id="lv-title"><span className="lv-line" {...d(1)}>초기 품질부터</span><span className="lv-line" {...d(2)}>저장 중 변화까지</span></h1>
-          <p className="lv-lead" {...d(3)}>초기 품질을 입력하고, 저장 기간에 따른 변화를 예측해 실제 측정값과 비교하세요.</p>
-          <div className="lv-actions" {...d(4)}>
-            <a className="btn btn-primary btn-lg" href="/try">예시로 체험하기<ArrowRight size={18} /></a>
-            <a className="btn btn-soft btn-lg" href="/try?mode=real">내 측정값 입력하기</a>
-          </div>
-          <p className="lv-note" {...d(5)}>가입하지 않아도 바로 볼 수 있어요. 기록으로 저장할 때만 로그인합니다.</p>
-        </div>
-        <div className="lv-preview-wrap" {...d(4)}><ServicePreview animate={motion} /></div>
-      </section>}
+      {story && <AppleSplitStory onFail={storyFail} intro={<div className="lv-hero-copy as-intro-copy">
+        <p className="lv-kicker">사과 품질을 데이터로</p>
+        <h2>사과 한 알에서<br />시작되는 기록</h2>
+        <p className="lv-lead">측정값과 저장 조건으로 사과의 변화를 살펴보세요.</p>
+      </div>} />}
 
-      <section className="lv-section" aria-labelledby="lv-how">
+      <section id="service-guide" className="lv-section" aria-labelledby="lv-how">
         <h2 id="lv-how" {...d(0)}>세 단계면 충분해요</h2>
         <ol className="lv-steps">
           <li {...d(1)}><span>1</span><div><b>초기 품질 입력</b><p>측정일, 표본 수와 경도(N)·당도(°Brix)·산도(%)를 넣어요. 한 항목만 있어도 됩니다.</p></div></li>
@@ -139,6 +112,117 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
       <span>계산값은 시연용이며 출하·안전 판정을 대신하지 않습니다.</span>
     </footer>
   </div>;
+}
+
+// 첫 화면 이미지 경로는 이곳에서 변경합니다.
+const HERO = { image: '/assets/photos/hero-orchard.svg', position: 'center center' };
+
+function Hero({onJoin, animate}: {onJoin: (mode: Mode) => void; animate: boolean}) {
+  const [open, setOpen] = useState(false);
+  const toggle = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { setOpen(false); toggle.current?.focus(); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
+  const guide = () => {
+    setOpen(false);
+    document.getElementById('service-guide')?.scrollIntoView({block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+  };
+  return <>
+    <header className="shot-header">
+      <div className="shot-header-inner">
+        <a className="shot-logo" href="/" aria-label="애플트랙 첫 화면"><span className="shot-logo-mark"><Apple size={25} aria-hidden="true" /></span><span>애플트랙<small>by FarmBridge</small></span></a>
+        <button ref={toggle} className="shot-menu-toggle" type="button" aria-label={open ? '메뉴 닫기' : '메뉴 열기'} aria-expanded={open} aria-controls="shot-nav" onClick={() => setOpen(!open)}><span /><span /><span /></button>
+        <nav id="shot-nav" className={'shot-nav' + (open ? ' is-open' : '')} aria-label="주요 메뉴">
+          <button type="button" onClick={guide}>이용 가이드</button>
+          <a href="/try">예시 체험</a>
+          <button type="button" onClick={() => { setOpen(false); onJoin('login'); }}>로그인</button>
+          <button type="button" className="shot-signup" onClick={() => { setOpen(false); onJoin('signup'); }}>가입하기</button>
+        </nav>
+      </div>
+    </header>
+    <section className="shot-hero" aria-labelledby="shot-title">
+      <div className="shot-copy">
+        <p className="shot-kicker">사과 품질 예측·저장 관리</p>
+        <h1 id="shot-title">초기 품질부터<br />저장 중 변화까지</h1>
+        <p className="shot-lead">초기 품질을 입력하고, 저장 기간에 따른 변화를<br className="shot-desktop-break" /> 예측해 실제 측정값과 비교하세요.</p>
+        <div className="shot-actions">
+          <a className="shot-action shot-primary" href="/try">예시로 체험하기 <ArrowRight size={18} aria-hidden="true" /></a>
+          <a className="shot-action shot-secondary" href="/try?mode=real">내 측정값 입력하기</a>
+        </div>
+        <p className="shot-note">가입하지 않아도 바로 볼 수 있어요.<br />기록으로 저장할 때만 로그인합니다.</p>
+      </div>
+      <div className="shot-visual">
+        <img className="shot-photo" src={HERO.image} alt="" style={{objectPosition: HERO.position}} />
+        <div className="shot-card"><ServicePreview animate={animate} /></div>
+      </div>
+    </section>
+    <style jsx>{`
+      :global(.as-intro-copy h2) {font-size:clamp(34px,4.2vw,54px); line-height:1.22; font-weight:700; letter-spacing:-1.4px; color:var(--ds-text); margin:0}
+      .shot-header {background:#fff}
+      .shot-header-inner {max-width:1440px; margin:0 auto; padding:26px 40px; min-height:98px; display:flex; align-items:center; justify-content:space-between; gap:24px; border-bottom:1px solid #e8eeea}
+      .shot-logo {display:inline-flex; align-items:center; gap:12px; color:#18241e; text-decoration:none; font-size:22px; font-weight:800; line-height:1.1; white-space:nowrap}
+      .shot-logo-mark {width:52px; height:52px; display:grid; place-items:center; border-radius:15px; background:#bc423a; color:white}
+      .shot-logo small {display:block; margin-top:4px; font-size:13px; font-weight:500; color:#71847b; letter-spacing:.01em}
+      .shot-nav {display:flex; align-items:center; gap:14px}
+      .shot-nav a,.shot-nav button {font:inherit; font-size:16px; font-weight:600; color:#20372d; text-decoration:none; background:transparent; border:0; border-radius:9px; padding:12px 14px; min-height:46px; white-space:nowrap; cursor:pointer}
+      .shot-nav a:hover,.shot-nav button:hover {background:#eef4ef}
+      .shot-nav .shot-signup {background:#225c41; color:#fff; padding:12px 22px}
+      .shot-nav .shot-signup:hover {background:#184a33}
+      .shot-menu-toggle {display:none}
+      .shot-hero {max-width:1440px; margin:0 auto; padding:72px 40px 100px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:clamp(44px,7vw,110px); align-items:center; min-height:650px}
+      .shot-copy {min-width:0; word-break:keep-all}
+      .shot-kicker {font-size:16px; color:#2d6b47; font-weight:700; margin:0 0 30px}
+      .shot-kicker:before {content:''; display:inline-block; width:9px; height:9px; border-radius:50%; background:#4e865c; vertical-align:middle; margin-right:10px}
+      .shot-copy h1 {margin:0; font-size:clamp(42px,4.7vw,70px); line-height:1.24; font-weight:900; letter-spacing:-.055em; color:#18241e}
+      .shot-lead {color:#65796e; font-size:18px; line-height:1.85; margin:30px 0 0}
+      .shot-actions {display:flex; flex-wrap:wrap; gap:12px; margin-top:34px}
+      .shot-action {min-height:56px; padding:0 23px; border-radius:9px; display:inline-flex; gap:18px; align-items:center; justify-content:center; text-decoration:none; font-size:16px; font-weight:700}
+      .shot-primary {background:#225c41; color:white}.shot-primary:hover {background:#184a33}
+      .shot-secondary {background:#eaf3ed; color:#225c41}.shot-secondary:hover {background:#dcebe1}
+      .shot-note {color:#87978e; font-size:14px; line-height:1.8; margin:24px 0 0}
+      .shot-visual {position:relative; min-width:0; padding:0 0 74px 36px}
+      .shot-photo {display:block; width:100%; aspect-ratio:1.03; object-fit:cover; border-radius:20px; background:#e8eee9}
+      .shot-card {position:absolute; width:min(83%,440px); bottom:0; left:0; filter:drop-shadow(0 16px 28px rgba(25,59,42,.12))}
+      .shot-card :global(.lv-preview) {background:#fff; border:1px solid #e8eeea; border-radius:18px; box-shadow:none; padding:20px; gap:10px}
+      .shot-card :global(.lv-preview-values > div) {background:#f6f9f6}
+      .shot-header :global(:focus-visible),.shot-hero :global(:focus-visible) {outline:3px solid #3264ff; outline-offset:3px}
+      @media(max-width:950px) {
+        .shot-hero {gap:35px; padding:50px 26px 80px; min-height:0}
+        .shot-header-inner {padding:20px 26px}
+        .shot-copy h1 {font-size:clamp(36px,5.4vw,55px)}
+        .shot-card {width:88%}
+      }
+      @media(max-width:700px) {
+        .shot-header-inner {padding:16px 20px; min-height:76px; position:relative; flex-wrap:wrap}
+        .shot-logo {font-size:19px}.shot-logo-mark {width:44px; height:44px; border-radius:12px}.shot-logo small {font-size:11px}
+        .shot-menu-toggle {display:flex; flex-direction:column; justify-content:center; gap:5px; width:44px; height:44px; padding:9px; background:transparent; border:0; cursor:pointer}
+        .shot-menu-toggle span {display:block; width:100%; height:2px; background:#1e392b}
+        .shot-nav {display:none; width:100%; flex-direction:column; align-items:stretch; gap:2px; padding-bottom:5px}
+        .shot-nav.is-open {display:flex}
+        .shot-nav a,.shot-nav button {text-align:left; padding:11px 12px; width:100%}
+        .shot-nav .shot-signup {text-align:center}
+        .shot-hero {display:flex; flex-direction:column; align-items:stretch; gap:38px; padding:52px 20px 65px}
+        .shot-kicker {margin-bottom:20px; font-size:14px}
+        .shot-copy h1 {font-size:clamp(35px,9vw,49px); letter-spacing:-.05em}
+        .shot-lead {font-size:16px; margin-top:22px; line-height:1.75}
+        .shot-desktop-break {display:none}
+        .shot-actions {margin-top:25px; gap:10px}
+        .shot-action {min-height:52px; font-size:15px; padding:0 17px}
+        .shot-note {margin-top:20px; font-size:13px}
+        .shot-visual {padding:0 0 0 14px}
+        .shot-photo {aspect-ratio:1.08; border-radius:16px}
+        .shot-card {position:relative; left:auto; bottom:auto; width:min(90%,390px); margin:-90px 0 0 -14px}
+        .shot-card :global(.lv-preview) {padding:14px; gap:7px}
+      }
+      @media(max-width:380px) {.shot-actions {flex-direction:column}.shot-action {width:100%}}
+      @media(prefers-reduced-motion:reduce) {.shot-header *, .shot-hero * {transition:none!important; animation:none!important}}
+    `}</style>
+  </>;
 }
 
 /** 첫 화면의 서비스 미리보기: 실제 계산 엔진으로 만든 예시 결과. 예시·시연용임을 함께 표시합니다. */
