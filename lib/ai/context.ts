@@ -1,5 +1,5 @@
 import type {Observation} from '../lot-types';
-import type {TrackerForm} from '../tracker-form';
+import {effectiveInitialMeasuredOn, type TrackerForm} from '../tracker-form';
 /** Reproduction fingerprint only, never an authentication credential. */
 export function observationFingerprint(observations:Observation[]){
   const encoded=JSON.stringify([...observations].sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id)).map(o=>[o.id,o.date,o.firmness,o.brix,o.acidity??null,o.tracked_weight??null,o.sample_count,o.details?.tracked?.sample_id??null,o.details?.measure??null]));
@@ -8,7 +8,7 @@ export function observationFingerprint(observations:Observation[]){
   return `v1:${observations.length}:${encoded.length}:${(a>>>0).toString(16)}:${(b>>>0).toString(16)}`;
 }
 export function baselineCore(form:TrackerForm,useLatest:boolean){
-  return JSON.stringify({variety:form.variety,start:form.sameStart?form.intake_date:form.storage_start_date,measuredOn:form.initial_measured_on,firmness:form.firmness,brix:form.brix,acidity:form.acidity,tracked:form.tracked,measure:form.measure,storage:form.storage,mcp:form.mcp,temperature:form.temperature,loss_reference:form.loss_reference,hongro:form.hongro,useLatest});
+  return JSON.stringify({variety:form.variety,start:form.sameStart?form.intake_date:form.storage_start_date,measuredOn:effectiveInitialMeasuredOn(form),firmness:form.firmness,firmness_unit:form.firmness_unit,brix:form.brix,acidity:form.acidity,missing:form.missing,tracked:form.tracked,measure:form.measure,storage:form.storage,mcp:form.mcp,temperature:form.temperature,loss_reference:form.loss_reference,hongro:form.hongro,legacyHongro:form.legacyHongro,useLatest});
 }
 type MeasurementConditions={probe_mm?:unknown;peeled?:unknown;position?:unknown;fruit_temp?:unknown;instrument?:unknown}|null|undefined;
 /** Explicit differences prohibit comparisons; missing metadata remains clearly unverified. */
