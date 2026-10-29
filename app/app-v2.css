@@ -596,3 +596,44 @@ legend.qt3-q-head{padding:0;margin-bottom:8px;width:100%;display:flex}
     line-height: 1.4;
   }
 }
+
+/* ── 결과 대시보드: 조건 → 저장 일수 → 지표 4칸 → 그래프·3D → 안내 ── */
+.qt5-dash{margin-top:12px;background:#fff;border:1px solid var(--app-line);border-radius:20px;overflow:hidden}
+.qt5-head{display:flex;align-items:baseline;justify-content:space-between;gap:6px 16px;flex-wrap:wrap;padding:16px 22px;background:var(--ds-brand);color:#fff}
+.qt5-head h2{margin:0;font-size:19px;font-weight:800;letter-spacing:-.3px;color:#fff}
+.qt5-head span{font-size:14px;opacity:.85;overflow-wrap:anywhere}
+.qt5-row{display:flex;align-items:center;flex-wrap:wrap;gap:10px 16px;padding:14px 22px;border-bottom:1px solid var(--app-line)}
+.qt5-row.qt2-when{padding:14px 22px;gap:10px 16px}
+.qt5-row-label{min-width:76px;font-size:15px;font-weight:800;color:var(--app-ink)}
+.qt5-chips{display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:1;min-width:0}
+.qt5-chips button{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;min-height:48px;padding:6px 14px;border:1px solid var(--app-line);border-radius:12px;background:#fff;font:inherit;font-size:15px;font-weight:700;color:var(--app-ink);cursor:pointer;text-align:left}
+.qt5-chips button small{font-size:12px;font-weight:500;color:var(--app-sub)}
+.qt5-chips button:hover:not(:disabled){border-color:var(--ds-brand)}
+.qt5-chips button:focus-visible{outline:2px solid var(--ds-brand);outline-offset:2px}
+.qt5-chips button.active{border-color:var(--ds-brand);box-shadow:inset 0 0 0 1px var(--ds-brand);background:var(--ds-brand-soft);color:var(--ds-brand)}
+.qt5-chips button.compare{border:1.5px dashed #B26A12;background:#FFF7EA;color:#7A4A0B}
+.qt5-chips button.compare small{color:#7A4A0B}
+.qt5-chips button:disabled{opacity:.5;cursor:not-allowed}
+.qt5-row-note{flex-basis:100%;font-size:14px;line-height:1.55;color:var(--ds-warn-text);background:var(--ds-warn-bg);border-radius:8px;padding:6px 10px}
+.qt5-dash .qt4-tiles{padding:16px 22px;border-bottom:1px solid var(--app-line)}
+.qt5-tile-seg{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:6px;background:#EEF2EA;color:#3E5A44;font-size:12px;font-weight:600}
+.qt5-main{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);border-bottom:1px solid var(--app-line)}
+.qt5-main .qt4-chart{grid-area:auto;border:0!important;border-right:1px solid var(--app-line)!important;border-radius:0;padding:18px 22px!important}
+.qt5-apple{display:flex;padding:16px;min-width:0}
+.qt5-apple>*{flex:1}
+.qt5-guide{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;padding:18px 22px;background:#FBFCF8}
+.qt5-guide-title{display:flex;align-items:center;gap:6px;margin:0 0 6px;font-size:16px;font-weight:800;color:var(--ds-brand)}
+.qt5-guide .qt2-result-value{font-size:clamp(34px,3.4vw,44px)}
+.qt5-guide .qt-result-basis-summary{margin-top:0;align-self:start}
+.qt5-guide .qt4-summary-actions{margin-top:12px}
+@media(max-width:960px){
+  .qt5-head{padding:14px 16px}
+  .qt5-row,.qt5-row.qt2-when{padding:12px 16px}
+  .qt5-row-label{flex-basis:100%}
+  .qt5-chips button{flex:1 1 140px}
+  .qt5-dash .qt4-tiles{padding:12px 16px}
+  .qt5-main{grid-template-columns:minmax(0,1fr)}
+  .qt5-main .qt4-chart{border-right:0!important;border-bottom:1px solid var(--app-line)!important;padding:14px 16px!important}
+  .qt5-apple{padding:12px 16px}
+  .qt5-guide{grid-template-columns:minmax(0,1fr);gap:14px;padding:16px}
+}

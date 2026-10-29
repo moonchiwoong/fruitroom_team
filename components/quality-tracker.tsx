@@ -20,7 +20,7 @@ import {isHongroVariety} from '@/lib/cultivar';
 import {calculateHongroForm, emptyHongroForm, exampleHongroForm} from '@/lib/hongro-tracker';
 import {HONGRO_WEATHER_PRESETS, HONGRO_STORAGE_LABELS, HONGRO_UNITS, HONGRO_WEATHER_FIELDS, HONGRO_UNITS_CONFLICT} from '@/lib/hongro';
 import {buildQualityExportCsv, type QualityExportInput} from '@/lib/quality-export';
-import {predictQuality, getQualitySeries, selectQualityModel} from '@/lib/quality-models';
+import {predictQuality, getQualitySeries, selectQualityModel, HONGRO_LOSS_RATE} from '@/lib/quality-models';
 type ModelResult = ReturnType<typeof predictQuality>;
 type ModelInput = Parameters<typeof predictQuality>[0];
 
@@ -378,6 +378,10 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     return out;
   })();
   const firstBrix = initialValue('brix');
+  /** 홍로 식의 어느 구간인지 (계산식 정의에서 그대로 읽은 설명) */
+  const hongroSegment = (m: MetricId) => m === 'firmness' ? (selDay <= 60 ? '0~60일 구간 식' : '60일 이후 구간 식')
+    : m === 'brix' ? '식에 저장 중 변화 없음' : m === 'acidity' ? (selDay <= 60 ? '60일까지 처음 값 유지' : '60일 이후 감소 구간')
+    : num(form.temperature) === 0 || num(form.temperature) === 4 ? `L = ${HONGRO_LOSS_RATE[num(form.temperature) as 0 | 4]} × t` : '';
   const lastObsDate = pastObs.length ? pastObs.reduce((a, o) => o.date > a ? o.date : a, pastObs[0].date) : null;
   const staleDays: number | null = !exampleMode && !!activeLot && !!lastObsDate && isDate(asOf) ? daysBetween(lastObsDate, asOf) : null;
 
@@ -669,8 +673,23 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
       <section className={'qt-main' + (stale ? ' qt3-stale' : '')} aria-label="품질 예측 결과" ref={resultsRef} tabIndex={-1} hidden={!showResults || !!loadError}>
         {stale && <div className="qt-banner warn qt3-stale-banner" role="status"><AlertTriangle size={16} /><span>입력이 바뀌었어요. 아래 결과는 바뀐 입력으로 다시 계산 중이니, <b>입력·예측 조건 확인</b>을 눌러 지원 여부를 다시 확인해 주세요.</span><button className="btn btn-ghost" onClick={checkConditions}>다시 확인</button></div>}
         <div className="qt3-note info" role="note"><Info size={16} /><div>현재는 측정 기록과 계산 결과를 비교해 보는 체험 단계입니다. 예측 정확도와 오차 범위는 아직 검증되지 않았으며, 출하·안전 여부를 판정하지 않습니다.</div></div>
-        <div className="qt2-when">
-          <span className="qt2-when-q">언제의 상태를 볼까요?</span>
+        <div className="qt5-dash">
+          <div className="qt5-head"><h2>{hongro ? '거창 홍로' : (form.variety || '사과')} 저장 품질 예측</h2><span>{lotName}</span></div>
+          <div className="qt5-row" role="group" aria-labelledby="qt5-cond-label">
+            <span id="qt5-cond-label" className="qt5-row-label">저장 조건</span>
+            {hongro ? <div className="qt5-chips">
+              {([0, 4] as const).map(t => { const rec = num(form.temperature) === t, recOk = num(form.temperature) === 0 || num(form.temperature) === 4;
+                return <button key={t} type="button" disabled={!recOk} aria-pressed={rec || (!rec && showConditions)} className={rec ? 'active' : showConditions ? 'compare' : ''}
+                  onClick={() => { if (rec) setShowConditions(false); else setShowConditions(v => !v); }}>{t}℃ 저온저장<small>{rec ? '기록한 조건' : showConditions ? '비교 중' : '비교해 보기'}</small></button>; })}
+              {!(num(form.temperature) === 0 || num(form.temperature) === 4) && <span className="qt5-row-note">기록한 온도({form.temperature || '미입력'}℃)에는 홍로 식이 없어 계산하지 않아요. 0℃·4℃로 바꿔 계산하지 않아요.</span>}
+            </div> : <div className="qt5-chips">
+              <button type="button" aria-pressed={futureId === 'same'} className={futureId === 'same' ? 'active' : ''} onClick={() => setFutureId('same')}>기록 조건 유지<small>{recorded.id ? modelLabel[recorded.id] : `${form.storage} · 1-MCP ${form.mcp}`}</small></button>
+              {(['cold', 'mcp', 'ca'] as StorageId[]).filter(id => id !== recorded.id).map(id => <button key={id} type="button" aria-pressed={futureId === id} className={futureId === id ? 'compare' : ''} onClick={() => setFutureId(futureId === id ? 'same' : id)}>{modelLabel[id]}<small>{futureId === id ? '오늘 이후 바꿨다면' : '바꿨다면?'}</small></button>)}
+              {futureId !== 'same' && <span className="qt5-row-note">조건 변경 시나리오: 오늘 이후 구간만 바꾼 식으로 이어 계산해요. 실제 전환 효과는 검증되지 않았어요.</span>}
+            </div>}
+          </div>
+          <div className="qt5-row qt2-when">
+            <span className="qt5-row-label">저장 일수</span>
           <div className="qt2-chips"><button type="button" className={selDay === asOfDay ? 'active' : ''} aria-pressed={selDay === asOfDay} disabled={!startOk || asOfDay < 0 || asOfDay > maxDays} onClick={() => setSelectedDay(asOfDay)}>오늘</button></div>
           <div className="qt-range-control" style={{flex: '1 1 300px', minWidth: 0}}>
             <label htmlFor="qt-selected-day">저장 기간 <strong>{selectedDayLabel}</strong></label>
@@ -680,56 +699,17 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           <label className="qt2-datepick" htmlFor="qt-selected-date"><CalendarDays size={18} /><span>날짜 선택</span>
             <input id="qt-selected-date" type="date" value={selDate} disabled={!startOk} min={startDate} max={startOk ? addDays(startDate, maxDays) : undefined}
               onChange={e => { if (!e.target.value) setSelectedDay(Number.NaN); else if (startOk && isDate(e.target.value)) setSelectedDay(daysBetween(startDate,e.target.value)); }} /></label>
-        </div>
-        {hongro && <><p className="qt-help">홍로 · {form.storage} · {form.temperature || '미입력'}℃ · 1-MCP {form.mcp} · 저장 {selectedDayLabel} · 초기품질 출처: {sourceLabel}{exampleMode ? ' · 예시 데이터' : ''}</p><div className="qt-latest-values">{(['weight', 'diameter'] as const).map(m => <div key={m}><dt>{m === 'weight' ? '중량' : '횡경'} · 초기값만 제공</dt><dd>{hongroResult?.initial[m] === undefined ? '미입력' : `${fmtNum(hongroResult.initial[m]!, 1)} ${HONGRO_UNITS[m]}`}</dd></div>)}</div><p className="qt-help">중량·횡경의 저장 중 변화 자료는 없습니다. 홍로 감모율은 일반 저온 0℃·4℃, 1-MCP 미처리 조건에서 계산하며 검증은 미완료입니다. 당도는 제공된 식에 따라 처음 값을 유지합니다.</p></>}
-        <div className="qt4-top">
-          <div className="qt4-apple"><Boundary><QualityAppleViewer compact day={selDay} cultivar={form.variety} metrics={modelResults} /></Boundary></div>
-          <aside id="qt-metric-result" role="tabpanel" aria-labelledby={'qt-tab-' + metric} className="qt2-result qt4-summary">
-            <p className="qt2-result-when">{whenLabel}{Number.isFinite(selDay) ? ` · 저장 ${selDay}일차` : ''}{isDate(selDate) ? ` · ${fmtDate(selDate)}` : ''}</p>
-            <div className="qt2-result-main" aria-live="polite">
-              <p className="qt2-result-label">{metricMeta[metric].label} {modelResults[metric].kind === '실측' ? '실측값' : modelResults[metric].kind === '참고 추정' ? '참고 추정값' : '계산값'}<span>{plainMeaning[metric]}</span></p>
-              {selectedValue.status === 'ok' ? <>
-                <p className="qt2-result-value">{fmtNum(selectedValue.value, metricMeta[metric].digits)}<span>{displayUnit(metric)}</span></p>
-                <p className="qt2-result-change" style={hasDisplayedChange ? {background: '#edf6ef', color: '#205e3b', borderLeft: '3px solid #3f8a5e', borderRadius: 8, padding: '10px 12px', fontWeight: 600} : undefined}>{initialComparison}</p>
-                <details className="qt2-fold">
-                  <summary>이 수치 자세히 보기<Plus size={16} /></summary>
-                  <p className="qt-help">{metric === 'firmness' ? '경도는 측정기로 과육을 누를 때 필요한 힘이에요. 처음 입력값과 계산값의 차이로, 식감을 직접 판정하지 않아요.'
-                    : metric === 'brix' ? '당도는 당을 포함한 가용성 고형분의 지표예요. 처음 값 대비 변화가 실제 단맛의 변화와 같다는 뜻은 아니에요.'
-                    : metric === 'acidity' ? '산도는 산 성분의 지표예요. %p는 산도 수치의 차이이고, 괄호 안 %는 처음 값에 대한 상대 변화예요.'
-                    : '실측 감모율은 같은 표본의 첫 중량 측정을 기준으로 하며, 모델 감모율은 저장 시작일을 기준으로 해요.'}</p>
-                  <p className="qt-help">계산값은 모델에 따른 결과예요. 비슷한 사과의 평균과 비교한 값이나 출하·안전 판정은 아니에요.</p>
-                </details>
-                {resultLines.map(t => <p key={t} className="qt2-result-change">{t}</p>)}
-              </> : <div className="qt2-result-na"><b>이 날짜의 값을 표시할 수 없어요</b><p>{selectedValue.reason}</p><button className="linkbtn" onClick={() => focus(hongro ? `tf-hongro-initial-${metric}` : 'tf-' + (metric === 'loss' ? 'tracked_sample_id' : metric))}>필요한 입력 확인하기</button></div>}
-            </div>
-            <div className="qt-result-basis-summary" aria-label="이 결과의 적용 조건과 검증 수준">
-              <p><b>이 결과에 사용한 조건</b> · {basisContext.cultivar} · {basisContext.storage} · {basisContext.temperature ? `${basisContext.temperature}℃` : '온도 미기록'} · 1-MCP {basisContext.mcp}</p>
-              <p>{!modelResults[metric].ok ? `계산할 수 없음 · ${modelResults[metric].reason || '입력과 조건을 확인해 주세요.'}` : modelResults[metric].kind === '실측' ? '같은 표본의 중량 기록에서 계산한 실측 감모율입니다.' : '모델 계산값 · 예측 정확도와 오차 범위는 검증되지 않았습니다.'}</p>
-              {!hongro && modelResults[metric].modelId && form.temperature.trim() !== '' && <p>후지 자료에 저장 온도가 없어 입력한 온도에서의 적용 타당성은 확인되지 않았습니다.</p>}
-              {(modelResults[metric].modelId === 'fuji-mcp-firmness' || priorResult?.modelId === 'fuji-mcp-firmness') && <p>후지 1-MCP 경도 자료의 수식과 설명이 서로 달라 정확성은 확인되지 않았습니다.</p>}
-              {hongro && metric === 'brix' && modelResults[metric].modelId && <p>홍로 당도 자료의 수식과 감소 설명이 서로 달라 실제 변화를 확인할 수 없습니다.</p>}
-              {weatherUnitWarning && <p>날씨로 추정한 초기 경도와 저장 모델의 경도 단위가 달라, 변환 없이 연결하거나 비교한 결과의 신뢰도는 확인되지 않았습니다.</p>}
-              {basisContext.contextNote && <p>{basisContext.contextNote}</p>}
-              <button type="button" className="linkbtn" onClick={() => openModelInfo(basisContext)}>이 결과의 계산 근거 <ArrowRight size={15} /></button>
-            </div>
-            {latestPoint && latestPoint.day !== selDay && <p className="qt4-line">최근 {exampleMode ? '예시 측정' : '실측'}({shortDate(latestPoint.date)}) {fmtNum(latestPoint.value, metricMeta[metric].digits)} {displayUnit(metric)}{firstValue !== null && latestPoint.day > t0 ? ` — 처음보다 ${describeChange(metric, latestPoint.value, firstValue).text}` : ''}</p>}
-            {staleDays !== null && staleDays >= 14 && <p className="qt4-line warn">마지막 측정이 {staleDays}일 전이에요. 오늘 측정값을 기록하면 최근 상태로 다시 계산할 수 있어요.</p>}
-            <div className="qt4-summary-actions">
-          {!exampleMode && activeLot && !guest ? <ObservationForm lot={activeLot} label="오늘 측정값 기록" className="btn btn-primary" onSaved={() => setReload(r => r + 1)} disabled={false} />
-            : guest && !exampleMode ? <button className="btn btn-primary" onClick={handoffToLogin}><Save size={16} />로그인하고 저장하기</button>
-            : exampleMode ? <button className="btn btn-primary" onClick={() => changeMode('real')}>내 측정값 입력하기</button>
-            : <button className="btn btn-primary" onClick={() => { setEditing(true); requestAnimationFrame(() => document.getElementById('qt-input-editor')?.scrollIntoView({behavior: 'smooth', block: 'start'})); }}>입력 정보 수정</button>}
-
-            </div>
-          </aside>
+          </div>
           <div className="qt4-tiles" role="group" aria-label="지표 요약 · 누르면 그래프가 바뀌어요">
             {visibleMetrics.map(m => { const r = modelResults[m], an = anchors[m], ok = r.ok && r.value !== null;
               return <button key={m} type="button" className={'qt4-tile' + (metric === m ? ' active' : '')} aria-pressed={metric === m} onClick={() => setMetric(m)}>
                 <span className="qt4-tile-label">{metricMeta[m].label}</span>
                 <span className="qt4-tile-value">{ok ? <>{fmtNum(r.value!, metricMeta[m].digits)}<small>{displayUnit(m)}</small></> : '계산 없음'}</span>
+                {hongro && ok && <span className="qt5-tile-seg">{hongroSegment(m)}</span>}
                 <span className="qt4-tile-note">{!ok ? (r.reason ?? '자료 부족').replace(/^적용 모델 없음:\s*/, '') : m === 'loss' ? (actualLoss ? `실측 ${fmtNum(actualLoss.value, 2)} %` : `${r.kind} · 저장일수로 계산`) : an ? `${an.source === 'latest' ? '계산 시작점' : '처음'}보다 ${describeChange(m, r.value!, an.value).short}` : r.kind}</span>
               </button>; })}
           </div>
+          <div className="qt5-main">
           <div className="qt2-chart qt4-chart">
           <div className="qt-chartbox">
           <div className="qt2-chart-head"><h2>{metricMeta[metric].label} 변화</h2>
@@ -752,8 +732,54 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         </div>
 
           </div>
+            <div className="qt5-apple"><Boundary><QualityAppleViewer compact day={selDay} cultivar={form.variety} metrics={modelResults} /></Boundary></div>
+          </div>
+          <section id="qt-metric-result" role="tabpanel" aria-labelledby={'qt-tab-' + metric} className="qt5-guide">
+            <div className="qt5-guide-main">
+              <p className="qt5-guide-title"><Info size={17} aria-hidden="true" />안내</p>
+            <p className="qt2-result-when">{whenLabel}{Number.isFinite(selDay) ? ` · 저장 ${selDay}일차` : ''}{isDate(selDate) ? ` · ${fmtDate(selDate)}` : ''}</p>
+            <div className="qt2-result-main" aria-live="polite">
+              <p className="qt2-result-label">{metricMeta[metric].label} {modelResults[metric].kind === '실측' ? '실측값' : modelResults[metric].kind === '참고 추정' ? '참고 추정값' : '계산값'}<span>{plainMeaning[metric]}</span></p>
+              {selectedValue.status === 'ok' ? <>
+                <p className="qt2-result-value">{fmtNum(selectedValue.value, metricMeta[metric].digits)}<span>{displayUnit(metric)}</span></p>
+                <p className="qt2-result-change" style={hasDisplayedChange ? {background: '#edf6ef', color: '#205e3b', borderLeft: '3px solid #3f8a5e', borderRadius: 8, padding: '10px 12px', fontWeight: 600} : undefined}>{initialComparison}</p>
+                <details className="qt2-fold">
+                  <summary>이 수치 자세히 보기<Plus size={16} /></summary>
+                  <p className="qt-help">{metric === 'firmness' ? '경도는 측정기로 과육을 누를 때 필요한 힘이에요. 처음 입력값과 계산값의 차이로, 식감을 직접 판정하지 않아요.'
+                    : metric === 'brix' ? '당도는 당을 포함한 가용성 고형분의 지표예요. 처음 값 대비 변화가 실제 단맛의 변화와 같다는 뜻은 아니에요.'
+                    : metric === 'acidity' ? '산도는 산 성분의 지표예요. %p는 산도 수치의 차이이고, 괄호 안 %는 처음 값에 대한 상대 변화예요.'
+                    : '실측 감모율은 같은 표본의 첫 중량 측정을 기준으로 하며, 모델 감모율은 저장 시작일을 기준으로 해요.'}</p>
+                  <p className="qt-help">계산값은 모델에 따른 결과예요. 비슷한 사과의 평균과 비교한 값이나 출하·안전 판정은 아니에요.</p>
+                </details>
+                {resultLines.map(t => <p key={t} className="qt2-result-change">{t}</p>)}
+              </> : <div className="qt2-result-na"><b>이 날짜의 값을 표시할 수 없어요</b><p>{selectedValue.reason}</p><button className="linkbtn" onClick={() => focus(hongro ? `tf-hongro-initial-${metric}` : 'tf-' + (metric === 'loss' ? 'tracked_sample_id' : metric))}>필요한 입력 확인하기</button></div>}
+            </div>
+            {latestPoint && latestPoint.day !== selDay && <p className="qt4-line">최근 {exampleMode ? '예시 측정' : '실측'}({shortDate(latestPoint.date)}) {fmtNum(latestPoint.value, metricMeta[metric].digits)} {displayUnit(metric)}{firstValue !== null && latestPoint.day > t0 ? ` — 처음보다 ${describeChange(metric, latestPoint.value, firstValue).text}` : ''}</p>}
+            {staleDays !== null && staleDays >= 14 && <p className="qt4-line warn">마지막 측정이 {staleDays}일 전이에요. 오늘 측정값을 기록하면 최근 상태로 다시 계산할 수 있어요.</p>}
+              {hongro && metric === 'firmness' && modelResults.firmness.ok && <p className="qt4-line">홍로 경도 식은 저장 60일 이후 하루 감소 폭이 조금 커지는 형태예요.</p>}
+              {hongro && metric === 'acidity' && modelResults.acidity.ok && <p className="qt4-line">홍로 산도 식은 60일까지 처음 값을 유지하고, 그 뒤 줄어드는 형태예요.</p>}
+            <div className="qt4-summary-actions">
+          {!exampleMode && activeLot && !guest ? <ObservationForm lot={activeLot} label="오늘 측정값 기록" className="btn btn-primary" onSaved={() => setReload(r => r + 1)} disabled={false} />
+            : guest && !exampleMode ? <button className="btn btn-primary" onClick={handoffToLogin}><Save size={16} />로그인하고 저장하기</button>
+            : exampleMode ? <button className="btn btn-primary" onClick={() => changeMode('real')}>내 측정값 입력하기</button>
+            : <button className="btn btn-primary" onClick={() => { setEditing(true); requestAnimationFrame(() => document.getElementById('qt-input-editor')?.scrollIntoView({behavior: 'smooth', block: 'start'})); }}>입력 정보 수정</button>}
+
+            </div>
+            </div>
+            <div className="qt-result-basis-summary" aria-label="이 결과의 적용 조건과 검증 수준">
+              <p><b>이 결과에 사용한 조건</b> · {basisContext.cultivar} · {basisContext.storage} · {basisContext.temperature ? `${basisContext.temperature}℃` : '온도 미기록'} · 1-MCP {basisContext.mcp}</p>
+              <p>{!modelResults[metric].ok ? `계산할 수 없음 · ${modelResults[metric].reason || '입력과 조건을 확인해 주세요.'}` : modelResults[metric].kind === '실측' ? '같은 표본의 중량 기록에서 계산한 실측 감모율입니다.' : '모델 계산값 · 예측 정확도와 오차 범위는 검증되지 않았습니다.'}</p>
+              {!hongro && modelResults[metric].modelId && form.temperature.trim() !== '' && <p>후지 자료에 저장 온도가 없어 입력한 온도에서의 적용 타당성은 확인되지 않았습니다.</p>}
+              {(modelResults[metric].modelId === 'fuji-mcp-firmness' || priorResult?.modelId === 'fuji-mcp-firmness') && <p>후지 1-MCP 경도 자료의 수식과 설명이 서로 달라 정확성은 확인되지 않았습니다.</p>}
+              {hongro && metric === 'brix' && modelResults[metric].modelId && <p>홍로 당도 자료의 수식과 감소 설명이 서로 달라 실제 변화를 확인할 수 없습니다.</p>}
+              {weatherUnitWarning && <p>날씨로 추정한 초기 경도와 저장 모델의 경도 단위가 달라, 변환 없이 연결하거나 비교한 결과의 신뢰도는 확인되지 않았습니다.</p>}
+              {basisContext.contextNote && <p>{basisContext.contextNote}</p>}
+              <button type="button" className="linkbtn" onClick={() => openModelInfo(basisContext)}>이 결과의 계산 근거 <ArrowRight size={15} /></button>
+            </div>
+          </section>
         </div>
         <div className="qt2-more">
+        {hongro && <details className="qt2-fold"><summary>홍로 조건·중량·횡경 초기값<Plus size={16} /></summary><p className="qt-help">홍로 · {form.storage} · {form.temperature || '미입력'}℃ · 1-MCP {form.mcp} · 저장 {selectedDayLabel} · 초기품질 출처: {sourceLabel}{exampleMode ? ' · 예시 데이터' : ''}</p><div className="qt-latest-values">{(['weight', 'diameter'] as const).map(m => <div key={m}><dt>{m === 'weight' ? '중량' : '횡경'} · 초기값만 제공</dt><dd>{hongroResult?.initial[m] === undefined ? '미입력' : `${fmtNum(hongroResult.initial[m]!, 1)} ${HONGRO_UNITS[m]}`}</dd></div>)}</div><p className="qt-help">중량·횡경의 저장 중 변화 자료는 없습니다. 홍로 감모율은 일반 저온 0℃·4℃, 1-MCP 미처리 조건에서 계산하며 검증은 미완료입니다. 당도는 제공된 식에 따라 처음 값을 유지합니다.</p></details>}
         <details className="qt2-fold"><summary>감모율 실측·예측 구분<Plus size={16} /></summary>
         <section className="qt-loss-sources" aria-label="감모율 자료 구분">
           <h3>감모율: 실측과 예측을 나눠 보여 줘요</h3>
