@@ -214,9 +214,9 @@ function Hero({onJoin, animate}: {onJoin: (mode: Mode) => void; animate: boolean
         .shot-actions {margin-top:25px; gap:10px}
         .shot-action {min-height:52px; font-size:15px; padding:0 17px}
         .shot-note {margin-top:20px; font-size:13px}
-        .shot-visual {padding-left:14px; padding-bottom:58px}
+        .shot-visual {padding:0 0 0 14px}
         .shot-photo {aspect-ratio:1.08; border-radius:16px}
-        .shot-card {width:min(90%,390px)}
+        .shot-card {position:relative; left:auto; bottom:auto; width:min(90%,390px); margin:-90px 0 0 -14px}
         .shot-card :global(.lv-preview) {padding:14px; gap:7px}
       }
       @media(max-width:380px) {.shot-actions {flex-direction:column}.shot-action {width:100%}}
