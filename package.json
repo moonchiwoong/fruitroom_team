@@ -6,7 +6,9 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "predev": "node scripts/restore-hongro-model.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/restore-hongro-model.mjs",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",

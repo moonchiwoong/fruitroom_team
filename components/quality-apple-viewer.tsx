@@ -7,6 +7,7 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {Minus, Plus, RotateCcw, Rotate3D, AlertTriangle} from 'lucide-react';
 import {APPLE_APPEARANCE_CONFIG, appleAppearance, positionChecksum, wrinkleApplePoint, type AppleAppearance} from '@/lib/apple-appearance';
+import {isHongroVariety} from '@/lib/cultivar';
 import styles from './quality-apple-viewer.module.css';
 
 export type AppearanceMetric = {
@@ -67,14 +68,15 @@ type MutableBody = {geometry: THREE.BufferGeometry; original: Float32Array; cent
 type ViewerApi = {controls: OrbitControls; camera: THREE.PerspectiveCamera; group: THREE.Group; bodies: MutableBody[]; update: (appearance: AppleAppearance) => void};
 
 /** The downloaded GLB is immutable; this viewer owns its parsed GPU resources. */
-export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '/models/apple-web.glb', compact = false}: QualityAppleViewerProps) {
+export default function QualityAppleViewer({day, cultivar, metrics, modelUrl, compact = false}: QualityAppleViewerProps) {
   const mount = useRef<HTMLDivElement>(null), api = useRef<ViewerApi | null>(null);
   const loss = metrics.loss.ok && metrics.loss.value !== null ? metrics.loss.value : null;
   const appearance = appleAppearance(loss), appearanceRef = useRef(appearance);
   appearanceRef.current = appearance;
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [errorText, setErrorText] = useState(''), [retry, setRetry] = useState(0);
-  const isHongro = /홍로|hongro/i.test(cultivar), isReference = metrics.loss.kind === '참고 추정';
+  const isHongro = isHongroVariety(cultivar), isReference = metrics.loss.kind === '참고 추정';
+  const resolvedModelUrl = modelUrl ?? (isHongro ? '/models/hongro-web.glb' : '/models/apple-web.glb');
 
   useEffect(() => {
     const host = mount.current;
@@ -147,17 +149,17 @@ export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '
     };
     renderer.domElement.addEventListener('webglcontextlost', contextLost);
     (async () => {
-      const bytes = await modelBytes(modelUrl);
+      const bytes = await modelBytes(resolvedModelUrl);
       if (disposed) return;
-      const gltf = await new GLTFLoader().parseAsync(bytes, new URL('.', new URL(modelUrl, window.location.href)).href);
+      const gltf = await new GLTFLoader().parseAsync(bytes, new URL('.', new URL(resolvedModelUrl, window.location.href)).href);
       if (disposed) {disposeScene(gltf.scene); return;}
       const original = gltf.scene;
       original.updateMatrixWorld(true);
       const bounds = new THREE.Box3().setFromObject(original), size = bounds.getSize(new THREE.Vector3()), centre = bounds.getCenter(new THREE.Vector3());
       if (!Number.isFinite(size.length()) || size.length() === 0) {disposeScene(original); throw new Error('빈 3D 모델입니다.');}
       const scale = 2 / Math.max(size.x, size.y, size.z);
-      // 붉은 면이 정면에 오도록 처음 방향만 돌려 둡니다(형상·변형 계산은 그대로).
-      const normalize = new THREE.Matrix4().makeRotationY(2.7).multiply(new THREE.Matrix4().makeScale(scale, scale, scale)).multiply(new THREE.Matrix4().makeTranslation(-centre.x, -centre.y, -centre.z));
+      // 첨부 홍로 모델은 +Z가 정면이고, 기존 후지 모델은 붉은 면을 정면으로 돌립니다.
+      const normalize = new THREE.Matrix4().makeRotationY(isHongro ? 0 : 2.7).multiply(new THREE.Matrix4().makeScale(scale, scale, scale)).multiply(new THREE.Matrix4().makeTranslation(-centre.x, -centre.y, -centre.z));
       const originals = new Set<THREE.BufferGeometry>();
       const meshCandidates: THREE.Mesh[] = [];
       original.traverse(object => {
@@ -170,7 +172,7 @@ export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '
       });
       originals.forEach(geometry => geometry.dispose());
       if (!meshCandidates.length) {disposeScene(original); throw new Error('표시할 메시가 없습니다.');}
-      const namedBodies = meshCandidates.filter(mesh => /apple.*body|fruit.*body/i.test(mesh.name));
+      const namedBodies = meshCandidates.filter(mesh => /apple.*body|fruit.*body|hongro.*body/i.test(mesh.name));
       const selected = namedBodies.length ? namedBodies : [meshCandidates.reduce((a, b) => a.geometry.getAttribute('position').count >= b.geometry.getAttribute('position').count ? a : b)];
       for (const mesh of selected) {
         const geometry = mesh.geometry, position = geometry.getAttribute('position');
@@ -190,7 +192,7 @@ export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '
       scene.environment?.dispose(); disposeScene(scene); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
       api.current = null;
     };
-  }, [modelUrl, retry]);
+  }, [resolvedModelUrl, isHongro, retry]);
 
   useEffect(() => {api.current?.update(appearanceRef.current);}, [loss]);
 
@@ -202,10 +204,10 @@ export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '
   };
   const reset = () => {const current = api.current; if (current) {current.group.rotation.set(0, 0, 0); current.controls.reset();}};
   const metricInfo = {firmness: ['경도', 1], brix: ['당도', 1], acidity: ['산도', 3], loss: ['감모율', 3]} as const;
-  const modelNote = <>공통 설명용 사과 모델 · {isHongro ? '홍로' : '후지'}의 실측 외형이 아닙니다. 정밀 스캔이 아니며 실제 크기는 확인되지 않았습니다.</>;
+  const modelNote = <>{isHongro ? '홍로 사진을 참고해 재구성한 설명용 3D 모델' : '설명용 후지 3D 모델'}입니다. 정밀 스캔이나 실제 사과의 측정 결과가 아닙니다.</>;
   return <section className={styles.viewer + (compact ? ' ' + styles.compact : '')} data-testid="quality-apple-viewer" data-day={day} data-load-state={loadState}>
     <div className={styles.heading}><span>{compact ? '설명용 3D · 실측 외형 아님' : '설명용 외관 시각화'}</span><b>저장 {Number.isFinite(day) ? day : '—'}일차</b></div>
-    {!compact && <p className={styles.modelNote}>공통 설명용 사과 모델 · {isHongro ? '홍로' : '후지'}의 실측 외형이 아닙니다. 정밀 스캔이 아니며 실제 크기는 확인되지 않았습니다.</p>}
+    {!compact && <p className={styles.modelNote}>{modelNote}</p>}
     <div className={styles.stage}>
       <div className={styles.canvas} ref={mount} role="img" aria-label="품질 계산과 연결된 사과 3D 모델. 드래그로 회전, 확대·축소 버튼으로 크기를 조절합니다." tabIndex={0}
         onKeyDown={event => {
@@ -223,7 +225,7 @@ export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '
           }
         }} />
       {loadState === 'loading' && <p className={styles.overlay} role="status">사과 3D 모델을 불러오는 중입니다…</p>}
-      {loadState === 'error' && <div className={styles.overlay} role="alert"><AlertTriangle size={22}/><p>{errorText}</p><button type="button" onClick={() => {bytesCache.delete(modelUrl); setRetry(value => value + 1);}}>3D 모델 다시 불러오기</button><small>아래 품질 계산값은 계속 확인할 수 있습니다.</small></div>}
+      {loadState === 'error' && <div className={styles.overlay} role="alert"><AlertTriangle size={22}/><p>{errorText}</p><button type="button" onClick={() => {bytesCache.delete(resolvedModelUrl); setRetry(value => value + 1);}}>3D 모델 다시 불러오기</button><small>아래 품질 계산값은 계속 확인할 수 있습니다.</small></div>}
     </div>
     <div className={styles.tools}>
       <small><Rotate3D size={15}/> 드래그로 회전 · 두 손가락으로 확대</small>
@@ -238,6 +240,6 @@ export default function QualityAppleViewer({day, cultivar, metrics, modelUrl = '
     {metrics.loss.source && metrics.loss.source.length > 0 && <p className={styles.source}>감모율 출처: {metrics.loss.source.join(' · ')}{metrics.loss.modelVersion && ` · ${metrics.loss.modelVersion}`}<br/>{metrics.loss.validation}</p>}
     {metrics.loss.warnings?.map(warning => <p key={warning} className={styles.source}>{warning}</p>)}
     </>}
-    <details className={styles.explanation}><summary>외관 연결 방식과 한계</summary>{compact && <p>{modelNote}</p>}{compact && metrics.loss.source && metrics.loss.source.length > 0 && <p>감모율 출처: {metrics.loss.source.join(' · ')}{metrics.loss.modelVersion && ` · ${metrics.loss.modelVersion}`} · {metrics.loss.validation}</p>}<p>감모율을 길이 감소율로 그대로 적용하지 않습니다. 일정 밀도·등방 수축을 가정해 길이 배율 = (1 − 감모율/100 × 수축 강도)의 세제곱근으로 나타내고, 표면 메시 좌표에 연속적인 주름 변형을 더합니다. 이 가정과 주름 강도는 실제 외관 자료로 보정되지 않은 설명용 설정입니다.</p><p>경도·당도·산도는 위 수치로 표시하며 형태 변형·껍질 색·부패를 결정하지 않습니다. 실측 사진이나 상품성·안전 보관 기간을 예측하는 모델이 아닙니다.</p><p>설정: 수축 강도 {APPLE_APPEARANCE_CONFIG.volumeLossStrength}, 주름 강도 {APPLE_APPEARANCE_CONFIG.wrinkleStrength}. 원본 GLB에는 품질 변화용 morph target이 없어 웹에서 본체 메시를 직접 변형합니다.</p></details>
+    <details className={styles.explanation}><summary>외관 연결 방식과 한계</summary>{compact && <p>{modelNote}</p>}{isHongro && <p>홍로 모델의 사진 출처: <a href="https://doi.org/10.3390/agriculture14050761" target="_blank" rel="noreferrer">Do 외 (2024), Agriculture 14(5), 761, 그림 3(b)</a>. 사진을 바탕으로 형태와 질감을 재구성·수정했습니다. <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>.</p>}{compact && metrics.loss.source && metrics.loss.source.length > 0 && <p>감모율 출처: {metrics.loss.source.join(' · ')}{metrics.loss.modelVersion && ` · ${metrics.loss.modelVersion}`} · {metrics.loss.validation}</p>}<p>감모율을 길이 감소율로 그대로 적용하지 않습니다. 일정 밀도·등방 수축을 가정해 길이 배율 = (1 − 감모율/100 × 수축 강도)의 세제곱근으로 나타내고, 표면 메시 좌표에 연속적인 주름 변형을 더합니다. 이 가정과 주름 강도는 실제 외관 자료로 보정되지 않은 설명용 설정입니다.</p><p>경도·당도·산도는 위 수치로 표시하며 형태 변형·껍질 색·부패를 결정하지 않습니다. 실측 사진이나 상품성·안전 보관 기간을 예측하는 모델이 아닙니다.</p><p>설정: 수축 강도 {APPLE_APPEARANCE_CONFIG.volumeLossStrength}, 주름 강도 {APPLE_APPEARANCE_CONFIG.wrinkleStrength}. 원본 GLB에는 품질 변화용 morph target이 없어 웹에서 본체 메시를 직접 변형합니다.</p></details>
   </section>;
 }

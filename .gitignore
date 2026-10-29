@@ -50,3 +50,6 @@ next-env.d.ts
 /artifacts/
 
 /tests/browser/artifacts/
+
+# Generated from the checked-in, hash-verified Hongro model chunks.
+/public/models/hongro-web.glb
