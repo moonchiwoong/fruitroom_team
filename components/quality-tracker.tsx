@@ -705,7 +705,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
             <div className="qt-result-basis-summary" aria-label="이 결과의 적용 조건과 검증 수준">
               <p><b>이 결과에 사용한 조건</b> · {basisContext.cultivar} · {basisContext.storage} · {basisContext.temperature ? `${basisContext.temperature}℃` : '온도 미기록'} · 1-MCP {basisContext.mcp}</p>
               <p>{!modelResults[metric].ok ? `계산할 수 없음 · ${modelResults[metric].reason || '입력과 조건을 확인해 주세요.'}` : modelResults[metric].kind === '실측' ? '같은 표본의 중량 기록에서 계산한 실측 감모율입니다.' : '모델 계산값 · 예측 정확도와 오차 범위는 검증되지 않았습니다.'}</p>
-              {!hongro && modelResults[metric].modelId && <p>후지 자료에 저장 온도가 없어 선택한 온도에서의 적용 타당성은 확인되지 않았습니다.</p>}
+              {!hongro && modelResults[metric].modelId && form.temperature.trim() !== '' && <p>후지 자료에 저장 온도가 없어 입력한 온도에서의 적용 타당성은 확인되지 않았습니다.</p>}
               {(modelResults[metric].modelId === 'fuji-mcp-firmness' || priorResult?.modelId === 'fuji-mcp-firmness') && <p>후지 1-MCP 경도 자료의 수식과 설명이 서로 달라 정확성은 확인되지 않았습니다.</p>}
               {hongro && metric === 'brix' && modelResults[metric].modelId && <p>홍로 당도 자료의 수식과 감소 설명이 서로 달라 실제 변화를 확인할 수 없습니다.</p>}
               {weatherUnitWarning && <p>날씨로 추정한 초기 경도와 저장 모델의 경도 단위가 달라, 변환 없이 연결하거나 비교한 결과의 신뢰도는 확인되지 않았습니다.</p>}
@@ -815,8 +815,6 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           </>}
           </section>}
         </details>
-
-        </div></details>
         </div>
       </section>
     </div>
