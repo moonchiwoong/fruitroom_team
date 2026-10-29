@@ -14,10 +14,11 @@ import {daysBetween} from '../lib/tracker';
 
 const asOf=todayKST(),actor:Actor={id:'isolation-test-user',isTeam:false};
 function fixture(variety='후지'){
-  const lot={...demoLots()[0],owner_id:actor.id,variety};
+  const demo=demoLots()[0];
+  const lot={...demo,initial_measured_on:demo.intake_date,owner_id:actor.id,variety};
   const analysis=demoAnalysis(lot,asOf),form=formFromLot(lot);
   if(isHongroVariety(variety)){
-    form.temperature='0';form.storage='일반 저온';form.mcp='미처리';
+    form.temperature='0';form.storage='일반 저온';form.mcp='미처리';form.legacyHongro=false;
     form.hongro.initial={firmness:'72',brix:'14.2',acidity:'0.38',weight:'',diameter:''};
   }
   const context:Extract<AIContext,{scope:'prediction'}>={mode:'real',scope:'prediction',lotId:lot.id,form,metric:'firmness',asOf,selectedDate:asOf,future:'same',useLatest:false,modelVersion:MODEL_VERSION,baseline:null};
