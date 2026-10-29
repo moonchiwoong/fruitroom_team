@@ -146,7 +146,7 @@ function HomePage({lots, loaded, error, retry, openTracker, setTab, onAskAI, ope
           <button className="ah-textlink" onClick={() => openTracker('example')}>처음이라면 예시로 체험하기<ArrowRight size={17} /></button>
         </div>
       </div>
-      <figure className="ah-hero-photo"><img src="/assets/photos/hero-orchard.svg" alt="나무 상자에서 사과를 고르는 손" /><figcaption>AI 생성 이미지 · 실제 저장고 사진이 아닙니다</figcaption></figure>
+      <figure className="ah-hero-photo"><img src="/assets/photos/hero-orchard.svg" alt="나무 상자에서 사과를 고르는 손" /></figure>
     </section>
 
     <section className="ah-section" aria-labelledby="ah-my">
