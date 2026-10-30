@@ -93,13 +93,11 @@ export function LotEditor({open, lot, onClose, onSaved}: {open: boolean; lot?: L
     </div>
     <div className={'ld-ready ' + preview.status} role="status"><Info size={16} aria-hidden="true" /><div><b>{preview.status === 'unsupported' ? preview.title : preview.status === 'conditions' ? '기록 가능 · ' + preview.title : '기록 가능 · ' + (preview.status === 'ready' ? '예측 가능' : '이 조건의 예측식 있음')}</b><span>{preview.status === 'ready' || preview.status === 'unsupported' || preview.status === 'conditions' ? preview.detail : '예측하려면 등록 후 예측 기준 초기 측정과 측정일을 기록해 주세요.'}</span></div></div>
     <details className="ld-more" open={!f.sameIntake || !!f.harvest || !!f.packaging || !!f.sensor || undefined}>
-      <summary>입고·수확·포장·센서 기록 <small>선택</small></summary>
+      <summary>입고·수확일 <small>선택</small></summary>
       <div className="ld-grid">
         <div className="ld-field wide"><label className="ld-check"><input type="checkbox" checked={f.sameIntake} onChange={e => setF(x => ({...x, sameIntake: e.target.checked, intake: e.target.checked ? x.intake : (x.intake || x.start)}))} />저장 시작일과 같은 날 입고했어요</label></div>
         {!f.sameIntake && <Field id="le-intake" label="입고일"><input id="le-intake" type="date" max={f.start || today()} value={f.intake} onChange={e => set('intake', e.target.value)} /></Field>}
         <Field id="le-harvest" label="수확일"><input id="le-harvest" type="date" max={intake || today()} value={f.harvest} onChange={e => set('harvest', e.target.value)} /></Field>
-        <Field id="le-pack" label="포장"><input id="le-pack" value={f.packaging} maxLength={120} placeholder="예: 통기성 상자" onChange={e => set('packaging', e.target.value)} /></Field>
-        <Field id="le-sensor" label="온습도 센서 번호" hint="온습도 CSV의 sensor_id와 같아야 업로드할 수 있어요."><input id="le-sensor" value={f.sensor} maxLength={60} onChange={e => set('sensor', e.target.value)} /></Field>
       </div>
     </details>
     {error && <p className="error-box" role="alert">{error}</p>}
@@ -161,30 +159,8 @@ export function MeasurementForm({open, lot, observation, prefill, isBaseline, ha
         {f.firmUnit === 'kgf' && f.firmness.trim() !== '' && Number.isFinite(Number(f.firmness)) && <p className="ld-hint">저장 값: {(Number(f.firmness) * KGF_TO_N).toFixed(1)} N (1 kgf = 9.80665 N)</p>}</Field>
       <Field id="mf-brix" label={<>당도 <small>°Brix</small></>}><input id="mf-brix" type="number" inputMode="decimal" step="any" min={0} value={f.brix} placeholder="예: 14.2" onChange={e => set('brix', e.target.value)} /></Field>
       <Field id="mf-acid" label={<>산도 <small>%</small></>}><input id="mf-acid" type="number" inputMode="decimal" step="any" min={0} value={f.acidity} placeholder="예: 0.32" onChange={e => set('acidity', e.target.value)} /></Field>
-      <Field id="mf-count" label={<>측정한 사과 수 <small>선택 · 개</small></>}><input id="mf-count" type="number" inputMode="numeric" step={1} min={1} value={f.count} placeholder="예: 5" onChange={e => set('count', e.target.value)} /></Field>
       <Field id="mf-notes" label={<>메모 <small>선택</small></>} wide><textarea id="mf-notes" rows={2} maxLength={1000} value={f.notes} placeholder="측정 방법, 관찰 내용" onChange={e => set('notes', e.target.value)} /></Field>
     </div>
-    <details className="ld-more" open={!!(f.weight || f.trackedWeight || f.trackedId) || undefined}>
-      <summary>중량·추적 표본 기록 <small>선택</small></summary>
-      <p className="ld-hint">실측 감모율은 같은 과실(추적 표본)의 ID·개수·측정일·중량이 초기와 이어질 때만 계산해요. 파괴 측정한 다른 과실의 평균 중량이나 모델 예측 감모율과 섞지 않아요. 초기 추적 표본 ID: <b>{lot.details?.tracked?.sample_id || '미기록'}</b></p>
-      <div className="ld-grid">
-        <Field id="mf-weight" label={<>파괴 측정 표본 평균 중량 <small>g</small></>}><input id="mf-weight" type="number" inputMode="decimal" step="any" value={f.weight} onChange={e => set('weight', e.target.value)} /></Field>
-        <Field id="mf-tw" label={<>같은 과실의 추적 표본 평균 중량 <small>g</small></>}><input id="mf-tw" type="number" inputMode="decimal" step="any" value={f.trackedWeight} onChange={e => set('trackedWeight', e.target.value)} /></Field>
-        <Field id="mf-tid" label="추적 표본 ID"><input id="mf-tid" value={f.trackedId} maxLength={80} onChange={e => set('trackedId', e.target.value)} /></Field>
-        <Field id="mf-tc" label={<>추적 표본 개수 <small>개</small></>}><input id="mf-tc" type="number" inputMode="numeric" step={1} value={f.trackedCount} onChange={e => set('trackedCount', e.target.value)} /></Field>
-      </div>
-    </details>
-    <details className="ld-more" open={(observation && !!(f.probe || f.position || f.instrument || f.defects !== '미확인')) || undefined}>
-      <summary>측정 조건·외관 관찰 <small>선택</small></summary>
-      <div className="ld-grid">
-        <Field id="mf-probe" label={<>탐침 직경 <small>mm</small></>}><input id="mf-probe" type="number" inputMode="decimal" step="any" value={f.probe} onChange={e => set('probe', e.target.value)} /></Field>
-        <Field id="mf-peel" label="껍질 제거 여부"><select id="mf-peel" value={f.peeled} onChange={e => set('peeled', e.target.value)}><option value="">미기록</option><option>껍질 제거</option><option>껍질 포함</option></select></Field>
-        <Field id="mf-pos" label="측정 위치"><input id="mf-pos" value={f.position} maxLength={80} onChange={e => set('position', e.target.value)} /></Field>
-        <Field id="mf-ft" label={<>과실 온도 <small>°C</small></>}><input id="mf-ft" type="number" inputMode="decimal" step="any" value={f.fruitTemp} onChange={e => set('fruitTemp', e.target.value)} /></Field>
-        <Field id="mf-inst" label="측정 기기"><input id="mf-inst" value={f.instrument} maxLength={80} onChange={e => set('instrument', e.target.value)} /></Field>
-        <Field id="mf-def" label="외관 관찰"><select id="mf-def" value={f.defects} onChange={e => set('defects', e.target.value)}>{['미확인', '없음', '주름', '멍·손상', '부패 의심'].map(v => <option key={v}>{v}</option>)}</select></Field>
-      </div>
-    </details>
     {error && <p className="error-box" role="alert">{error} 입력한 내용은 그대로 남아 있어요.</p>}
   </Shell>;
 }

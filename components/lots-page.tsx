@@ -120,12 +120,6 @@ export default function LotsPage({lots, loadError, reload, openTracker, focus, o
   return <div className={'lm' + (mobileDetail && selected ? ' has-detail' : '')}>
     <div className="lm-overview">
       {head}
-      <section className="lm-stats" aria-label="전체 물량 현황">
-        <div><span>관리 중인 물량</span><b>{summary.count}<small>건</small></b><Boxes size={22} aria-hidden="true" /></div>
-        <div><span>전체 저장 수량</span><b>{totalText.length ? totalText.map((t, i) => <span key={t}>{i > 0 && <em> · </em>}{t}</span>) : '—'}</b><Archive size={22} aria-hidden="true" />{summary.missingQuantity > 0 && <small className="lm-stat-sub">수량 미입력 {summary.missingQuantity}건 제외</small>}</div>
-        <div><span>사용 중인 저장고</span><b>{summary.storages}<small>곳</small></b><Warehouse size={22} aria-hidden="true" />{summary.noStorage > 0 && <small className="lm-stat-sub">저장고 미입력 {summary.noStorage}건</small>}</div>
-      </section>
-      <p className="lm-stats-note">조회할 수 있는 전체 물량 기준 · 공유받은 물량 {summary.shared}건 포함 · 검색·필터와 관계없이 집계 · 상자와 kg는 따로 합산</p>
     </div>
     {loadError && <div className="error-box" role="alert">목록을 새로 불러오지 못했습니다. {loadError}<button onClick={() => void reload()}>목록 다시 불러오기</button></div>}
     {notice && <div className="success-notice" role="status"><Check size={16} />{notice}<button onClick={() => setNotice('')} aria-label="알림 닫기">×</button></div>}
@@ -175,9 +169,6 @@ export default function LotsPage({lots, loadError, reload, openTracker, focus, o
           </div></div>}
         </div>
 
-        <div className="lm-tabs" role="tablist" aria-label="기록 종류">
-          {([['records', '측정 기록'], ['environment', '온습도 기록'], ['photos', '사진']] as [Sub, string][]).map(([k, t]) => <button key={k} id={'lot-tab-' + k} type="button" role="tab" aria-controls="lot-record-panel" aria-selected={sub === k} tabIndex={sub === k ? 0 : -1} className={sub === k ? 'active' : ''} onKeyDown={tabKeys} onClick={() => setSub(k)}>{t}</button>)}
-        </div>
         {loading && <div className="loading-strip"><Loader2 size={17} className="spin" />기록을 불러오는 중입니다.</div>}
 
         <div id="lot-record-panel" role="tabpanel" aria-labelledby={'lot-tab-' + sub} className="lm-panel">
@@ -206,7 +197,7 @@ export default function LotsPage({lots, loadError, reload, openTracker, focus, o
                   <td>{shortDate(o.date)}{isBase && <em className="lm-base-tag">예측 기준 초기</em>}</td><td><V v={o.firmness} /></td><td><V v={o.brix} /></td><td><V v={o.acidity} d={2} /></td><td>{o.sample_count ?? '—'}</td>
                   <td className="lm-note">{o.notes || (o.defects && o.defects !== '미확인' ? `외관: ${o.defects}` : '—')}</td>
                   <td className="lm-row-actions"><button type="button" className="linkbtn" onClick={() => setMeasure({open: true, obs: o, preset: false})}>수정</button>
-                    {!isBase && [o.firmness, o.brix, o.acidity].some(v => v !== null && v !== undefined) && <button type="button" className="linkbtn" disabled={!!busy} onClick={() => void post('initial', {observation_id: o.id}, `${shortDate(o.date)} 기록을 예측 기준 초기 측정으로 지정했습니다. 이전 기준값은 이력에 남겼어요.`)}>기준 지정</button>}</td>
+                    </td>
                 </tr>; })}
                 {!byNewest.length && !(hasInitialValues(lot) && !baseObs) && <tr><td colSpan={7} className="lm-note">아직 기록이 없어요. ‘측정 기록 추가’로 첫 기록을 남겨 주세요.</td></tr>}
                 {hasInitialValues(lot) && !baseObs && <tr className="is-base"><td>{lot.initial_measured_on ? shortDate(lot.initial_measured_on) : <span className="lm-warn-text">측정일 미기록</span>}<em className="lm-base-tag">예측 기준 초기 · 등록 시 입력</em></td>
@@ -223,8 +214,6 @@ export default function LotsPage({lots, loadError, reload, openTracker, focus, o
               </tbody></table></div>}
             <p className="lm-hint">‘—’는 그 기록에서 측정하지 않은 항목이에요(0이 아니에요). 예측 기준 초기 측정은 날짜 순서와 별도로 지정해요.</p>
             <div className="lm-foot-links"><button type="button" className="ah-textlink" aria-expanded={showAll} onClick={() => setShowAll(v => !v)}>{showAll ? '간단히 보기' : '전체 항목 보기'}<ArrowRight size={16} /></button></div>
-            {!!lot.details?.initial_history?.length && <details className="lm-more"><summary>이전 예측 기준값 이력 {lot.details.initial_history.length}건</summary>
-              <ul className="lm-prev">{lot.details.initial_history.map((h, i) => <li key={i}>{h.date ? shortDate(h.date) : '측정일 미기록'} · 경도 {fmt(h.firmness) ?? '—'} · 당도 {fmt(h.brix) ?? '—'} · 산도 {fmt(h.acidity, 2) ?? '—'}{h.replaced_at ? <small> · {h.replaced_at.slice(0, 10)} 기준 변경</small> : null}</li>)}</ul></details>}
           </section>
 
           <details className="lm-more">
