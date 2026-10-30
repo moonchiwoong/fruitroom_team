@@ -24,8 +24,8 @@ const ServicePreview = dynamic(() => import('@/components/landing').then(m => m.
 type Page = 'home' | 'track' | 'lots' | 'model' | 'account';
 const pages: {id: Page; label: string; icon: typeof Apple; kicker: string; title: string; desc: string; hidden?: boolean}[] = [
   {id: 'home', label: '홈', icon: HomeIcon, kicker: '', title: '', desc: ''},
-  {id: 'track', label: '품질 예측', icon: LineChart, kicker: '', title: '품질 예측', desc: '초기 품질을 입력하고, 저장 기간에 따른 변화를 계산해 실제 측정값과 비교하세요.'},
-  {id: 'lots', label: '물량 관리', icon: ClipboardList, kicker: 'STORAGE LOTS', title: '물량 관리', desc: '물량별 초기·후속 측정 기록, 온습도 이력, 사진을 한곳에서 확인합니다.'},
+  {id: 'track', hidden: true, label: '품질 예측', icon: LineChart, kicker: '', title: '품질 예측', desc: '초기 품질을 입력하고, 저장 기간에 따른 변화를 계산해 실제 측정값과 비교하세요.'},
+  {id: 'lots', label: '내 사과', icon: ClipboardList, kicker: 'MY APPLES', title: '내 사과', desc: '물량별 초기·후속 측정 기록, 온습도 이력, 사진을 한곳에서 확인합니다.'},
   {id: 'model', hidden: true, label: '모델 정보', icon: BookOpen, kicker: 'MODEL INFO', title: '모델 정보', desc: '계산에 쓰는 수식과 출처, 적용 조건, 검증 상태를 확인합니다. 기상 기반 회귀식도 여기에서 볼 수 있어요.'},
   {id: 'account', label: '내 정보', icon: UserRound, kicker: 'MY ACCOUNT', title: '내 정보', desc: '이름·소속·주 산지를 관리합니다.'},
 ];
@@ -63,6 +63,8 @@ export default function Home() {
   }, [openTracker]);
   // 소개·체험 화면에서 ‘실측값 입력’·‘예시로 체험’을 누르고 로그인한 경우
   const sessionUser = session?.userId;
+  // 로그인한 농가는 홈 대신 바로 ‘내 사과’ 목록에서 시작합니다(주소에 다른 화면이 지정된 경우는 그대로).
+  useEffect(() => { if (sessionUser && tabRef.current === 'home' && !location.hash.slice(1)) setTab('lots'); }, [sessionUser, setTab]);
   useEffect(() => {
     try {
       const intent = sessionStorage.getItem('appletrack:intent');

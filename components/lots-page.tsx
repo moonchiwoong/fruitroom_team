@@ -98,14 +98,14 @@ export default function LotsPage({lots, loadError, reload, openTracker, focus, o
 
   const head = <div className="lm-head">
     <div><h1>물량 관리</h1><p>저장한 사과와 측정 기록을 한눈에 확인하세요.</p></div>
-    <button className="btn btn-primary" onClick={() => setEditor({open: true, lot: null})}><Plus size={17} />새 물량 등록</button>
+    <button className="btn btn-primary" onClick={() => openTracker('real', 'new')}><Plus size={17} />새 사과</button>
   </div>;
   const editorEl = <LotEditor open={editor.open} lot={editor.lot} onClose={() => setEditor({open: false, lot: null})} onSaved={lot => void onLotSaved(lot)} />;
 
   if (!lots.length) return <div className="lm">{head}
     <section className="empty-panel"><ClipboardList size={34} /><h2>{loadError ? '물량을 불러오지 못했습니다.' : '아직 등록한 물량이 없어요.'}</h2>
       <p>{loadError || '물량을 등록하고 측정 기록·온습도 이력·사진을 여기서 관리하세요.'}</p>
-      <div className="qt-inline-btns"><button className="btn btn-primary" onClick={() => setEditor({open: true, lot: null})}><Plus size={16} />새 물량 등록</button><button className="btn btn-outline" onClick={() => openTracker('example')}>예시로 체험</button>{loadError && <button className="btn btn-outline" onClick={() => void reload()}>다시 불러오기</button>}</div>
+      <div className="qt-inline-btns"><button className="btn btn-primary" onClick={() => openTracker('real', 'new')}><Plus size={16} />새 물량 등록</button><button className="btn btn-outline" onClick={() => openTracker('example')}>예시로 체험</button>{loadError && <button className="btn btn-outline" onClick={() => void reload()}>다시 불러오기</button>}</div>
     </section>{editorEl}</div>;
 
   const lot = data?.lot ?? selected;
