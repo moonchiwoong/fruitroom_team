@@ -8,7 +8,7 @@ const kstToday = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 
 
 export async function GET(req: Request) {
   const key = process.env.RDA_SERVICE_KEY;
-  if (!key) return Response.json({error: '날씨 자동 조회가 아직 설정되지 않았어요. 날씨를 직접 골라 주세요.'}, {status: 503});
+  if (!key) return Response.json({error: '날씨 자동 조회가 아직 설정되지 않았어요.'}, {status: 503});
   const today = kstToday(), thisYear = Number(today.slice(0, 4));
   const year = Number(new URL(req.url).searchParams.get('year'));
   if (!Number.isInteger(year) || year < 2000 || year > thisYear) return Response.json({error: '조회할 연도를 확인해 주세요.'}, {status: 400});
@@ -22,7 +22,7 @@ export async function GET(req: Request) {
       rows.push(...parseDailyXml(await r.text()).rows);
     }
   } catch (e) {
-    const msg = e instanceof RdaError ? `농업기상 자료를 받지 못했어요: ${scrub(e.message)}` : '농업기상 서버에 연결하지 못했어요. 잠시 뒤 다시 시도하거나 날씨를 직접 골라 주세요.';
+    const msg = e instanceof RdaError ? `농업기상 자료를 받지 못했어요: ${scrub(e.message)}` : '농업기상 서버에 연결하지 못했어요. ';
     return Response.json({error: msg}, {status: 502});
   }
   const vars = computeHongroWeather(year, rows, today);
