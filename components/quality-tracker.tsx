@@ -144,7 +144,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     // 품종과 무관한 보관 기록은 새 품종 입력으로 이어 갑니다(측정값·날씨 선택은 품종별로 따로 보관).
     const {name, name_auto, storage, mcp, mcpSelected, temperature, intake_date, storage_start_date, sameStart, harvest_date, location, packaging, sensor_id, mcpd, ca, team_shared} = form;
     carryRef.current = {name, name_auto, storage, mcp, mcpSelected, temperature, intake_date, storage_start_date, sameStart, harvest_date, location, packaging, sensor_id, mcpd, ca, team_shared};
-    setSelectionDateRaw(isDate(selDate) ? selDate : null); setSelectedDayState(selDay); setCultivar(next); setMetric('firmness'); setBaseline(null); setUseLatest(false); setFutureId('same');
+    setSelectionDateRaw(isDate(selDate) ? selDate : null); setSelectedDayState(selDay); setCultivar(next); setMetric('firmness'); setBaseline(null); setUseLatest(true); setFutureId('same');
     setShowConditions(false); setShowObsCompare(false); setSaveMsg(null); setSaveErrors({});
     setEditing(true); setShowResults(false);
   }
@@ -182,7 +182,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const [futureId, setFutureId] = useState<StorageId | 'same'>('same');
   const future = isHongroVariety(form.variety) || futureId === 'same' ? recorded : {id: futureId, reason: ''};
   const futureLabel = futureId === 'same' ? `기록 조건 유지${recorded.id ? ` (${modelLabel[recorded.id]})` : ''}` : modelLabel[futureId];
-  const [useLatest, setUseLatest] = useState(false);
+  const [useLatest, setUseLatest] = useState(true);
   const [metric, setMetric] = useState<MetricId>('firmness');
   const [editing, setEditing] = useState(false), [showResults, setShowResults] = useState(false), [showConditions, setShowConditions] = useState(false);
   const [inputNotice, setInputNotice] = useState('');
@@ -191,7 +191,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   useEffect(() => {
     const firstInput = mode === 'real' && !activeLot;
     setEditing(firstInput || hongro); setShowResults(!firstInput); setShowConditions(false); setInputNotice('');
-    setBaseline(null); setFutureId('same'); setUseLatest(false); setMetric('firmness'); setShowObsCompare(false); setSaveMsg(null); setSaveErrors({});
+    setBaseline(null); setFutureId('same'); setUseLatest(true); setMetric('firmness'); setShowObsCompare(false); setSaveMsg(null); setSaveErrors({});
   }, [scope, mode, key, activeLot?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 실측(또는 예시) 기록과 계산 ──
@@ -295,6 +295,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         const r = await requestJson<{lot: Lot}>('/api/lots', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
         clearDraft(user, mode, draftKey); readyKey.current = ''; await onLotsChanged(); setLotKey(r.lot.id);
         setSaveMsg({ok: true, text: `정식 기록 저장 완료 · ‘${r.lot.name}’`});
+        openLot(r.lot.id);
       }
     } catch (err) { setSaveMsg({ok: false, text: (err as Error).message}); }
     finally { setSaving(false); }
@@ -398,7 +399,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   // ── 입력 화면: 물량 전환 · 저장고 조건 불러오기 · 조건 판별 · 입력·예측 조건 확인 ──
   const [storeOpen, setStoreOpen] = useState(false), [storeFrom, setStoreFrom] = useState('');
   // 새 홍로 물량: ‘수확 당일 바로 입고’를 고르면 저장 시작일을 수확일과 같게 둡니다. 체크하지 않으면 날짜를 따로 받습니다.
-  const [harvestSame, setHarvestSame] = useState(false);
+  const [harvestSame, setHarvestSame] = useState(true);
   const [quickDay, setQuickDay] = useState(60);
   useEffect(() => { if (firstInput && fujiWeather && !form.initialSameStart) setForm(f => ({...f, initialSameStart: true})); }, [firstInput, fujiWeather, form.initialSameStart, setForm]);
   // 새 물량 화면은 예측식이 있는 조합만 고르게 합니다. 홍로는 일반 저온·1-MCP 미처리 한 가지라 그 조건으로 둡니다.
@@ -544,7 +545,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
       <section id="qt-input-editor" className="new-card" aria-labelledby="new-condition"><div className="new-card-head"><h2 id="new-condition"><span>1</span>사과와 보관 조건</h2><small>예측 조건 확인에 필요</small></div>
         <div className="new-grid2">
           <Seg id="tf-variety" legend="품종" value={hongro ? '홍로' : '후지'} options={[{value:'후지',label:'후지'},{value:'홍로',label:'홍로'}]} onChange={switchCultivar} err={shownErrors.variety} />
-          {hongro ? <div className="qt3-q"><div className="qt3-q-head"><span>보관 조건</span></div><p className="new-fixed-cond">일반 저온 · 1-MCP 미처리</p><p className="qt3-help">다른 조건은 준비 중이에요.</p></div>
+          {hongro ? <div className="qt3-q"><div className="qt3-q-head"><span>보관 조건</span></div><p className="new-fixed-cond">일반 저온 · 1-MCP 미처리</p><p className="qt3-help">홍로는 거창 자료로 만든 식으로 계산해요. 다른 조건은 준비 중이에요.</p></div>
           : <><Seg id="tf-storage" legend="보관 방식" value={form.storage} options={[{value:'일반 저온',label:'일반 저온'},{value:'CA',label:'CA'},...(form.storage === '기타' ? [{value:'기타' as const,label:'기타',disabled:true,tag:'준비 중'}] : [])]} onChange={v => setForm(f => ({...f, storage: v, ...(v === 'CA' && f.mcp === '처리' ? {mcp: '미확인', mcpSelected: false} : {})}))} />
           <div><Seg id="tf-mcp" legend="1-MCP 처리 여부" value={mcpChosen ? form.mcp : ''} options={[{value:'처리',label:'처리함',disabled:form.storage === 'CA',tag:form.storage === 'CA' ? '준비 중' : undefined},{value:'미처리',label:'미처리'}]} onChange={v => setForm(f => ({...f,mcp:v,mcpSelected:true}))} err={shownErrors.mcp} />{form.storage === 'CA' && <p className="qt3-help">CA + 1-MCP 처리 예측은 준비 중이에요. 기록은 물량 관리에서 남길 수 있어요.</p>}</div></>}
           {hongro && <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-harvest_date">수확일</label></div><input id="tf-harvest_date" className="qt3-input" type="date" max={today} value={form.harvest_date} onChange={e => { const v = e.target.value; setForm(f => ({...f, harvest_date: v, ...(harvestSame ? {storage_start_date: v, ...(f.sameStart ? {intake_date: v} : {})} : {})})); }} aria-invalid={!!shownErrors.harvest_date} />{shownErrors.harvest_date && <span className="qf-err">{shownErrors.harvest_date}</span>}
@@ -576,7 +577,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         <div className="new-card-head"><h2 id="new-quick-h">바로 보기 · 저장 {quickDay}일째 <small>{fmtDate(addDays(startDate, quickDay))}</small></h2>
           <div className="new-quick-days" role="group" aria-label="저장 일수">{[30, 60, 90, 120].map(d => <button key={d} type="button" aria-pressed={quickDay === d} className={quickDay === d ? 'active' : ''} onClick={() => setQuickDay(d)}>{d}일</button>)}</div></div>
         <div className="new-quick-grid">{predictable.map(m => { const v = valueAt(series[m], quickDay), a = m === 'loss' ? null : anchors[m];
-          return <div key={m} className="new-quick-tile"><span>{EASY_LABEL[m]}</span>{v.status === 'ok' ? <b>{easyChange(m, v.value, a?.value ?? null)}</b> : <b className="na">계산 없음</b>}
+          return <div key={m} className="new-quick-tile"><span>{EASY_LABEL[m]}</span>{v.status === 'ok' ? <b>{easyChange(m, v.value, a?.value ?? null, estMode)}</b> : <b className="na">계산 없음</b>}
             <small>{v.status !== 'ok' ? v.reason : `${fmtNum(v.value, metricMeta[m].digits)} ${displayUnit(m)}${m === 'loss' ? ' · 저장일수로 계산' : estMode ? ' · 처음 값은 날씨 추정' : ''}`}</small></div>; })}</div>
         <p className="new-quick-note">{estMode ? '초기 품질은 날씨로 추정한 값이에요(실측 아님). ' : ''}{fujiWeather ? '후지 단단함은 식 단위가 달라 계산하지 않아요. ' : ''}시연용 계산이며 출하·안전 판정이 아니에요. 그래프와 자세한 근거는 ‘자세히 보기’에서 볼 수 있어요.</p>
       </section>}
@@ -948,7 +949,7 @@ function FujiWeather({form, setForm, estimate}: {form: TrackerForm; setForm: (up
     <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-harvest_date">수확일</label></div><input id="tf-harvest_date" className="qt3-input" type="date" max={todayKST()} value={form.harvest_date} onChange={e => { const v = e.target.value; setForm(f => ({...f, harvest_date: v})); }} /></div>
     {key && <div className={'qt-weather-auto' + (st.state === 'error' ? ' err' : '')} role="status" aria-live="polite">
       {st.state === 'loading' ? <p><Loader2 className="spin" size={15} aria-hidden="true" />{year}년 {region?.station} 농업기상 자료를 불러오는 중이에요…</p>
-        : st.state === 'error' ? <p>{st.msg}</p>
+        : st.state === 'error' ? <><p>{st.msg}</p><button type="button" className="qt3-minibtn" onClick={() => setSt({state: 'idle'})}>다시 불러오기</button></>
         : estimate ? <><p><b>{year}년 · 농업기상 {region?.station} 관측</b> 자료로 추정했어요 (실측 아님).</p>
           <ul><li><span>단맛(당도)</span><b>{fmtNum(estimate.brix, 1)} °Brix</b></li><li><span>신맛(산도)</span><b>{fmtNum(estimate.acidity, 2)} %</b></li><li><span>중량</span><b>{fmtNum(estimate.weight, 0)} g</b></li><li><span>횡경</span><b>{fmtNum(estimate.diameter, 1)} mm</b></li><li><span>단단함(참고)</span><b>{fmtNum(estimate.firmness, 1)} N/mm</b><small>단위가 저장식(N)과 달라 저장 중 변화는 계산하지 않아요.</small></li></ul></> : null}
     </div>}
@@ -1003,13 +1004,14 @@ function WeatherChoices({form, setForm, errors, estimate, harvestDate}: {form: T
 
 /** 농가가 읽기 쉬운 이름과 변화 표현. 계산값은 그대로이며, 처음 값 대비 비율을 반올림해 ‘약’으로 보여 줍니다. */
 const EASY_LABEL: Record<MetricId, string> = {firmness: '단단함', brix: '단맛(당도)', acidity: '신맛(산도)', loss: '무게 감소'};
-function easyChange(m: MetricId, value: number, first: number | null): string {
+function easyChange(m: MetricId, value: number, first: number | null, estimated = false): string {
   if (m === 'loss') return `약 ${fmtNum(value, 1)}% 줄어듦`;
   if (first === null || !Number.isFinite(first) || first === 0) return fmtNum(value, metricMeta[m].digits);
   const rel = (value - first) / first * 100;
-  if (Math.abs(rel) < 0.5) return '처음과 비슷';
+  const base = estimated ? '수확 때(추정)' : '첫 측정';
+  if (Math.abs(rel) < 0.5) return estimated ? '수확 때(추정)와 비슷' : '첫 측정과 비슷';
   const pct = Math.round(Math.abs(rel));
-  return `처음보다 약 ${pct < 1 ? 1 : pct}% ${m === 'firmness' ? (rel < 0 ? '물러짐' : '단단해짐') : rel < 0 ? '낮아짐' : '높아짐'}`;
+  return `${base}보다 약 ${pct < 1 ? 1 : pct}% ${m === 'firmness' ? (rel < 0 ? '물러짐' : '단단해짐') : rel < 0 ? '낮아짐' : '높아짐'}`;
 }
 
 /** Adapter for the existing SVG chart; every point retains the engine result. */

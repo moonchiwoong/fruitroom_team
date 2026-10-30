@@ -92,7 +92,7 @@ export default function Home() {
       {tab === 'model' && <PageHead title="계산 근거" />}
       <div className="page-body">
         {trackerVisited && <div hidden={tab !== 'track'}><QualityTracker lots={lots} onLotsChanged={reload} request={trackReq} onAskAI={setAIContext} openModelInfo={context => {setModelContext(context); setTab('model', true);}} openLot={id => { setLotFocus(id); setTab('lots'); }} /></div>}
-        {lotsVisited && <div hidden={tab !== 'lots'}>{lotsLoaded ? <MyApples lots={lots} loadError={lotsError} reload={reload} openTracker={openTracker} /> : <div className="loading-strip">물량을 불러오는 중…</div>}</div>}
+        {lotsVisited && <div hidden={tab !== 'lots'}>{lotsLoaded ? <MyApples lots={lots} loadError={lotsError} reload={reload} openTracker={openTracker} focus={lotFocus} /> : <div className="loading-strip">물량을 불러오는 중…</div>}</div>}
         {tab === 'model' && <ModelInfo context={modelContext} />}
         {tab === 'account' && <Account onOpenPredict={() => { setTab('model'); }} />}
       </div>
@@ -118,11 +118,11 @@ function ProjectGuide() {
 }
 
 function SiteHeader({tab, setTab, menu, setMenu}: {tab: Page; setTab: (p: Page) => void; menu: boolean; setMenu: (v: boolean) => void}) {
-  const session = useTeamSession();
+  const session = useTeamSession(), signedIn = !!session?.userId;
   return <header className="site-header2 app-header"><div className="site-header-inner">
     <Brand onClick={() => setTab('home')} />
     <nav className={'site-nav' + (menu ? ' open' : '')} aria-label="주요 메뉴">
-      {pages.filter(p => !p.hidden).map(p => <button key={p.id} className={'nav-link' + (tab === p.id ? ' active' : '')} aria-current={tab === p.id ? 'page' : undefined} onClick={() => setTab(p.id)}>{p.label}</button>)}
+      {pages.filter(p => !p.hidden && !(p.id === 'home' && signedIn)).map(p => <button key={p.id} className={'nav-link' + (tab === p.id ? ' active' : '')} aria-current={tab === p.id ? 'page' : undefined} onClick={() => setTab(p.id)}>{p.label}</button>)}
       <div className="nav-mobile-foot">{session && <button onClick={() => void session.signOut()}><LogOut size={15} />로그아웃</button>}</div>
     </nav>
     <div className="site-utils"><ProjectGuide />
@@ -191,6 +191,6 @@ function HomePage({lots, loaded, error, retry, openTracker, setTab, onAskAI, ope
 function SiteFooter({setTab}: {setTab: (p: Page) => void}) {
   return <footer className="site-footer"><div className="site-footer-inner">
     <div className="footer-brand"><div><img src="/assets/appletrack-logo.svg" alt="애플트랙" width={170} height={42} style={{display:'block', width:'clamp(132px, 16vw, 170px)', height:'auto'}} /><p>초기 품질부터 저장 중 변화까지. 실측·모델 계산·예시·미측정을 구분해 표시하며, 계산값은 출하·안전 판정을 대신하지 않습니다.</p></div></div>
-    <nav aria-label="하단 메뉴">{pages.map(p => <button key={p.id} onClick={() => setTab(p.id)}>{p.id === 'model' ? '전체 모델 정보' : p.label}</button>)}</nav>
+    <nav aria-label="하단 메뉴">{pages.filter(p => !p.hidden).map(p => <button key={p.id} onClick={() => setTab(p.id)}>{p.label}</button>)}</nav>
   </div><div className="site-footer-bottom"><ShieldCheck size={14} />사과 품질 예측·저장 관리 · FarmBridge</div></footer>;
 }
