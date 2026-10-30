@@ -11,6 +11,7 @@ import type {LotsFocus} from '@/components/lots-page';
 import type {ModelInfoContext} from '@/components/model-info';
 import {clearDraft, HANDOFF_KEY, loadDraft, saveDraft, type TrackerHandoff} from '@/lib/tracker-form';
 import AIAssistant, {type AssistantContext} from '@/components/ai-assistant';
+import SimplePrediction from '@/components/simple-prediction';
 import type {Lot} from '@/lib/lot-types';
 import {fmtNum, daysBetween, todayKST} from '@/lib/tracker';
 import {quantityUnit, storageStart} from '@/lib/lot-readiness';
@@ -37,6 +38,7 @@ export default function Home() {
   const [modelContext, setModelContext] = useState<ModelInfoContext | undefined>();
   const [tab, setTabState] = useState<Page>('home'), [menu, setMenu] = useState(false);
   const [trackerVisited, setTrackerVisited] = useState(false), [lotsVisited, setLotsVisited] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const scrollMemo = useRef<Partial<Record<Page, number>>>({}), tabRef = useRef<Page>('home');
   const [lots, setLots] = useState<Lot[]>([]), [lotsError, setLotsError] = useState(''), [lotsLoaded, setLotsLoaded] = useState(false);
   const [trackReq, setTrackReq] = useState<TrackerRequest | null>(null), [lotFocus, setLotFocusState] = useState<LotsFocus | null>(null);
@@ -55,7 +57,7 @@ export default function Home() {
     scrollMemo.current[tabRef.current] = window.scrollY; const back = p === 'lots' ? scrollMemo.current.lots ?? 0 : 0; tabRef.current = p;
     setTabState(p); setMenu(false); history.replaceState(null, '', '/#' + p); requestAnimationFrame(() => window.scrollTo({top: back}));
   }, []);
-  const openTracker = useCallback((mode: 'real' | 'example', lotId?: string) => { setTrackReq(r => ({mode, lotId, n: (r?.n ?? 0) + 1})); setTab('track'); }, [setTab]);
+  const openTracker = useCallback((mode: 'real' | 'example', lotId?: string) => { setDetailOpen(true); setTrackReq(r => ({mode, lotId, n: (r?.n ?? 0) + 1})); setTab('track'); }, [setTab]);
   useEffect(() => {
     const h = window.location.hash.slice(1); const p = (legacy[h] ?? h) as Page;
     if (pages.some(x => x.id === p)) { if (p === 'track') setTrackerVisited(true); if (p === 'lots') setLotsVisited(true); tabRef.current = p; setTabState(p); }
@@ -75,6 +77,7 @@ export default function Home() {
           if (!existing || existing.savedAt < handoff.draft.savedAt) saveDraft(sessionUser, 'real', handoff.draftKey, handoff.draft);
           clearDraft('anon', 'real', handoff.draftKey); sessionStorage.removeItem(HANDOFF_KEY);
         }
+        setDetailOpen(true);
         setTrackReq(r => ({mode: intent, lotId: intent === 'real' ? 'new' : undefined, cultivar: handoff?.cultivar, n: (r?.n ?? 0) + 1})); setTab('track');
       }
     } catch { /* 무시 */ }
@@ -84,11 +87,15 @@ export default function Home() {
     <SiteHeader tab={tab} setTab={setTab} menu={menu} setMenu={setMenu} />
     <main className={'site-main tab-' + tab}>
       {tab === 'home' && <HomePage lots={lots} loaded={lotsLoaded} error={lotsError} retry={reload} openTracker={openTracker} setTab={setTab} openLot={id => { setLotFocus(id); setTab('lots'); }} newLot={() => { setLotFocus(null, true); setTab('lots'); }} onAskAI={() => setAIContext({mode:'real',scope:'all'})} />}
-      {tab === 'track' && <PageHead title="사과 품질을 확인해 보세요" desc="보관 조건을 기록하고, 초기 품질 입력 방식을 골라 주세요." />}
+      {tab === 'track' && <PageHead title="사과 품질을 확인해 보세요" desc="지역과 수확 예정일로 저장 품질을 살펴보세요." />}
       {tab === 'account' && <PageHead title="내 정보" desc="이름·소속·주 산지를 관리합니다." />}
       {tab === 'model' && <PageHead title="계산 근거" />}
       <div className="page-body">
-        {trackerVisited && <div hidden={tab !== 'track'}><QualityTracker lots={lots} onLotsChanged={reload} request={trackReq} onAskAI={setAIContext} openModelInfo={context => {setModelContext(context); setTab('model', true);}} openLot={id => { setLotFocus(id); setTab('lots'); }} /></div>}
+        {trackerVisited && <div hidden={tab !== 'track'}>
+          <SimplePrediction />
+          <button type="button" className="btn btn-ghost" aria-expanded={detailOpen} onClick={() => setDetailOpen(v=>!v)}>{detailOpen ? '상세 예측 닫기' : '측정값으로 상세 예측하기'}</button>
+          <div hidden={!detailOpen}><QualityTracker lots={lots} onLotsChanged={reload} request={trackReq} onAskAI={setAIContext} openModelInfo={context => {setModelContext(context); setTab('model', true);}} openLot={id => { setLotFocus(id); setTab('lots'); }} /></div>
+        </div>}
         {lotsVisited && <div hidden={tab !== 'lots'}>{lotsLoaded ? <LotsPage lots={lots} loadError={lotsError} reload={reload} openTracker={openTracker} focus={lotFocus} onAskAI={id => setAIContext({mode:'real',scope:'lot',lotId:id})} /> : <div className="loading-strip">물량을 불러오는 중…</div>}</div>}
         {tab === 'model' && <ModelInfo context={modelContext} />}
         {tab === 'account' && <Account onOpenPredict={() => { setTab('model'); }} />}
