@@ -11,8 +11,8 @@ const candidates: [string, string, Record<string, string>][] = [
 ];
 
 export async function GET(req: Request) {
-  const host = new URL(req.url).host;
-  if (!host.startsWith('deploy-preview-')) return Response.json({error: 'not available'}, {status: 404});
+  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? new URL(req.url).host;
+  if (!host.startsWith('deploy-preview-') && process.env.CONTEXT !== 'deploy-preview') return Response.json({error: 'not available'}, {status: 404});
   const key = process.env.RDA_SERVICE_KEY;
   if (!key) return Response.json({key: false});
   const scrub = (t: string) => [key, encodeURIComponent(key)].reduce((s, k) => s.split(k).join('[KEY]'), t);
