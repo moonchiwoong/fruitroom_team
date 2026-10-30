@@ -87,7 +87,6 @@ export default function Home() {
     <SiteHeader tab={tab} setTab={setTab} menu={menu} setMenu={setMenu} />
     <main className={'site-main tab-' + tab}>
       {tab === 'home' && <HomePage lots={lots} loaded={lotsLoaded} error={lotsError} retry={reload} openTracker={openTracker} setTab={setTab} openLot={id => { setLotFocus(id); setTab('lots'); }} newLot={() => { setLotFocus(null, true); setTab('lots'); }} onAskAI={() => setAIContext({mode:'real',scope:'all'})} />}
-      {tab === 'track' && <PageHead title="사과 품질을 확인해 보세요" desc="보관 조건을 기록하고, 초기 품질 입력 방식을 골라 주세요." />}
       {tab === 'account' && <PageHead title="내 정보" desc="이름·소속·주 산지를 관리합니다." />}
       {tab === 'model' && <PageHead title="계산 근거" />}
       <div className="page-body">

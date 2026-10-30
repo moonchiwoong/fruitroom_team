@@ -7,9 +7,10 @@ import type {Lot, Observation} from '@/lib/lot-types';
 import {requestJson} from '@/components/lot-forms';
 import {LotEditor, MeasurementForm} from '@/components/lot-dialogs';
 import {lotPredictor, easyChange, EASY_LABEL, EASY_METRICS, weatherPending, type WeatherValues} from '@/lib/lot-predict';
-import {lotReadiness, baselineObservation, storageStart} from '@/lib/lot-readiness';
+import {lotReadiness, baselineObservation, storageStart, quantityUnit} from '@/lib/lot-readiness';
 import {fmtNum, metricMeta, todayKST, addDays} from '@/lib/tracker';
 
+const SHORT: Record<string, string> = {firmness: '단단함', loss: '무게', brix: '단맛', acidity: '신맛'};
 const md = (d: string) => { const [, m, day] = d.split('-').map(Number); return `${m}/${day}`; };
 const unit = (m: string, hongro: boolean) => m === 'firmness' ? (hongro ? 'N (Ø11 mm)' : 'N') : metricMeta[m as 'brix'].unit;
 
@@ -77,7 +78,8 @@ function AppleDetail({lot, onBack, reload, openTracker}: {lot: Lot; onBack: () =
   const ready = lotReadiness(lot);
   const recent = [...(obs ?? [])].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
   const fromMeasured = EASY_METRICS.some(m => { const r = p.at(m, sel); return r.ok && r.from === 'measured'; });
-  return <div className="ma">
+  useEffect(() => { if (!msg) return; const t = setTimeout(() => setMsg(''), 2400); return () => clearTimeout(t); }, [msg]);
+  return <div className="ma ma-detail">
     <button type="button" className="ma-back" onClick={onBack}><ArrowLeft size={18} aria-hidden="true" />내 사과</button>
     <div className="ma-title"><h1>{lot.name}</h1><p>{[lot.variety, lot.location, lot.storage, lot.details?.storage_temperature != null ? `${lot.details.storage_temperature}℃` : null].filter(Boolean).join(' · ')}{p.todayDay !== null && p.todayDay >= 0 ? ` · 저장 ${p.todayDay}일째` : ''}</p></div>
     {(ready.status === 'unsupported' || ready.status === 'conditions') && <p className="ma-hint muted">{ready.title} · {ready.detail}</p>}
@@ -85,15 +87,16 @@ function AppleDetail({lot, onBack, reload, openTracker}: {lot: Lot; onBack: () =
     {override && <p className="ma-hint">{pend?.year}년 농업기상 자료로 처음 품질을 자동 추정했어요(실측 아님).</p>}
     <div className="ma-days" role="group" aria-label="저장 일수">{days.map(d => <button key={d} type="button" aria-pressed={sel === d} className={sel === d ? 'active' : ''} onClick={() => setDay(d)}>{d === p.todayDay ? '오늘' : `${d}일`}</button>)}</div>
     <p className="ma-date">{p.start ? `${md(addDays(p.start, sel))} 기준 (저장 ${sel}일째)` : ''}</p>
-    <div className="ma-tiles">{EASY_METRICS.map(m => { const r = p.at(m, sel);
-      return <div key={m} className="ma-tile"><span>{EASY_LABEL[m]}</span>{r.ok ? <><b>{easyChange(m, r.value, r.first, p.weather)}</b><small>{fmtNum(r.value, metricMeta[m].digits)} {unit(m, hongro)}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div>; })}</div>
+    <div className="ma-rows">{EASY_METRICS.map(m => { const r = p.at(m, sel);
+      const boxes = m === 'loss' && r.ok && typeof lot.quantity === 'number' && quantityUnit(lot) === '상자' && lot.quantity > 0 ? ` · ${lot.quantity}상자 기준 약 ${fmtNum(lot.quantity * r.value / 100, 1)}상자분` : '';
+      return <div key={m + ':' + sel} className="ma-row"><span>{SHORT[m]}</span><div>{r.ok ? <><b>{easyChange(m, r.value, r.first, p.weather)}</b><small>{fmtNum(r.value, metricMeta[m].digits)} {unit(m, hongro)}{boxes}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div></div>; })}</div>
     <div className="ma-actions">
       <button type="button" className="ma-primary big" onClick={() => setMeasure(true)}><Plus size={18} aria-hidden="true" />측정 추가</button>
-      <button type="button" className="ma-ghost" onClick={() => openTracker('real', lot.id)}>그래프·자세히 보기<ArrowRight size={16} aria-hidden="true" /></button>
+      <button type="button" className="ma-ghost" onClick={() => openTracker('real', lot.id)}>그래프 · 사과 모양 보기<ArrowRight size={16} aria-hidden="true" /></button>
     </div>
-    {msg && <p className="ma-ok" role="status">{msg}</p>}
+    {msg && <div key={msg} className="ma-toast" role="status">✓ {msg}</div>}
     <section className="ma-records" aria-label="최근 측정 기록"><h2>최근 측정</h2>
-      {obs === null ? <p><Loader2 className="spin" size={15} aria-hidden="true" />불러오는 중…</p> : err ? <p className="error-box">{err}</p>
+      {obs === null ? <div aria-label="불러오는 중" style={{display: 'grid', gap: 8}}><span className="ma-sk" style={{height: 18}} /><span className="ma-sk" style={{height: 18, width: '70%'}} /></div> : err ? <p className="error-box">{err}</p>
         : recent.length ? <ul>{recent.map(o => <li key={o.id}><b>{md(o.date)}</b> {[o.brix != null ? `단맛 ${o.brix}` : null, o.firmness != null ? `단단함 ${o.firmness} N` : null, o.acidity != null ? `신맛 ${o.acidity}%` : null].filter(Boolean).join(' · ') || '값 없음'}</li>)}</ul>
         : <p>아직 측정 기록이 없어요.</p>}
     </section>
