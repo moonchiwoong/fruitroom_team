@@ -226,7 +226,7 @@ function Hero({onJoin, animate}: {onJoin: (mode: Mode) => void; animate: boolean
 }
 
 /** 첫 화면의 서비스 미리보기: 실제 계산 엔진으로 만든 예시 결과. 예시·시연용임을 함께 표시합니다. */
-function ServicePreview({animate}: {animate: boolean}) {
+export function ServicePreview({animate}: {animate: boolean}) {
   const [ref, play] = useInView<HTMLElement>(animate);
   const data = useMemo(() => {
     const today = todayKST(), start = addDays(today, -28), asOfDay = 28, day = 60;
