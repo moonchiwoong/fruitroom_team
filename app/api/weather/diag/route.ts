@@ -4,21 +4,9 @@ export const dynamic = 'force-dynamic';
 
 const BASE = 'https://apis.data.go.kr/1390802/AgriWeather/WeatherObsrInfo';
 const V4 = `${BASE}/V4/InsttWeather`;
-const P = {Page_No: '1', Page_Size: '2', date: '2026-04-01', search_Year: '2026', search_Month: '04', obsr_Spot_Nm: '거창'};
 const candidates: [string, string, Record<string, string>][] = [
-  ['v4-base', `${V4}`, P],
-  ['v4-getWeatherTenMinList', `${V4}/getWeatherTenMinList`, P],
-  ['v4-getWeatherTenMinList4', `${V4}/getWeatherTenMinList4`, P],
-  ['v4-getWeatherTimeList', `${V4}/getWeatherTimeList`, P],
-  ['v4-getWeatherTimeList4', `${V4}/getWeatherTimeList4`, P],
-  ['v4-getWeatherDayList', `${V4}/getWeatherDayList`, P],
-  ['v4-getWeatherDayList4', `${V4}/getWeatherDayList4`, P],
-  ['v4-getWeatherMonDayList', `${V4}/getWeatherMonDayList`, P],
-  ['v4-getWeatherMonDayList4', `${V4}/getWeatherMonDayList4`, P],
-  ['v4-getWeatherList', `${V4}/getWeatherList`, P],
-  ['v4-getWeatherList4', `${V4}/getWeatherList4`, P],
-  ['v4-getInsttWeatherList', `${V4}/getInsttWeatherList`, P],
-  ['v4-getWeatherTenMinList3', `${V4}/getWeatherTenMinList3`, P],
+  ['day-geochang-eup-2026-04', `${V4}/getWeatherMonDayList4`, {Page_No: '1', Page_Size: '1', search_Year: '2026', search_Month: '04', obsr_Spot_Cd: '670807A001'}],
+  ['day-name-geochang-eup-2025-09', `${V4}/getWeatherMonDayList4`, {Page_No: '1', Page_Size: '1', search_Year: '2025', search_Month: '09', obsr_Spot_Nm: '거창군 거창읍'}],
 ];
 
 export async function GET(req: Request) {
@@ -33,7 +21,7 @@ export async function GET(req: Request) {
     try {
       const r = await fetch(`${url}?${q}`, {signal: AbortSignal.timeout(10000), cache: 'no-store'});
       const text = await r.text();
-      out[name] = {status: r.status, body: scrub(text).slice(0, 700)};
+      out[name] = {status: r.status, body: scrub(text).slice(0, 6000)};
     } catch (e) {
       out[name] = {error: e instanceof Error ? e.name + ': ' + e.message : 'fetch failed'};
     }
