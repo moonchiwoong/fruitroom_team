@@ -72,12 +72,19 @@ export type Series = {ok: true; startDay: number; endDay: number; points: Series
  * 분석 기준일 이전(과거)은 기록된 저장 조건의 모델, 이후(미래)는 선택한 조건의 모델을 씁니다.
  * 계산 시작점 이전 날짜는 채우지 않습니다.
  */
+/** 한글 마지막 글자의 받침 여부로 주격 조사(이/가)를 고릅니다. 한글이 아니면 ‘이(가)’. */
+export function subjectParticle(word: string): string {
+  const c = word.trim().slice(-1).charCodeAt(0);
+  if (!(c >= 0xac00 && c <= 0xd7a3)) return '이(가)';
+  return (c - 0xac00) % 28 ? '이' : '가';
+}
+
 export function computeSeries(o: {variety?: string; temperature?: number | null; metric: MetricId; anchor: Anchor | null; recorded: StorageId | null; recordedReason?: string; future: StorageId | null; futureReason?: string; asOfDay: number; horizon?: number}): Series {
   if (isHongroVariety(o.variety)) return {ok: false, reason: HONGRO_DEDICATED_NOTICE};
   const {metric} = o, horizon = o.horizon ?? MODEL_RANGE.displayDays;
   // Predicted loss is cumulative from storage start, independent of weighing records.
   const anchor: Anchor | null = metric === 'loss' ? {day: 0, date: '', value: 0, kind: '모델 계산', source: 'initial'} : o.anchor;
-  if (!anchor) return {ok: false, reason: `초기 ${metricMeta[metric].label}${metric === 'loss' ? ' 계산에 필요한 추적 표본 초기 중량' : ''}이 없습니다.`};
+  if (!anchor) { const subject = `초기 ${metricMeta[metric].label}${metric === 'loss' ? ' 계산에 필요한 추적 표본 초기 중량' : ''}`; return {ok: false, reason: `${subject}${subjectParticle(subject)} 없습니다.`}; }
   const policy = allowModelMetric(metric, anchor.kind); if (!policy.ok) return policy;
   if (!Number.isFinite(anchor.value) || anchor.value < 0 || !Number.isInteger(anchor.day) || !Number.isInteger(o.asOfDay) || o.asOfDay < 0 || !Number.isInteger(horizon) || horizon < 0 || horizon > MODEL_RANGE.displayDays) return {ok: false, reason: '계산 입력값·날짜·표시 범위를 확인해 주세요.'};
   if (MODEL_RANGE.validatedDays !== null && horizon > MODEL_RANGE.validatedDays) return {ok: false, reason: '확인된 모델 적용 기간 밖의 수치는 제공하지 않습니다.'};
