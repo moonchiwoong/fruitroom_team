@@ -394,6 +394,14 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const [storeOpen, setStoreOpen] = useState(false), [storeFrom, setStoreFrom] = useState('');
   // 새 홍로 물량: ‘수확 당일 바로 입고’를 고르면 저장 시작일을 수확일과 같게 둡니다. 체크하지 않으면 날짜를 따로 받습니다.
   const [harvestSame, setHarvestSame] = useState(false);
+  const [quickDay, setQuickDay] = useState(60);
+  // 새 홍로 물량: 수확일을 넣고 측정값이 없으면 한 번만 ‘날씨로 추정’으로 바꿔 수확일·온도만으로 결과가 나오게 합니다. 다시 바꾸면 그대로 둡니다.
+  const autoWeatherRef = useRef(false);
+  useEffect(() => {
+    if (!firstInput || !hongro || autoWeatherRef.current || form.hongro.source !== 'measured' || !isDate(form.harvest_date)) return;
+    if ((['firmness', 'brix', 'acidity'] as const).some(m => String(form.hongro.initial[m] ?? '').trim() !== '')) return;
+    autoWeatherRef.current = true; setForm(f => ({...f, hongro: {...f.hongro, source: 'weather'}}));
+  }, [firstInput, hongro, form.hongro.source, form.harvest_date, form.hongro.initial, setForm]);
   // 날씨 추정값은 수확 시점 품질입니다. 사용자가 ‘수확 당일 바로 입고’를 고른 경우에만 그 추정 기준일을 저장 시작일로 둡니다.
   useEffect(() => { if (firstInput && weatherMode && harvestSame && !form.initialSameStart) setForm(f => ({...f, initialSameStart: true})); }, [firstInput, weatherMode, harvestSame, form.initialSameStart]);
   const [checkShown, setCheckShown] = useState(false), [checkedSig, setCheckedSig] = useState<string | null>(null);
@@ -571,7 +579,15 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         <details className="qt3-more"><summary>온습도 센서 연결 기록</summary><F id="sensor_id" label="온습도 센서 번호"><input id="tf-sensor_id" value={form.sensor_id} onChange={e=>set('sensor_id',e.target.value)} maxLength={60} /></F><p className="qt3-help">센서 번호는 기록용이며 예측식에 온습도 이력을 반영하지 않아요.</p></details>
         {session?.isTeam && <label className="qt-check"><input type="checkbox" checked={form.team_shared} onChange={e=>set('team_shared',e.target.checked)} />팀과 공유</label>}
       </div></details>
-      <div className="new-actions"><div className="new-status"><b>{statusTitle}</b>{statusDetail && <p>{statusDetail}</p>}{checkShown && uniqueErrors.length > 0 && <div className="new-action-errors" role="alert"><p>다음 항목을 확인해 주세요.</p><ul>{uniqueErrors.map(([id, text]) => <li key={id}><button type="button" onClick={() => focus(id === 'intake_date' && form.sameStart ? 'tf-storage_start_date' : id === 'initial_measured_on' && form.initialSameStart ? 'tf-initialSameStart' : 'tf-' + id.replaceAll('.', '-'))}>{text}</button></li>)}</ul></div>}{inputNotice && noticeSig === signature(form) && <div className="new-condition-note" role="status">{inputNotice}{hongro && form.temperature !== '0' && form.temperature !== '4' && <button type="button" className="linkbtn new-temperature-link" onClick={() => focus('tf-temperature')}>온도 입력하기</button>}</div>}</div><div className="new-actions-right"><button type="button" className="new-primary" onClick={checkNew}>예측 가능 여부 확인 <ArrowRight size={18} /></button><p>{guest && '기록 저장에는 로그인이 필요해요'} <button type="button" className="new-save" onClick={saveRecord} disabled={saving || !!loadError}>{saving ? '저장 중…' : '기록만 저장'}</button></p></div></div>
+      {!missingRequired && startOk && predictable.length > 0 && <section className="new-card new-quick" aria-labelledby="new-quick-h">
+        <div className="new-card-head"><h2 id="new-quick-h">바로 보기 · 저장 {quickDay}일째 <small>{fmtDate(addDays(startDate, quickDay))}</small></h2>
+          <div className="new-quick-days" role="group" aria-label="저장 일수">{[30, 60, 90, 120].map(d => <button key={d} type="button" aria-pressed={quickDay === d} className={quickDay === d ? 'active' : ''} onClick={() => setQuickDay(d)}>{d}일</button>)}</div></div>
+        <div className="new-quick-grid">{predictable.map(m => { const v = valueAt(series[m], quickDay), a = m === 'loss' ? null : anchors[m];
+          return <div key={m} className="new-quick-tile"><span>{metricMeta[m].label}</span>{v.status === 'ok' ? <b>{fmtNum(v.value, metricMeta[m].digits)}<small> {displayUnit(m)}</small></b> : <b className="na">계산 없음</b>}
+            <small>{v.status !== 'ok' ? v.reason : m === 'loss' ? '저장일수로 계산' : a ? `${weatherMode ? '처음 추정값' : '처음'}보다 ${describeChange(m, v.value, a.value).short}` : ''}</small></div>; })}</div>
+        <p className="new-quick-note">{weatherMode ? '초기 품질은 날씨로 추정한 값이에요(실측 아님). ' : ''}시연용 계산이며 출하·안전 판정이 아니에요. 그래프와 자세한 근거는 ‘자세히 보기’에서 볼 수 있어요.</p>
+      </section>}
+      <div className="new-actions"><div className="new-status"><b>{statusTitle}</b>{statusDetail && <p>{statusDetail}</p>}{checkShown && uniqueErrors.length > 0 && <div className="new-action-errors" role="alert"><p>다음 항목을 확인해 주세요.</p><ul>{uniqueErrors.map(([id, text]) => <li key={id}><button type="button" onClick={() => focus(id === 'intake_date' && form.sameStart ? 'tf-storage_start_date' : id === 'initial_measured_on' && form.initialSameStart ? 'tf-initialSameStart' : 'tf-' + id.replaceAll('.', '-'))}>{text}</button></li>)}</ul></div>}{inputNotice && noticeSig === signature(form) && <div className="new-condition-note" role="status">{inputNotice}{hongro && form.temperature !== '0' && form.temperature !== '4' && <button type="button" className="linkbtn new-temperature-link" onClick={() => focus('tf-temperature')}>온도 입력하기</button>}</div>}</div><div className="new-actions-right"><button type="button" className="new-primary" onClick={checkNew}>{!missingRequired && predictable.length ? '자세히 보기' : '예측 가능 여부 확인'} <ArrowRight size={18} /></button><p>{guest && '기록 저장에는 로그인이 필요해요'} <button type="button" className="new-save" onClick={saveRecord} disabled={saving || !!loadError}>{saving ? '저장 중…' : '기록만 저장'}</button></p></div></div>
       {saveMsg && <p className={saveMsg.ok?'qt-ok':'auth-error'} role="status">{saveMsg.text}</p>}
       <p className="new-disclaimer">계산은 시연용입니다. 예측 정확도와 오차 범위는 아직 검증되지 않았어요.</p>
       <style jsx>{`

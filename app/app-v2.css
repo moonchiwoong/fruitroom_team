@@ -821,3 +821,15 @@ legend.qt3-q-head{padding:0;margin-bottom:8px;width:100%;display:flex}
   .ah-hero-preview .lv-preview-values dd{font-size:clamp(16px,5vw,20px);white-space:nowrap}
   .ah-hero-preview .lv-preview-values small{font-size:11px;margin-left:2px}
 }
+/* 새 물량: 입력하면 바로 보이는 결과 */
+.new-quick{border-color:#b9d3b2!important}
+.new-quick h2 small{font-size:14px;font-weight:500;color:#556358;margin-left:6px}
+.new-quick-days{display:flex;gap:6px;flex-wrap:wrap}
+.new-quick-days button{min-height:40px;padding:0 14px;border-radius:999px;border:1px solid #c4d0c0;background:#fff;font:inherit;font-size:14px;cursor:pointer}
+.new-quick-days button.active{background:#2d6a3a;border-color:#2d6a3a;color:#fff;font-weight:700}
+.new-quick-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px}
+.new-quick-tile{display:flex;flex-direction:column;gap:2px;padding:14px;border-radius:12px;background:#f6f8f4}
+.new-quick-tile>span{font-size:13px;color:#4a5a4d}
+.new-quick-tile b{font-size:24px}.new-quick-tile b small{font-size:13px;font-weight:500}.new-quick-tile b.na{font-size:16px;color:#6b776d}
+.new-quick-tile>small{font-size:12px;color:#4a5a4d}
+.new-quick-note{margin:12px 0 0;font-size:13px;color:#556358}
