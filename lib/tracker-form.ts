@@ -3,6 +3,7 @@ import type {Lot, LotDetails} from './lot-types';
 import {addDays, isDate, todayKST} from './tracker';
 import {parseOptionalNumber} from './quality-policy';
 import {isHongroVariety} from './cultivar';
+import {predictAll} from './initial-quality';
 import {HONGRO_MODEL_VERSION, HONGRO_UNITS} from './hongro';
 import {emptyHongroForm, validateHongroForm, type HongroTrackerForm} from './hongro-tracker';
 
@@ -18,6 +19,8 @@ export type TrackerForm = {
   ca: {from: string; to: string; o2: string; co2: string};
   tracked: {sample_id: string; count: string; initial_weight: string};
   hongro: HongroTrackerForm;
+  /** 후지(청송·장수·영주): 수확한 해 농업기상으로 초기 당도·산도를 추정할 때의 입력. 경도는 단위(N/mm)가 달라 저장 예측에 연결하지 않습니다. */
+  fuji: FujiWeatherForm;
   /** 이전 홍로 기록에 전용 모델 출처가 없을 때 상위 실측값을 보존합니다. */
   legacyHongro: boolean;
   team_shared: boolean;
@@ -29,6 +32,16 @@ export type TrackerForm = {
   missing: {firmness: boolean; brix: boolean; acidity: boolean};
 };
 
+export type FujiRegion = 'cheongsong' | 'jangsu' | 'yeongju';
+export type FujiWeatherForm = {source: 'measured' | 'weather'; region: '' | FujiRegion; year: string; weather: {rain9: string; lc56: string; lc78: string; min4: string}};
+export const emptyFujiForm = (): FujiWeatherForm => ({source: 'measured', region: '', year: '', weather: {rain9: '', lc56: '', lc78: '', min4: ''}});
+/** 후지 날씨 추정: 지역 식(lib/initial-quality)으로 초기 품질 5개를 계산합니다. 네 값과 지역이 모두 있어야 합니다. */
+export function fujiWeatherEstimate(f: FujiWeatherForm) {
+  if (f.source !== 'weather' || !f.region) return null;
+  const x = {rain9: num(f.weather.rain9), lc56: num(f.weather.lc56), lc78: num(f.weather.lc78), min4: num(f.weather.min4)};
+  if (Object.values(x).some(v => v === null)) return null;
+  return predictAll(f.region, x as Record<keyof typeof x, number>);
+}
 export const KGF_TO_N = 9.80665;
 /** 입력한 경도를 N으로 바꿉니다. 빈칸·잘못된 값은 null. */
 export function firmnessToN(raw: string, unit: 'N' | 'kgf'): number | null {
@@ -55,7 +68,7 @@ export function emptyForm(): TrackerForm {
     firmness: '', brix: '', acidity: '', weight: '', packaging: '', location: '', sensor_id: '', storage: '일반 저온', mcp: '미확인', mcpSelected: false, temperature: '', loss_reference: false,
     measure: {probe_mm: '', peeled: '', position: '', fruit_temp: '', instrument: ''},
     mcpd: {treated_on: '', product: '', concentration: '', hours: '', temp: ''},
-    ca: {from: '', to: '', o2: '', co2: ''}, tracked: {sample_id: '', count: '', initial_weight: ''}, hongro: emptyHongroForm(), legacyHongro: false, team_shared: false,
+    ca: {from: '', to: '', o2: '', co2: ''}, tracked: {sample_id: '', count: '', initial_weight: ''}, hongro: emptyHongroForm(), fuji: emptyFujiForm(), legacyHongro: false, team_shared: false,
     name_auto: true, firmness_unit: 'N', missing: {firmness: false, brix: false, acidity: false},
   };
 }
@@ -93,6 +106,7 @@ export function formFromLot(l: Lot): TrackerForm {
     tracked: {sample_id: s(d.tracked?.sample_id), count: s(d.tracked?.count), initial_weight: s(d.tracked?.initial_weight)},
     temperature: s(d.storage_temperature ?? (h ? h.storage === 'cold0' ? 0 : 4 : null)), loss_reference: d.loss_reference === true,
     hongro, legacyHongro: isHongroVariety(l.variety) && !h, team_shared: !!l.team_shared,
+    fuji: d.fuji_weather ? {source: 'weather', region: d.fuji_weather.region, year: s(d.fuji_weather.year), weather: {rain9: s(d.fuji_weather.inputs.rain9), lc56: s(d.fuji_weather.inputs.lc56), lc78: s(d.fuji_weather.inputs.lc78), min4: s(d.fuji_weather.inputs.min4)}} : emptyFujiForm(),
     name_auto: false, firmness_unit: unit, missing: {firmness: nm.includes('firmness'), brix: nm.includes('brix'), acidity: nm.includes('acidity')},
   };
 }
@@ -122,7 +136,9 @@ export function payloadFromForm(f: TrackerForm, mode: 'real' | 'example' = 'real
   const h=f.hongro;
   const legacyHongro=isHongro && f.legacyHongro;
   const quality=legacyHongro ? {firmness:h.initial.firmness.trim()||f.firmness,brix:h.initial.brix.trim()||f.brix,acidity:h.initial.acidity.trim()||f.acidity,weight:h.initial.weight.trim()||f.weight} : isHongro ? (h.source==='measured' ? h.initial : {firmness:'',brix:'',acidity:'',weight:''}) : f;
-  const measuredInput = !isHongro || legacyHongro || h.source === 'measured';
+  const fujiEst = !isHongro ? fujiWeatherEstimate(f.fuji ?? emptyFujiForm()) : null;
+  const fujiWeather = !isHongro && f.fuji?.source === 'weather';
+  const measuredInput = (!isHongro && !fujiWeather) || legacyHongro || (isHongro && h.source === 'measured');
   const firmN = measuredInput && !f.missing.firmness ? firmnessToN(quality.firmness, f.firmness_unit) : null;
   if (measuredInput && !f.missing.firmness && quality.firmness.trim() && firmN === null) num(quality.firmness);
   return {
@@ -130,14 +146,15 @@ export function payloadFromForm(f: TrackerForm, mode: 'real' | 'example' = 'real
     name: effectiveName(f).trim(), variety: f.variety.trim(), intake_date: f.intake_date, harvest_date: f.harvest_date || null,
     storage_start_date: f.sameStart ? (f.intake_date || null) : (f.storage_start_date || null),
     initial_measured_on: effectiveInitialMeasuredOn(f) || null, initial_sample_count: num(f.initial_sample_count),
-    firmness: firmN, brix: measuredInput && !f.missing.brix ? num(quality.brix) : null, acidity: measuredInput && !f.missing.acidity ? num(quality.acidity) : null, weight: num(quality.weight),
+    firmness: firmN, brix: fujiEst ? Math.round(fujiEst.brix * 100) / 100 : measuredInput && !f.missing.brix ? num(quality.brix) : null, acidity: fujiEst ? Math.round(fujiEst.acidity * 1000) / 1000 : measuredInput && !f.missing.acidity ? num(quality.acidity) : null, weight: num(quality.weight),
     packaging: txt(f.packaging), location: txt(f.location), sensor_id: txt(f.sensor_id),
     storage: f.storage, mcp: f.mcp, team_shared: f.team_shared,
     details: {
       storage_temperature: num(f.temperature), loss_reference: f.loss_reference === true,
       initial_same_start: f.initialSameStart === true,
-      initial_source: isHongro && !legacyHongro && h.source === 'weather' ? '날씨 기반 추정' : '실측',
-      firmness_input: (() => { const raw = quality.firmness; return !f.missing.firmness && firmnessToN(raw, f.firmness_unit) !== null ? {value: num(raw), unit: f.firmness_unit} : null; })(),
+      initial_source: (isHongro && !legacyHongro && h.source === 'weather') || fujiWeather ? '날씨 기반 추정' : '실측',
+      fuji_weather: fujiWeather && f.fuji.region ? {region: f.fuji.region, year: num(f.fuji.year), inputs: {rain9: num(f.fuji.weather.rain9), lc56: num(f.fuji.weather.lc56), lc78: num(f.fuji.weather.lc78), min4: num(f.fuji.weather.min4)}, estimate: fujiEst ? {firmness_nmm: fujiEst.firmness, brix: fujiEst.brix, acidity: fujiEst.acidity, weight: fujiEst.weight, diameter: fujiEst.diameter} : null} : null,
+      firmness_input: (() => { const raw = quality.firmness; return measuredInput && !f.missing.firmness && firmnessToN(raw, f.firmness_unit) !== null ? {value: num(raw), unit: f.firmness_unit} : null; })(),
       not_measured: (['firmness', 'brix', 'acidity'] as const).filter(k => f.missing[k]),
       measure: {probe_mm: num(f.measure.probe_mm), peeled: f.measure.peeled || null, position: txt(f.measure.position), fruit_temp: num(f.measure.fruit_temp), instrument: txt(f.measure.instrument)},
       mcp: {treated_on:f.mcpd.treated_on||null,product:txt(f.mcpd.product),concentration:txt(f.mcpd.concentration),hours:num(f.mcpd.hours),temp:num(f.mcpd.temp)},
@@ -209,7 +226,7 @@ export function loadDraft(user: string, mode: string, lot: string): Draft | null
     const raw = window.localStorage.getItem(draftKey(user, mode, lot)); if (!raw) return null;
     const d = JSON.parse(raw), empty = emptyForm(); if (!d?.form) return null;
     const mcpSelected = typeof d.form.mcpSelected === 'boolean' ? d.form.mcpSelected : ['처리', '미처리'].includes(d.form.mcp);
-    return {...d, form: {...empty, ...d.form, mcpSelected, measure: {...empty.measure, ...d.form.measure}, mcpd: {...empty.mcpd, ...d.form.mcpd}, ca: {...empty.ca, ...d.form.ca}, tracked: {...empty.tracked, ...d.form.tracked}, missing: {...empty.missing, ...d.form.missing}, hongro:{...empty.hongro,...d.form.hongro,initial:{...empty.hongro.initial,...d.form.hongro?.initial},weather:{...empty.hongro.weather,...d.form.hongro?.weather}}}};
+    return {...d, form: {...empty, ...d.form, mcpSelected, measure: {...empty.measure, ...d.form.measure}, mcpd: {...empty.mcpd, ...d.form.mcpd}, ca: {...empty.ca, ...d.form.ca}, tracked: {...empty.tracked, ...d.form.tracked}, missing: {...empty.missing, ...d.form.missing}, hongro:{...empty.hongro,...d.form.hongro,initial:{...empty.hongro.initial,...d.form.hongro?.initial},weather:{...empty.hongro.weather,...d.form.hongro?.weather}}, fuji:{...empty.fuji,...d.form.fuji,weather:{...empty.fuji.weather,...d.form.fuji?.weather}}}};
   } catch { return null; }
 }
 export function saveDraft(user: string, mode: string, lot: string, d: Draft): boolean {

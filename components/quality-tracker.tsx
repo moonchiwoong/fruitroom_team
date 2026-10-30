@@ -12,7 +12,7 @@ import {
   modelLabel, resolveModel, summarySentence, todayKST, valueAt,
   type Anchor, type DataKind, type MeasuredPoint, type MetricId, type Series, type ValueAt,
 } from '@/lib/tracker';
-import {HANDOFF_KEY, firmnessToN, suggestName, effectiveInitialMeasuredOn, type TrackerHandoff, clearDraft, emptyForm, exampleForm, formFromLot, loadDraft, loadPref, payloadFromForm, saveDraft, savePref, signature, validateForm, type Draft, type TrackerForm} from '@/lib/tracker-form';
+import {HANDOFF_KEY, firmnessToN, fujiWeatherEstimate, emptyFujiForm, type FujiRegion, suggestName, effectiveInitialMeasuredOn, type TrackerHandoff, clearDraft, emptyForm, exampleForm, formFromLot, loadDraft, loadPref, payloadFromForm, saveDraft, savePref, signature, validateForm, type Draft, type TrackerForm} from '@/lib/tracker-form';
 import type {StorageId} from '@/lib/initial-quality';
 import type {ModelInfoContext} from '@/components/model-info';
 import {measurementCompatibility, observationFingerprint} from '@/lib/ai/context';
@@ -203,10 +203,15 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const observationsFingerprint = useMemo(() => observationFingerprint(pastObs), [pastObs]);
   const measured = useMemo(() => Object.fromEntries(metricIds.map(m => [m, startOk ? measuredPoints(m, pastObs, startDate, kind, trackedInitial, {sampleId: form.tracked.sample_id, date: measuredOn, count: num(form.tracked.count)}) : []])) as Record<MetricId, MeasuredPoint[]>, [pastObs, startDate, startOk, kind, trackedInitial, form.tracked.sample_id, form.tracked.count, measuredOn]);
   const weatherMode = hongro && form.hongro.source === 'weather';
+  // 후지(청송·장수·영주) 날씨 추정: 당도·산도만 저장 예측에 이어 씁니다. 경도는 식 단위(N/mm)가 달라 연결하지 않습니다.
+  const fujiWeather = !hongro && form.fuji?.source === 'weather';
+  const fujiEst = useMemo(() => hongro ? null : fujiWeatherEstimate(form.fuji ?? emptyFujiForm()), [hongro, form.fuji]);
+  const estMode = weatherMode || fujiWeather;
   /** 계산에 쓰는 초기값: 날씨 추정은 추정값, 직접 입력은 입력값(경도는 N으로 환산). 미측정·빈칸은 null. */
   const initialValue = (m: MetricId): number | null => {
     if (m === 'loss') return null;
     if (weatherMode) return hongroResult?.initial[m] ?? null;
+    if (fujiWeather) return m === 'firmness' ? null : fujiEst ? fujiEst[m] : null;
     if (form.missing[m]) return null;
     const raw = hongro ? form.hongro.initial[m] : form[m];
     return m === 'firmness' ? firmnessToN(raw, form.firmness_unit) : num(raw);
@@ -219,7 +224,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     if (latest) return [m, {day: latest.day, date: latest.date, value: latest.value, kind: latest.kind, source: 'latest'} as Anchor];
     if (!isDate(measuredOn)) return [m, null];
     const v = initialValue(m);
-    return [m, v === null ? null : {day:t0, date:measuredOn, value:v, kind:weatherMode ? '모델 계산' : kind, source:'initial'} as Anchor];
+    return [m, v === null ? null : {day:t0, date:measuredOn, value:v, kind:estMode ? '모델 계산' : kind, source:'initial'} as Anchor];
   })) as Record<MetricId, Anchor | null>, [hongro, hongroResult, startDate, startOk, initialMeasuredAfterAsOf, useLatest, measured, t0, form, measuredOn, kind, errors.storage_start_date, errors.intake_date, errors.initial_measured_on, errors.firmness, errors.brix, errors.acidity]);
   const modelInput = (m:MetricId, day:number, temperature = num(form.temperature)):ModelInput => ({
     cultivar:form.variety, storage:form.storage === '일반 저온' ? 'cold' : form.storage === 'CA' ? 'ca' : 'other',
@@ -395,6 +400,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   // 새 홍로 물량: ‘수확 당일 바로 입고’를 고르면 저장 시작일을 수확일과 같게 둡니다. 체크하지 않으면 날짜를 따로 받습니다.
   const [harvestSame, setHarvestSame] = useState(false);
   const [quickDay, setQuickDay] = useState(60);
+  useEffect(() => { if (firstInput && fujiWeather && !form.initialSameStart) setForm(f => ({...f, initialSameStart: true})); }, [firstInput, fujiWeather, form.initialSameStart, setForm]);
   // 새 물량 화면은 예측식이 있는 조합만 고르게 합니다. 홍로는 일반 저온·1-MCP 미처리 한 가지라 그 조건으로 둡니다.
   useEffect(() => {
     if (firstInput && hongro && (form.storage !== '일반 저온' || form.mcp !== '미처리' || !form.mcpSelected)) setForm(f => ({...f, storage: '일반 저온', mcp: '미처리', mcpSelected: true}));
@@ -505,7 +511,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     const statusDetail = missingRequired ? (valueNames.length ? `${valueNames.join(' · ')} 입력됨` : '측정한 항목을 입력할 수 있어요.')
       : !predictable.length ? (condition.ok ? '처음 측정한 경도·당도·산도 중 하나 이상을 넣으면 계산할 수 있어요. 기록은 저장할 수 있어요.' : [condition.title, condition.detail].filter(Boolean).join(' '))
       : lossOnlyNew ? (anyInitial ? (supportRows.find(r => r.key !== 'loss' && r.key !== 'weather' && visibleMetrics.includes(r.key as MetricId) && !r.ok)?.text ?? '경도·당도·산도는 계산하지 않아요.') : '경도·당도·산도는 처음 측정한 값이 있어야 계산돼요. 감모율은 저장일수로 계산해요.')
-      : weatherMode ? '초기 품질은 날씨로 추정한 값이에요(실측 아님).' : valueNames.length ? `${valueNames.join(' · ')} 입력됨` : '';
+      : estMode ? '초기 품질은 날씨로 추정한 값이에요(실측 아님).' : valueNames.length ? `${valueNames.join(' · ')} 입력됨` : '';
     const temperatureField = <F id="temperature" label={hongro ? '저장고 온도' : '실제 저장고 온도'} unit="℃" err={shownErrors.temperature} hint={hongro?'홍로 예측식은 0℃ 또는 4℃에만 있어요. 다른 온도는 기록만 하고 계산하지 않아요.':'후지의 온도는 기록용이며 예측식을 보정하지 않아요.'}><input id="tf-temperature" type="number" step="any" value={form.temperature} onChange={e=>setForm(f=>({...f,temperature:e.target.value,hongro:{...f.hongro,storage:e.target.value==='0'?'cold0':e.target.value==='4'?'cold4':f.hongro.storage}}))} /></F>;
     const setStart = (value: string) => setForm(f => ({...f, storage_start_date: value, ...(f.sameStart ? {intake_date: value} : {})}));
     const setInitialSame = (checked: boolean) => setForm(f => ({...f, initialSameStart: checked, ...(!checked ? {initial_measured_on: effectiveInitialMeasuredOn(f)} : {})}));
@@ -550,18 +556,19 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         {'preparing' in condition && condition.preparing && <p className="new-condition-note new-preparing" role="status"><b>서비스 준비 중</b> {condition.detail}</p>}
       </section>
       <section className="new-card" aria-labelledby="new-quality"><div className="new-card-head"><h2 id="new-quality"><span>2</span>{hongro ? '초기 품질' : '처음 측정한 품질'}</h2><small>{weatherMode ? '날씨로 추정 · 실측 아님' : '측정한 항목만 입력'}</small></div><p className="new-description">{weatherMode ? '수확 시점 품질을 재배기 날씨로 추정해요. 실제로 쟀다면 ‘직접 측정값 입력’을 골라 주세요.' : '측정한 사과의 평균값을 입력해 주세요.'}</p>
+        {!hongro && <fieldset className="qt3-q"><legend className="qt3-q-head">초기 품질 입력 방식</legend><div className="qt3-seg">{([['measured','직접 측정값 입력'],['weather','수확한 해 날씨로 추정']] as const).map(([v,t]) => <label key={v} className={(form.fuji?.source ?? 'measured')===v?'active':''}><input type="radio" name="tf-fuji-source" checked={(form.fuji?.source ?? 'measured')===v} onChange={() => setForm(f=>({...f,fuji:{...(f.fuji ?? emptyFujiForm()),source:v}}))} /><span>{t}</span></label>)}</div></fieldset>}
         {hongro && <fieldset className="qt3-q"><legend className="qt3-q-head">초기 품질 입력 방식</legend><div className="qt3-seg">{([['measured','직접 측정값 입력'],['weather','올해 날씨로 추정']] as const).map(([v,t]) => <label key={v} className={form.hongro.source===v?'active':''}><input type="radio" name="tf-hongro-source" checked={form.hongro.source===v} onChange={() => setForm(f=>({...f,hongro:{...f.hongro,source:v}}))} /><span>{t}</span></label>)}</div></fieldset>}
         <div className="new-grid2">
-          <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-initial_measured_on">{weatherMode ? '추정 기준일' : '측정일'}</label></div><label className="new-date-check"><input id="tf-initialSameStart" type="checkbox" checked={!!form.initialSameStart} onChange={e => setInitialSame(e.target.checked)} /><span>저장 시작일과 같음</span><span>{form.initialSameStart && startOk ? fmtDate(startDate) : ''}</span></label>{!form.initialSameStart && <input id="tf-initial_measured_on" className="qt3-input" type="date" max={today} value={form.initial_measured_on} onChange={e => set('initial_measured_on',e.target.value)} aria-invalid={!!shownErrors.initial_measured_on} />}{shownErrors.initial_measured_on && <span className="qf-err">{shownErrors.initial_measured_on}</span>}</div>
+          <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-initial_measured_on">{estMode ? '추정 기준일' : '측정일'}</label></div><label className="new-date-check"><input id="tf-initialSameStart" type="checkbox" checked={!!form.initialSameStart} onChange={e => setInitialSame(e.target.checked)} /><span>저장 시작일과 같음</span><span>{form.initialSameStart && startOk ? fmtDate(startDate) : ''}</span></label>{!form.initialSameStart && <input id="tf-initial_measured_on" className="qt3-input" type="date" max={today} value={form.initial_measured_on} onChange={e => set('initial_measured_on',e.target.value)} aria-invalid={!!shownErrors.initial_measured_on} />}{shownErrors.initial_measured_on && <span className="qf-err">{shownErrors.initial_measured_on}</span>}</div>
         </div>
-        {weatherMode ? <WeatherChoices form={form} setForm={setForm} errors={errors} estimate={hongroResult ? hongroResult.initial : null} harvestDate={form.harvest_date} /> : <div className="new-grid3">{(['firmness','brix','acidity'] as const).map(metricInput)}</div>}
+        {weatherMode ? <WeatherChoices form={form} setForm={setForm} errors={errors} estimate={hongroResult ? hongroResult.initial : null} harvestDate={form.harvest_date} /> : fujiWeather ? <FujiWeather form={form} setForm={setForm} estimate={fujiEst} /> : <div className="new-grid3">{(['firmness','brix','acidity'] as const).map(metricInput)}</div>}
       </section>
       <details className="new-card new-extra" ref={optionalRef}><summary><strong>추가 기록</strong><span>선택 &nbsp; {hongro ? '입고 · 포장 · 측정 조건' : '입고 · 온도 · 수확 · 포장'}</span><Plus size={20} /></summary><div className="new-extra-body">
         <div className="new-grid2">
           <F id="name" label="물량 이름" err={shownErrors.name}><input id="tf-name" value={form.name_auto && !form.name.trim() ? suggestName(form) : form.name} onChange={e=>setForm(f=>({...f,name:e.target.value,name_auto:false}))} maxLength={120} /><p className="qt3-help">품종과 저장 시작일로 자동 생성되며 직접 수정할 수 있어요.</p></F>
           {!hongro && temperatureField}
           <F id="location" label="저장고 이름·위치"><input id="tf-location" value={form.location} onChange={e=>set('location',e.target.value)} maxLength={120} /></F>
-          {!hongro && <F id="harvest_date" label="수확일" err={shownErrors.harvest_date}><input id="tf-harvest_date" type="date" max={today} value={form.harvest_date} onChange={e=>set('harvest_date',e.target.value)} /></F>}
+          {!hongro && !fujiWeather && <F id="harvest_date" label="수확일" err={shownErrors.harvest_date}><input id="tf-harvest_date" type="date" max={today} value={form.harvest_date} onChange={e=>set('harvest_date',e.target.value)} /></F>}
         </div>
         {session?.isTeam && <label className="qt-check"><input type="checkbox" checked={form.team_shared} onChange={e=>set('team_shared',e.target.checked)} />팀과 공유</label>}
       </div></details>
@@ -570,8 +577,8 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           <div className="new-quick-days" role="group" aria-label="저장 일수">{[30, 60, 90, 120].map(d => <button key={d} type="button" aria-pressed={quickDay === d} className={quickDay === d ? 'active' : ''} onClick={() => setQuickDay(d)}>{d}일</button>)}</div></div>
         <div className="new-quick-grid">{predictable.map(m => { const v = valueAt(series[m], quickDay), a = m === 'loss' ? null : anchors[m];
           return <div key={m} className="new-quick-tile"><span>{EASY_LABEL[m]}</span>{v.status === 'ok' ? <b>{easyChange(m, v.value, a?.value ?? null)}</b> : <b className="na">계산 없음</b>}
-            <small>{v.status !== 'ok' ? v.reason : `${fmtNum(v.value, metricMeta[m].digits)} ${displayUnit(m)}${m === 'loss' ? ' · 저장일수로 계산' : weatherMode ? ' · 처음 값은 날씨 추정' : ''}`}</small></div>; })}</div>
-        <p className="new-quick-note">{weatherMode ? '초기 품질은 날씨로 추정한 값이에요(실측 아님). ' : ''}시연용 계산이며 출하·안전 판정이 아니에요. 그래프와 자세한 근거는 ‘자세히 보기’에서 볼 수 있어요.</p>
+            <small>{v.status !== 'ok' ? v.reason : `${fmtNum(v.value, metricMeta[m].digits)} ${displayUnit(m)}${m === 'loss' ? ' · 저장일수로 계산' : estMode ? ' · 처음 값은 날씨 추정' : ''}`}</small></div>; })}</div>
+        <p className="new-quick-note">{estMode ? '초기 품질은 날씨로 추정한 값이에요(실측 아님). ' : ''}{fujiWeather ? '후지 단단함은 식 단위가 달라 계산하지 않아요. ' : ''}시연용 계산이며 출하·안전 판정이 아니에요. 그래프와 자세한 근거는 ‘자세히 보기’에서 볼 수 있어요.</p>
       </section>}
       <div className="new-actions"><div className="new-status"><b>{statusTitle}</b>{statusDetail && <p>{statusDetail}</p>}{checkShown && uniqueErrors.length > 0 && <div className="new-action-errors" role="alert"><p>다음 항목을 확인해 주세요.</p><ul>{uniqueErrors.map(([id, text]) => <li key={id}><button type="button" onClick={() => focus(id === 'intake_date' && form.sameStart ? 'tf-storage_start_date' : id === 'initial_measured_on' && form.initialSameStart ? 'tf-initialSameStart' : 'tf-' + id.replaceAll('.', '-'))}>{text}</button></li>)}</ul></div>}{inputNotice && noticeSig === signature(form) && <div className="new-condition-note" role="status">{inputNotice}{hongro && form.temperature !== '0' && form.temperature !== '4' && <button type="button" className="linkbtn new-temperature-link" onClick={() => focus('tf-temperature')}>온도 입력하기</button>}</div>}</div><div className="new-actions-right"><button type="button" className="new-primary" onClick={checkNew}>{!missingRequired && predictable.length ? '자세히 보기' : '예측 가능 여부 확인'} <ArrowRight size={18} /></button><p>{guest && '기록 저장에는 로그인이 필요해요'} <button type="button" className="new-save" onClick={saveRecord} disabled={saving || !!loadError}>{saving ? '저장 중…' : '기록만 저장'}</button></p></div></div>
       {saveMsg && <p className={saveMsg.ok?'qt-ok':'auth-error'} role="status">{saveMsg.text}</p>}
@@ -911,6 +918,41 @@ function MeasureInput({id, label, value, onValue, missing, onMissing, unit, err,
     <div className="qt3-q-head"><label htmlFor={id}>{label}</label><label className="qt-check qt3-missing"><input type="checkbox" checked={missing} onChange={e => onMissing(e.target.checked)} />미측정</label></div>
     <div className="qt3-unit-input"><input id={id} className="qt3-input" type="number" inputMode="decimal" step="any" min={0} value={value} disabled={missing} placeholder={missing ? '미측정으로 기록' : '측정한 숫자'} onChange={e => onValue(e.target.value)} aria-invalid={!!err} />{unit}</div>
     {err ? <span className="qf-err" role="alert">{err}</span> : help && <p className="qt3-help">{help}</p>}
+  </div>;
+}
+
+const FUJI_REGIONS: {id: FujiRegion; label: string; station: string}[] = [{id: 'cheongsong', label: '청송', station: '청송군 청송읍'}, {id: 'jangsu', label: '장수', station: '장수군 장수읍'}, {id: 'yeongju', label: '영주', station: '영주시 봉현면'}];
+/** 후지 날씨 추정: 생산지와 수확일을 고르면 그 해 농업기상 일자료로 네 값을 계산해 지역 식으로 초기 품질을 추정합니다. */
+function FujiWeather({form, setForm, estimate}: {form: TrackerForm; setForm: (update: (f: TrackerForm) => TrackerForm) => void; estimate: Record<'weight' | 'diameter' | 'firmness' | 'brix' | 'acidity', number> | null}) {
+  const fj = form.fuji ?? emptyFujiForm();
+  const year = isDate(form.harvest_date) ? +form.harvest_date.slice(0, 4) : null;
+  const [st, setSt] = useState<{state: 'idle' | 'loading' | 'ok' | 'error'; msg?: string; key?: string}>({state: 'idle'});
+  const key = fj.region && year ? `${fj.region}:${year}` : '';
+  useEffect(() => {
+    if (!key || st.key === key) return;
+    let live = true; setSt({state: 'loading', key});
+    fetch(`/api/weather/hongro?year=${year}&region=${fj.region}`).then(async r => {
+      const j = await r.json().catch(() => ({}));
+      if (!live) return;
+      if (!r.ok) { setSt({state: 'error', key, msg: `${j.error || '날씨 자료를 불러오지 못했어요.'} 지금은 예측할 수 없어요. 잠시 뒤 다시 시도해 주세요.`}); return; }
+      const v = Object.fromEntries((j.variables as {key: string; value: number | null}[]).map(x => [x.key, x.value]));
+      const reasons = (j.variables as {reason: string | null}[]).map(x => x.reason).filter(Boolean);
+      setForm(f => ({...f, fuji: {...(f.fuji ?? emptyFujiForm()), year: String(year), weather: {rain9: v.chang_9rain == null ? '' : String(v.chang_9rain), lc56: v.chang_LC56 == null ? '' : String(v.chang_LC56), lc78: v.chang_LC78 == null ? '' : String(v.chang_LC78), min4: v.chang_min4 == null ? '' : String(v.chang_min4)}}}));
+      setSt({state: reasons.length ? 'error' : 'ok', key, msg: reasons.length ? `${reasons[0]} 지금은 예측할 수 없어요.` : undefined});
+    }).catch(() => { if (live) setSt({state: 'error', key, msg: '날씨 자료를 불러오지 못해 지금은 예측할 수 없어요. 잠시 뒤 다시 시도해 주세요.'}); });
+    return () => { live = false; };
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const region = FUJI_REGIONS.find(r => r.id === fj.region);
+  return <div className="qt-weather qt3-weather">
+    <fieldset className="qt3-q"><legend className="qt3-q-head">생산지</legend><div className="qt3-seg">{FUJI_REGIONS.map(r => <label key={r.id} className={fj.region === r.id ? 'active' : ''}><input type="radio" name="tf-fuji-region" checked={fj.region === r.id} onChange={() => setForm(f => ({...f, fuji: {...(f.fuji ?? emptyFujiForm()), region: r.id, weather: {rain9: '', lc56: '', lc78: '', min4: ''}}}))} /><span>{r.label}</span></label>)}</div></fieldset>
+    <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-harvest_date">수확일</label></div><input id="tf-harvest_date" className="qt3-input" type="date" max={todayKST()} value={form.harvest_date} onChange={e => { const v = e.target.value; setForm(f => ({...f, harvest_date: v})); }} /></div>
+    {key && <div className={'qt-weather-auto' + (st.state === 'error' ? ' err' : '')} role="status" aria-live="polite">
+      {st.state === 'loading' ? <p><Loader2 className="spin" size={15} aria-hidden="true" />{year}년 {region?.station} 농업기상 자료를 불러오는 중이에요…</p>
+        : st.state === 'error' ? <p>{st.msg}</p>
+        : estimate ? <><p><b>{year}년 · 농업기상 {region?.station} 관측</b> 자료로 추정했어요 (실측 아님).</p>
+          <ul><li><span>단맛(당도)</span><b>{fmtNum(estimate.brix, 1)} °Brix</b></li><li><span>신맛(산도)</span><b>{fmtNum(estimate.acidity, 2)} %</b></li><li><span>중량</span><b>{fmtNum(estimate.weight, 0)} g</b></li><li><span>횡경</span><b>{fmtNum(estimate.diameter, 1)} mm</b></li><li><span>단단함(참고)</span><b>{fmtNum(estimate.firmness, 1)} N/mm</b><small>단위가 저장식(N)과 달라 저장 중 변화는 계산하지 않아요.</small></li></ul></> : null}
+    </div>}
+    {!key && <p className="qt3-help">생산지와 수확일을 고르면 그 해 날씨로 처음 품질을 추정해요.</p>}
   </div>;
 }
 

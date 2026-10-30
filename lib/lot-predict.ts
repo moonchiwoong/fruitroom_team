@@ -59,5 +59,5 @@ export function lotPredictor(lot: Lot, observations: Observation[] = []) {
     const r = predictQuality({...base, anchor});
     return r.ok && r.value !== null ? {ok: true, value: r.value, first: first ?? anchor.value, from: obs ? 'measured' : weather ? 'weather' : 'initial'} : {ok: false, reason: (r.reason || '계산할 수 없어요.').replace(/^적용 모델 없음:\s*/, '')};
   }
-  return {start, todayDay, weather, at};
+  return {start, todayDay, weather: weather || !!lot.details?.fuji_weather, at};
 }

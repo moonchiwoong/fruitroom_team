@@ -9,6 +9,14 @@
 
 export const RDA_DAILY_URL = 'https://apis.data.go.kr/1390802/AgriWeather/WeatherObsrInfo/V4/InsttWeather/getWeatherMonDayList4';
 export const GEOCHANG_EUP = {code: '670807A001', name: '거창군 거창읍'} as const;
+/** 지역별 회귀식을 만들 때 쓴 농업날씨365 관측소(작성자 확인, 2026-10-31). 홍로=거창, 후지=청송·장수·영주. */
+export const WEATHER_STATIONS = {
+  geochang: {name: '거창군 거창읍', code: '670807A001', label: '거창', cultivar: '홍로'},
+  cheongsong: {name: '청송군 청송읍', code: null, label: '청송', cultivar: '후지'},
+  jangsu: {name: '장수군 장수읍', code: null, label: '장수', cultivar: '후지'},
+  yeongju: {name: '영주시 봉현면', code: null, label: '영주', cultivar: '후지'},
+} as const;
+export type WeatherRegion = keyof typeof WEATHER_STATIONS;
 export const GDD_BASE = 5;
 
 export type DailyObs = {date: string; mean: number | null; min: number | null; rain: number | null};
@@ -30,13 +38,14 @@ export class RdaError extends Error {
 }
 
 /** getWeatherMonDayList4 XML 응답을 일자료로 바꿉니다. 지정한 관측소 코드가 아닌 행은 버립니다. */
-export function parseDailyXml(xml: string, spotCode: string = GEOCHANG_EUP.code): {rows: DailyObs[]; total: number} {
+export function parseDailyXml(xml: string, spot: string | {code?: string | null; name?: string} = GEOCHANG_EUP.code): {rows: DailyObs[]; total: number} {
+  const match = typeof spot === 'string' ? {code: spot} : spot;
   const code = tag(xml, 'result_Code') ?? tag(xml, 'returnReasonCode');
   if (code !== '200') throw new RdaError(tag(xml, 'result_Msg') ?? tag(xml, 'returnAuthMsg') ?? '농업기상 자료를 받지 못했어요.', code ?? undefined);
   const items = xml.match(/<item>[\s\S]*?<\/item>/g) ?? [];
   const rows: DailyObs[] = [];
   for (const it of items) {
-    if (tag(it, 'obsr_Spot_Cd') !== spotCode) continue;
+    if (match.code ? tag(it, 'obsr_Spot_Cd') !== match.code : tag(it, 'obsr_Spot_Nm') !== match.name) continue;
     const date = tag(it, 'date_Time') ?? '';
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
     rows.push({date, mean: toNum(tag(it, 'tmprt_150')), min: toNum(tag(it, 'tmprt_150Lwet')), rain: toNum(tag(it, 'rn'))});

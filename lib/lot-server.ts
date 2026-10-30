@@ -63,6 +63,17 @@ export function cleanDetails(v:unknown){
  if(s.mcp){const m=s.mcp;o.mcp={treated_on:date(m.treated_on,'1-MCP 처리일'),product:txt(m.product,'제품명'),concentration:txt(m.concentration,'농도',40),hours:num(m.hours,0,500,'처리 시간 h'),temp:num(m.temp,-5,40,'처리 온도 °C')};}
  if(s.ca){const m=s.ca;o.ca={from:date(m.from,'CA 시작일'),to:date(m.to,'CA 종료일'),o2:num(m.o2,0,21,'산소 농도 %'),co2:num(m.co2,0,30,'이산화탄소 농도 %')};}
  if(s.tracked){const m=s.tracked;const c=num(m.count,1,10000,'추적 표본 수');if(c!==null&&!Number.isInteger(c))throw new InputError('추적 표본 수는 정수로 입력해 주세요.');o.tracked={sample_id:txt(m.sample_id,'추적 표본 ID',80),count:c,initial_weight:num(m.initial_weight,1,2000,'추적 표본 초기 평균 중량 g')};}
+ if(Object.hasOwn(s,'fuji_weather')){
+  const w=s.fuji_weather;
+  if(w===null)o.fuji_weather=null;
+  else{
+   if(typeof w!=='object'||Array.isArray(w)||!['cheongsong','jangsu','yeongju'].includes(w.region)||!w.inputs||typeof w.inputs!=='object')throw new InputError('후지 날씨 추정 정보를 확인해 주세요.');
+   const big=Number.MAX_VALUE,yr=num(w.year,2000,2100,'수확 연도');
+   const e=w.estimate;if(e!==null&&e!==undefined&&(typeof e!=='object'||Array.isArray(e)))throw new InputError('후지 날씨 추정값 형식을 확인해 주세요.');
+   o.fuji_weather={region:w.region,year:yr,inputs:{rain9:num(w.inputs.rain9,-big,big,'9월 강수량'),lc56:num(w.inputs.lc56,-big,big,'5~6월 생장도일'),lc78:num(w.inputs.lc78,-big,big,'7~8월 생장도일'),min4:num(w.inputs.min4,-big,big,'4월 최저기온')},
+    estimate:e?{firmness_nmm:num(e.firmness_nmm,-big,big,'추정 경도'),brix:num(e.brix,-big,big,'추정 당도'),acidity:num(e.acidity,-big,big,'추정 산도'),weight:num(e.weight,-big,big,'추정 중량'),diameter:num(e.diameter,-big,big,'추정 횡경')}:null};
+  }
+ }
  if(s.hongro!==undefined&&s.hongro!==null){
   const h=s.hongro;
   if(typeof h!=='object'||Array.isArray(h)||h.schemaVersion!==1||h.cultivar!=='hongro'||h.region!=='geochang'||h.modelVersion!==HONGRO_MODEL_VERSION)throw new InputError('거창 홍로 모델 정보를 확인해 주세요.');
