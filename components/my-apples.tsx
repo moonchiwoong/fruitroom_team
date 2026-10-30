@@ -13,8 +13,10 @@ import {fmtNum, metricMeta, todayKST, addDays} from '@/lib/tracker';
 const md = (d: string) => { const [, m, day] = d.split('-').map(Number); return `${m}/${day}`; };
 const unit = (m: string, hongro: boolean) => m === 'firmness' ? (hongro ? 'N (Ø11 mm)' : 'N') : metricMeta[m as 'brix'].unit;
 
-export default function MyApples({lots, loadError, reload, openTracker}: {lots: Lot[]; loadError: string; reload: () => Promise<Lot[]>; openTracker: (mode: 'real' | 'example', lotId?: string) => void}) {
+export default function MyApples({lots, loadError, reload, openTracker, focus}: {lots: Lot[]; loadError: string; reload: () => Promise<Lot[]>; openTracker: (mode: 'real' | 'example', lotId?: string) => void; focus?: {id: string | null; n: number} | null}) {
   const [openId, setOpenId] = useState<string | null>(null);
+  // 다른 화면에서 특정 사과를 열도록 요청하면(새 사과 저장 직후 등) 그 사과 상세를 엽니다.
+  useEffect(() => { if (focus) setOpenId(focus.id); }, [focus?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   const sorted = useMemo(() => [...lots].sort((a, b) => (storageStart(a) || '').localeCompare(storageStart(b) || '')), [lots]);
   const lot = lots.find(l => l.id === openId) ?? null;
   if (lot) return <AppleDetail lot={lot} onBack={() => setOpenId(null)} reload={reload} openTracker={openTracker} />;
@@ -66,7 +68,7 @@ function AppleDetail({lot, onBack, reload, openTracker}: {lot: Lot; onBack: () =
     <div className="ma-days" role="group" aria-label="저장 일수">{days.map(d => <button key={d} type="button" aria-pressed={sel === d} className={sel === d ? 'active' : ''} onClick={() => setDay(d)}>{d === p.todayDay ? '오늘' : `${d}일`}</button>)}</div>
     <p className="ma-date">{p.start ? `${md(addDays(p.start, sel))} 기준 (저장 ${sel}일째)` : ''}</p>
     <div className="ma-tiles">{EASY_METRICS.map(m => { const r = p.at(m, sel);
-      return <div key={m} className="ma-tile"><span>{EASY_LABEL[m]}</span>{r.ok ? <><b>{easyChange(m, r.value, r.first)}</b><small>{fmtNum(r.value, metricMeta[m].digits)} {unit(m, hongro)}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div>; })}</div>
+      return <div key={m} className="ma-tile"><span>{EASY_LABEL[m]}</span>{r.ok ? <><b>{easyChange(m, r.value, r.first, p.weather)}</b><small>{fmtNum(r.value, metricMeta[m].digits)} {unit(m, hongro)}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div>; })}</div>
     <div className="ma-actions">
       <button type="button" className="ma-primary big" onClick={() => setMeasure(true)}><Plus size={18} aria-hidden="true" />측정 추가</button>
       <button type="button" className="ma-ghost" onClick={() => openTracker('real', lot.id)}>그래프·자세히 보기<ArrowRight size={16} aria-hidden="true" /></button>

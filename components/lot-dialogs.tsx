@@ -8,7 +8,7 @@ import {requestJson} from '@/components/lot-forms';
 import {useTeamSession} from '@/components/team-auth';
 import {today, type Lot, type Observation} from '@/lib/lot-types';
 import {KGF_TO_N} from '@/lib/tracker-form';
-import {lotReadiness, quantityUnit, storageStart} from '@/lib/lot-readiness';
+import {lotReadiness, quantityUnit, storageStart, hasInitialValues, weatherInitial} from '@/lib/lot-readiness';
 import {isDate} from '@/lib/tracker';
 
 const VARIETIES = ['후지', '홍로', '감홍'] as const;
@@ -83,13 +83,13 @@ export function LotEditor({open, lot, onClose, onSaved}: {open: boolean; lot?: L
         {f.varietyPick === '기타' && <input aria-label="품종 직접 입력" value={f.varietyOther} maxLength={60} placeholder="품종 이름" onChange={e => set('varietyOther', e.target.value)} />}</Field>
       <Field id="le-location" label="저장고"><input id="le-location" value={f.location} maxLength={120} placeholder="예: A저장고" onChange={e => set('location', e.target.value)} /></Field>
       <Field id="le-qty" label="저장 수량" hint="선택 · 상자와 kg는 따로 합산해요."><div className="ld-row"><input id="le-qty" type="number" inputMode="decimal" min={0.1} step="any" value={f.quantity} placeholder="예: 120" onChange={e => set('quantity', e.target.value)} />
-        <select aria-label="저장 수량 단위" value={f.unit} onChange={e => set('unit', e.target.value as 'kg' | '상자')}><option>상자</option><option>kg</option></select></div></Field>
+        {f.unit === 'kg' && <select aria-label="저장 수량 단위" value={f.unit} onChange={e => set('unit', e.target.value as 'kg' | '상자')}><option>상자</option><option>kg</option></select>}{f.unit !== 'kg' && <span className="ld-unit">상자</span>}</div></Field>
       <Field id="le-start" label="저장 시작일" hint="저장고에 넣어 보관을 시작한 날 · 예측의 0일차"><input id="le-start" type="date" max={today()} value={f.start} onChange={e => set('start', e.target.value)} /></Field>
-      <Field id="le-storage" label="보관 방식"><select id="le-storage" value={f.storage} onChange={e => set('storage', e.target.value)}><option>일반 저온</option><option value="CA">CA 저장</option><option>기타</option></select></Field>
+      <Field id="le-storage" label="보관 방식"><select id="le-storage" value={f.storage} onChange={e => set('storage', e.target.value)}><option>일반 저온</option><option value="CA">CA 저장</option><option value="기타">기타 (예측 준비 중)</option></select></Field>
       <Field id="le-mcp" label="1-MCP 처리" hint="모르면 ‘모름’으로 두세요. ‘미처리’로 바꿔 계산하지 않아요."><select id="le-mcp" value={f.mcp} onChange={e => set('mcp', e.target.value)}><option value="미확인">모름</option><option value="처리">처리함</option><option value="미처리">미처리</option></select></Field>
       <Field id="le-temp" label={<>실제 저장고 온도 <small>℃ · 선택</small></>} hint="기록한 온도를 지원 온도로 바꾸지 않아요."><input id="le-temp" type="number" inputMode="decimal" step="any" value={f.temperature} placeholder="예: 0" onChange={e => set('temperature', e.target.value)} /></Field>
-      <Field id="le-share" label="공유 범위" hint={!session?.isTeam ? '팀 계정에서만 팀과 공유할 수 있어요.' : !owner ? '공유 범위는 물량을 등록한 사람만 바꿀 수 있어요.' : '팀과 공유하면 팀원이 기록을 보고 추가·수정할 수 있어요.'}>
-        <select id="le-share" value={f.team ? 'team' : 'me'} disabled={!canShare} onChange={e => set('team', e.target.value === 'team')}><option value="me">나만 보기</option><option value="team">팀과 공유</option></select></Field>
+      {session?.isTeam && <Field id="le-share" label="공유 범위" hint={!session?.isTeam ? '팀 계정에서만 팀과 공유할 수 있어요.' : !owner ? '공유 범위는 물량을 등록한 사람만 바꿀 수 있어요.' : '팀과 공유하면 팀원이 기록을 보고 추가·수정할 수 있어요.'}>
+        <select id="le-share" value={f.team ? 'team' : 'me'} disabled={!canShare} onChange={e => set('team', e.target.value === 'team')}><option value="me">나만 보기</option><option value="team">팀과 공유</option></select></Field>}
     </div>
     <div className={'ld-ready ' + preview.status} role="status"><Info size={16} aria-hidden="true" /><div><b>{preview.status === 'unsupported' ? preview.title : preview.status === 'conditions' ? '기록 가능 · ' + preview.title : '기록 가능 · ' + (preview.status === 'ready' ? '예측 가능' : '이 조건의 예측식 있음')}</b><span>{preview.status === 'ready' || preview.status === 'unsupported' || preview.status === 'conditions' ? preview.detail : '예측하려면 등록 후 예측 기준 초기 측정과 측정일을 기록해 주세요.'}</span></div></div>
     <details className="ld-more" open={!f.sameIntake || !!f.harvest || !!f.packaging || !!f.sensor || undefined}>
@@ -121,7 +121,7 @@ export function MeasurementForm({open, lot, observation, prefill, isBaseline, ha
   const ready = useRef(false);
   useEffect(() => {
     if (!open) { ready.current = false; return; }
-    const raw = store.get(key); let d = {...obsDraft(lot, observation ?? prefill), ...(prefill && !observation ? {date: prefill.date} : {}), setInitial: presetInitial}, r = false;
+    const raw = store.get(key); let d = {...obsDraft(lot, observation ?? prefill), ...(prefill && !observation ? {date: prefill.date} : {}), setInitial: presetInitial || (!observation && !hasBaseline && !hasInitialValues(lot) && !weatherInitial(lot))}, r = false;
     if (raw) { try { d = {...d, ...JSON.parse(raw)}; r = true; } catch { store.del(key); } }
     setF(d); setRestored(r); setError(''); ready.current = true;
   }, [open, key]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -150,7 +150,7 @@ export function MeasurementForm({open, lot, observation, prefill, isBaseline, ha
     {restored && <div className="ld-restored" role="status"><span>작성하던 내용을 불러왔어요.</span><button type="button" className="linkbtn" onClick={() => { store.del(key); setF(obsDraft(lot, observation)); setRestored(false); }}><Undo2 size={13} />처음 값으로</button></div>}
     {fromInitial ? <p className="ld-baseline on"><b>물량 등록 때 입력한 초기 측정을 고쳐요.</b> 저장하면 이 값이 측정 기록으로 남고 예측 기준 초기 측정으로 지정돼요. 고치기 전 값은 ‘이전 예측 기준값 이력’에 남아요.</p>
       : isBaseline ? <p className="ld-baseline on"><b>현재 예측 기준 초기 측정이에요.</b> 고치면 예측에 쓰는 초기값도 함께 바뀌어요.</p>
-      : <label className="ld-check ld-baseline"><input type="checkbox" checked={f.setInitial} onChange={e => set('setInitial', e.target.checked)} /><span><b>이 기록을 예측 기준 초기 측정으로 지정</b><small>{hasBaseline ? '한 물량에 기준은 하나예요. 바꿔도 이전 측정 기록과 이전 기준값 이력은 남아요.' : '이 물량에는 아직 예측 기준 초기 측정이 없어요. 가장 오래된 기록을 자동으로 기준으로 쓰지 않아요.'}</small></span></label>}
+      : null}
     <div className="ld-guide"><p>측정한 항목만 입력하세요. 빈칸은 미측정으로 남겨둘게요.</p><p>측정한 사과들의 평균값을 입력해 주세요.</p></div>
     <div className="ld-grid">
       <Field id="mf-date" label="측정일" hint={`저장 시작일 ${start} 이후 · 오늘까지`}><input id="mf-date" type="date" min={lot.intake_date} max={today()} value={f.date} onChange={e => set('date', e.target.value)} /><div className="ld-row ld-quickdates">{[['오늘', today()], ['어제', new Date(Date.parse(today() + 'T00:00:00Z') - 864e5).toISOString().slice(0, 10)]].map(([t, d]) => <button key={t} type="button" className={'btn ' + (f.date === d ? 'btn-primary' : 'btn-outline')} onClick={() => set('date', d)}>{t}</button>)}</div></Field>

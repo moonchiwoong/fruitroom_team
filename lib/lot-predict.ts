@@ -13,13 +13,14 @@ export const EASY_LABEL: Record<MetricId, string> = {firmness: '단단함', brix
 export const EASY_METRICS: MetricId[] = ['firmness', 'loss', 'brix', 'acidity'];
 
 /** 처음 값 대비 변화를 반올림해 ‘약’으로 표현합니다. 판정이 아니라 계산값의 표현입니다. */
-export function easyChange(m: MetricId, value: number, first: number | null): string {
+export function easyChange(m: MetricId, value: number, first: number | null, estimated = false): string {
   if (m === 'loss') return `약 ${fmtNum(value, 1)}% 줄어듦`;
   if (first === null || !Number.isFinite(first) || first === 0) return fmtNum(value, metricMeta[m].digits);
   const rel = (value - first) / first * 100;
-  if (Math.abs(rel) < 0.5) return '처음과 비슷';
+  const base = estimated ? '수확 때(추정)' : '첫 측정';
+  if (Math.abs(rel) < 0.5) return estimated ? '수확 때(추정)와 비슷' : '첫 측정과 비슷';
   const pct = Math.max(1, Math.round(Math.abs(rel)));
-  return `처음보다 약 ${pct}% ${m === 'firmness' ? (rel < 0 ? '물러짐' : '단단해짐') : rel < 0 ? '낮아짐' : '높아짐'}`;
+  return `${base}보다 약 ${pct}% ${m === 'firmness' ? (rel < 0 ? '물러짐' : '단단해짐') : rel < 0 ? '낮아짐' : '높아짐'}`;
 }
 
 const num = (s: unknown) => { const t = String(s ?? '').trim(); if (t === '') return null; const n = Number(t); return Number.isFinite(n) ? n : null; };
