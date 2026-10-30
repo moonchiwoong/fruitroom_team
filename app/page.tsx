@@ -16,7 +16,7 @@ import {fmtNum, daysBetween, todayKST} from '@/lib/tracker';
 import {quantityUnit, storageStart} from '@/lib/lot-readiness';
 
 const QualityTracker = dynamic(() => import('@/components/quality-tracker'), {ssr: false, loading: () => <div className="loading-strip">화면을 준비하고 있어요…</div>});
-const LotsPage = dynamic(() => import('@/components/lots-page'), {ssr: false, loading: () => <div className="loading-strip">물량을 불러오는 중…</div>});
+const MyApples = dynamic(() => import('@/components/my-apples'), {ssr: false, loading: () => <div className="loading-strip">사과 목록을 불러오는 중…</div>});
 const ModelInfo = dynamic(() => import('@/components/model-info'), {ssr: false, loading: () => <div className="loading-strip">모델 정보를 불러오는 중…</div>});
 const Account = dynamic(() => import('@/components/account'), {ssr: false});
 const ServicePreview = dynamic(() => import('@/components/landing').then(m => m.ServicePreview), {ssr: false});
@@ -92,7 +92,7 @@ export default function Home() {
       {tab === 'model' && <PageHead title="계산 근거" />}
       <div className="page-body">
         {trackerVisited && <div hidden={tab !== 'track'}><QualityTracker lots={lots} onLotsChanged={reload} request={trackReq} onAskAI={setAIContext} openModelInfo={context => {setModelContext(context); setTab('model', true);}} openLot={id => { setLotFocus(id); setTab('lots'); }} /></div>}
-        {lotsVisited && <div hidden={tab !== 'lots'}>{lotsLoaded ? <LotsPage lots={lots} loadError={lotsError} reload={reload} openTracker={openTracker} focus={lotFocus} onAskAI={id => setAIContext({mode:'real',scope:'lot',lotId:id})} /> : <div className="loading-strip">물량을 불러오는 중…</div>}</div>}
+        {lotsVisited && <div hidden={tab !== 'lots'}>{lotsLoaded ? <MyApples lots={lots} loadError={lotsError} reload={reload} openTracker={openTracker} /> : <div className="loading-strip">물량을 불러오는 중…</div>}</div>}
         {tab === 'model' && <ModelInfo context={modelContext} />}
         {tab === 'account' && <Account onOpenPredict={() => { setTab('model'); }} />}
       </div>
