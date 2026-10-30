@@ -569,8 +569,8 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         <div className="new-card-head"><h2 id="new-quick-h">바로 보기 · 저장 {quickDay}일째 <small>{fmtDate(addDays(startDate, quickDay))}</small></h2>
           <div className="new-quick-days" role="group" aria-label="저장 일수">{[30, 60, 90, 120].map(d => <button key={d} type="button" aria-pressed={quickDay === d} className={quickDay === d ? 'active' : ''} onClick={() => setQuickDay(d)}>{d}일</button>)}</div></div>
         <div className="new-quick-grid">{predictable.map(m => { const v = valueAt(series[m], quickDay), a = m === 'loss' ? null : anchors[m];
-          return <div key={m} className="new-quick-tile"><span>{metricMeta[m].label}</span>{v.status === 'ok' ? <b>{fmtNum(v.value, metricMeta[m].digits)}<small> {displayUnit(m)}</small></b> : <b className="na">계산 없음</b>}
-            <small>{v.status !== 'ok' ? v.reason : m === 'loss' ? '저장일수로 계산' : a ? `${weatherMode ? '처음 추정값' : '처음'}보다 ${describeChange(m, v.value, a.value).short}` : ''}</small></div>; })}</div>
+          return <div key={m} className="new-quick-tile"><span>{EASY_LABEL[m]}</span>{v.status === 'ok' ? <b>{easyChange(m, v.value, a?.value ?? null)}</b> : <b className="na">계산 없음</b>}
+            <small>{v.status !== 'ok' ? v.reason : `${fmtNum(v.value, metricMeta[m].digits)} ${displayUnit(m)}${m === 'loss' ? ' · 저장일수로 계산' : weatherMode ? ' · 처음 값은 날씨 추정' : ''}`}</small></div>; })}</div>
         <p className="new-quick-note">{weatherMode ? '초기 품질은 날씨로 추정한 값이에요(실측 아님). ' : ''}시연용 계산이며 출하·안전 판정이 아니에요. 그래프와 자세한 근거는 ‘자세히 보기’에서 볼 수 있어요.</p>
       </section>}
       <div className="new-actions"><div className="new-status"><b>{statusTitle}</b>{statusDetail && <p>{statusDetail}</p>}{checkShown && uniqueErrors.length > 0 && <div className="new-action-errors" role="alert"><p>다음 항목을 확인해 주세요.</p><ul>{uniqueErrors.map(([id, text]) => <li key={id}><button type="button" onClick={() => focus(id === 'intake_date' && form.sameStart ? 'tf-storage_start_date' : id === 'initial_measured_on' && form.initialSameStart ? 'tf-initialSameStart' : 'tf-' + id.replaceAll('.', '-'))}>{text}</button></li>)}</ul></div>}{inputNotice && noticeSig === signature(form) && <div className="new-condition-note" role="status">{inputNotice}{hongro && form.temperature !== '0' && form.temperature !== '4' && <button type="button" className="linkbtn new-temperature-link" onClick={() => focus('tf-temperature')}>온도 입력하기</button>}</div>}</div><div className="new-actions-right"><button type="button" className="new-primary" onClick={checkNew}>{!missingRequired && predictable.length ? '자세히 보기' : '예측 가능 여부 확인'} <ArrowRight size={18} /></button><p>{guest && '기록 저장에는 로그인이 필요해요'} <button type="button" className="new-save" onClick={saveRecord} disabled={saving || !!loadError}>{saving ? '저장 중…' : '기록만 저장'}</button></p></div></div>
@@ -750,7 +750,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           <div className="qt4-tiles" role="group" aria-label="지표 요약 · 누르면 그래프가 바뀌어요">
             {visibleMetrics.map(m => { const r = modelResults[m], an = anchors[m], ok = r.ok && r.value !== null;
               return <button key={m} type="button" className={'qt4-tile' + (metric === m ? ' active' : '')} aria-pressed={metric === m} onClick={() => setMetric(m)}>
-                <span className="qt4-tile-label">{metricMeta[m].label}</span>
+                <span className="qt4-tile-label">{EASY_LABEL[m]}</span>
                 <span className="qt4-tile-value">{ok ? <>{fmtNum(r.value!, metricMeta[m].digits)}<small>{displayUnit(m)}</small></> : '계산 없음'}</span>
                 {hongro && ok && <span className="qt5-tile-seg">{hongroSegment(m)}</span>}
                 <span className="qt4-tile-note">{!ok ? (r.reason ?? '자료 부족').replace(/^적용 모델 없음:\s*/, '') : m === 'loss' ? (actualLoss ? `실측 ${fmtNum(actualLoss.value, 2)} %` : `${r.kind} · 저장일수로 계산`) : an ? `${an.source === 'latest' ? '계산 시작점' : weatherMode ? '처음 추정값' : '처음'}보다 ${describeChange(m, r.value!, an.value).short}` : r.kind}</span>
@@ -956,6 +956,17 @@ function WeatherChoices({form, setForm, errors, estimate, harvestDate}: {form: T
     <p className="qt3-help">경도 추정식의 원단위(N/mm)와 저장 모델 단위(N)가 같게 쓰일 수 있는지 확인되지 않았어요. 변환 없이 연결하므로 경도 결과의 신뢰도는 미확인이에요.</p>
     </details>
   </div>;
+}
+
+/** 농가가 읽기 쉬운 이름과 변화 표현. 계산값은 그대로이며, 처음 값 대비 비율을 반올림해 ‘약’으로 보여 줍니다. */
+const EASY_LABEL: Record<MetricId, string> = {firmness: '단단함', brix: '단맛(당도)', acidity: '신맛(산도)', loss: '무게 감소'};
+function easyChange(m: MetricId, value: number, first: number | null): string {
+  if (m === 'loss') return `약 ${fmtNum(value, 1)}% 줄어듦`;
+  if (first === null || !Number.isFinite(first) || first === 0) return fmtNum(value, metricMeta[m].digits);
+  const rel = (value - first) / first * 100;
+  if (Math.abs(rel) < 0.5) return '처음과 비슷';
+  const pct = Math.round(Math.abs(rel));
+  return `처음보다 약 ${pct < 1 ? 1 : pct}% ${m === 'firmness' ? (rel < 0 ? '물러짐' : '단단해짐') : rel < 0 ? '낮아짐' : '높아짐'}`;
 }
 
 /** Adapter for the existing SVG chart; every point retains the engine result. */
