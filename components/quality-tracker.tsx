@@ -1091,11 +1091,11 @@ function WeatherChoices({form, setForm, errors, estimate, harvestDate}: {form: T
     try {
       const r = await fetch(`/api/weather/hongro?year=${year}`);
       const j = await r.json().catch(() => ({}));
-      if (!r.ok) { setAuto({state: 'error', year, error: j.error || '날씨 자료를 불러오지 못했어요.'}); return; }
+      if (!r.ok) { setAuto({state: 'error', year, error: `${j.error || '날씨 자료를 불러오지 못했어요.'} 지금은 예측할 수 없어요. 잠시 뒤 다시 시도해 주세요.`}); return; }
       const data = j as Fetched;
       setAuto({state: 'ok', year, data});
       setForm(f => ({...f, hongro: {...f.hongro, weather: {...f.hongro.weather, ...Object.fromEntries(data.variables.filter(v => v.value !== null).map(v => [v.key, String(v.value)]))}}}));
-    } catch { setAuto({state: 'error', year, error: '날씨 자료를 불러오지 못했어요. 날씨를 직접 골라 주세요.'}); }
+    } catch { setAuto({state: 'error', year, error: '날씨 자료를 불러오지 못해 지금은 예측할 수 없어요. 잠시 뒤 다시 시도해 주세요.'}); }
   }, [setForm]);
   useEffect(() => { if (harvest && allEmpty && auto.year !== harvest.y && auto.state !== 'loading') void load(harvest.y); }, [harvest?.y, allEmpty]); // eslint-disable-line react-hooks/exhaustive-deps
   const fromApi = auto.state === 'ok' && !!auto.data && auto.data.variables.every(v => v.value === null || String(form.hongro.weather[v.key as keyof typeof form.hongro.weather] ?? '') === String(v.value));
@@ -1120,11 +1120,6 @@ function WeatherChoices({form, setForm, errors, estimate, harvestDate}: {form: T
     {harvest && harvest.m < 9 && <p className="qt3-note warn qt-weather-sept" role="note"><AlertTriangle size={16} aria-hidden="true" /><span>9월 전에 수확했어요. 식에는 9월 강수량이 들어가지만 이 사과의 재배 기간에는 9월이 없어요. 추정값 해석에 주의해 주세요.</span></p>}
     <div className="qt3-note info"><Info size={16} /><div><span>{fromApi ? '날씨 값은 농촌진흥청 농업기상 관측(거창읍) 일자료로 계산했어요: 4월 일최저기온 평균, 5~6월·7~8월 (일평균기온 − 5℃) 합계, 9월 강수량 합계. 초기 품질은 이 값으로 추정한 값이며 실측이 아니에요.' : '날씨 값은 초기 품질을 추정하기 위한 입력이에요. 직접 입력한 값은 실측 기상자료와 구분해 기록해요.'}</span></div></div>
     <p className="qt3-help">경도 추정식의 원단위(N/mm)와 저장 모델 단위(N)가 같게 쓰일 수 있는지 확인되지 않았어요. 변환 없이 연결하므로 경도 결과의 신뢰도는 미확인이에요.</p>
-    </details>
-    <details className="qt3-more" open={auto.state === 'error' || (auto.state === 'idle' && !harvest) || (!fromApi && picked > 0) || undefined}>
-      <summary>날씨 값 확인·직접 입력</summary>
-      <div className="qt3-grid2">{HONGRO_WEATHER_FIELDS.map(field => <F key={field.key} id={`hongro-weather-${field.key}`} label={field.label} unit={field.unit} hint={`참고 범위 ${field.reference.min.toLocaleString('ko-KR', {maximumFractionDigits: 1})}~${field.reference.max.toLocaleString('ko-KR', {maximumFractionDigits: 1})}`} err={errors[`hongro.weather.${field.key}`]}>
-        <input id={`tf-hongro-weather-${field.key}`} type="number" step="any" value={h.weather[field.key]} placeholder="숫자 입력" onChange={e => setW(field.key, e.target.value)} /></F>)}</div>
     </details>
   </div>;
 }
