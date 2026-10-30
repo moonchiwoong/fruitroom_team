@@ -830,6 +830,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
             </details>
           </section>
         </div>
+        <div className="qt2-more"><Apple3DFold day={selDay} cultivar={form.variety} metrics={modelResults} /></div>
         {guest && !exampleMode && <div className="qt-actions qt-result-actions qt2-actions"><button className="btn btn-primary" onClick={handoffToLogin}><Save size={16} />로그인하고 저장하기</button></div>}
       </section>
     </div>
@@ -888,8 +889,8 @@ class Boundary extends Component<{children: ReactNode}, {failed: boolean}> {
 function Apple3DFold({day, cultivar, metrics}: {day: number; cultivar: string; metrics: Record<MetricId, ModelResult>}) {
   const [open, setOpen] = useState(false);
   return <details className="qt2-fold" onToggle={e => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
-    <summary>3D 외관 예시 보기<Plus size={16} /></summary>
-    {open && <div className="qt5-apple-fold"><Boundary><QualityAppleViewer compact day={day} cultivar={cultivar} metrics={metrics} /></Boundary></div>}
+    <summary>사과 모양 보기 (3D)<Plus size={16} /></summary>
+    {open && <div className="qt5-apple-fold"><p className="qt-help">무게 감소에 따라 주름을 표현한 설명용 모델이에요. 실제 사진으로 검증하지 않았어요.</p><Boundary><QualityAppleViewer compact day={day} cultivar={cultivar} metrics={metrics} /></Boundary></div>}
   </details>;
 }
 
