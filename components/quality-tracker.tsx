@@ -18,7 +18,7 @@ import type {ModelInfoContext} from '@/components/model-info';
 import {measurementCompatibility, observationFingerprint} from '@/lib/ai/context';
 import {isHongroVariety} from '@/lib/cultivar';
 import {calculateHongroForm, emptyHongroForm, exampleHongroForm} from '@/lib/hongro-tracker';
-import {HONGRO_WEATHER_PRESETS, HONGRO_STORAGE_LABELS, HONGRO_UNITS, HONGRO_WEATHER_FIELDS, HONGRO_UNITS_CONFLICT} from '@/lib/hongro';
+import {HONGRO_STORAGE_LABELS, HONGRO_UNITS, HONGRO_WEATHER_FIELDS, HONGRO_UNITS_CONFLICT} from '@/lib/hongro';
 import {buildQualityExportCsv, type QualityExportInput} from '@/lib/quality-export';
 import {predictQuality, getQualitySeries, selectQualityModel, HONGRO_LOSS_RATE} from '@/lib/quality-models';
 type ModelResult = ReturnType<typeof predictQuality>;
@@ -353,7 +353,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const priorResult = changedScenario ? predictQuality(modelInput(metric, asOfDay)) : undefined;
   const recordedConditions = `${form.storage} · ${form.temperature ? `${form.temperature}℃` : '온도 미기록'} · 1-MCP ${form.mcp}`;
   const futureConditions = `${currentStorage} · ${form.temperature ? `${form.temperature}℃` : '온도 미기록'} · 1-MCP ${currentMcp}`;
-  const weatherInitialInfo = usesWeatherInitial ? `거창 날씨 선택값: ${HONGRO_WEATHER_FIELDS.map(field => `${field.label} ${form.hongro.weather[field.key]} ${field.unit}`).join(' · ')}. 선택값으로 초기 품질을 추정하며 실제 기상 관측을 자동 조회하지 않습니다.` : undefined;
+  const weatherInitialInfo = usesWeatherInitial ? `거창 날씨 값: ${HONGRO_WEATHER_FIELDS.map(field => `${field.label} ${form.hongro.weather[field.key]} ${field.unit}`).join(' · ')}. 수확한 해의 농업기상(거창읍) 일자료로 계산하거나 직접 입력한 값으로 초기 품질을 추정합니다.` : undefined;
   const basisContext: ModelInfoContext = {
     modelId: selDay <= asOfDay ? recorded.id : future.id,
     metric, cultivar: form.variety, storage: currentStorage, temperature: form.temperature, mcp: currentMcp,
@@ -412,16 +412,17 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const condition = (() => {
     const tRaw = form.temperature.trim(), t = num(form.temperature);
     if (hongro && tRaw === '') return {ok: false, title: '실제 저장고 온도를 입력하면 적용할 식을 찾아요.', detail: '홍로 식은 일반 저온·1-MCP 처리 안 함·정확히 0℃ 또는 4℃에만 있어요.'};
+    if (form.mcp !== '처리' && form.mcp !== '미처리') return {ok: false, title: '1-MCP 처리 여부를 고르면 적용할 식을 찾아요.', detail: '처리 여부를 모르면 예측식을 적용하지 않아요. 기록은 저장할 수 있어요.'};
     const sel = selectQualityModel({cultivar: form.variety, storage: form.storage === '일반 저온' ? 'cold' : form.storage === 'CA' ? 'ca' : 'other', temperature: t, mcp: form.mcp === '처리' ? 'treated' : form.mcp === '미처리' ? 'untreated' : 'unknown', metric: 'firmness', day: 0});
-    if (!sel.model) return {ok: false, title: '이 조건에 적용할 예측식이 확인되지 않았어요.', detail: `${(sel.reason ?? '').replace(/^적용 모델 없음:\s*/, '')} 지금은 기록을 남길 수 있어요.`};
+    if (!sel.model) return {ok: false, preparing: true, title: '이 보관 조건의 예측은 서비스 준비 중이에요.', detail: `${(sel.reason ?? '').replace(/^적용 모델 없음:\s*/, '')} 기록은 지금도 저장할 수 있어요.`};
     return {ok: true, title: `적용 예측식: ${sel.model.label}`, detail: hongro ? '입력한 온도에 해당하는 식으로만 계산해요.' : '후지 원자료에 저장 온도가 없어 온도와 관계없이 같은 식을 써요. 해당 온도에서의 적용 타당성은 확인되지 않았어요.'};
   })();
   const measuredLossRows = measured.loss.map(p => ({date: p.date, day: p.day, value: p.value}));
   const lossPlan = modelResults.loss.ok ? `${hongro ? `홍로 ${num(form.temperature)}℃ 감모율 식` : '후지 감모율 식'}으로 저장일수에 따라 계산해요(검증 전). 실측 감모율과는 따로 표시해요.` : (modelResults.loss.reason ?? '적용식·조건 확인 필요').replace(/^적용 모델 없음:\s*/, '이 조건에 적용할 감모율 식이 확인되지 않았어요. ');
-  const missingWeather = HONGRO_WEATHER_FIELDS.filter(f => String(form.hongro.weather[f.key] ?? '').trim() === '').map(f => HONGRO_WEATHER_PRESETS[f.key].question.replace(/\s*\(.*\)/, ''));
+  const missingWeather = HONGRO_WEATHER_FIELDS.filter(f => String(form.hongro.weather[f.key] ?? '').trim() === '').map(f => f.label);
   const supportRows: {key: string; label: string; ok: boolean; text: string}[] = (() => {
     const rows: {key: string; label: string; ok: boolean; text: string}[] = [];
-    if (weatherMode) rows.push(missingWeather.length ? {key: 'weather', label: '날씨 기반 초기 품질 추정', ok: false, text: `아직 고르지 않은 항목: ${missingWeather.join(', ')}. 네 항목을 모두 골라야 추정해요. 고른 항목만으로도 기록은 남길 수 있어요.`}
+    if (weatherMode) rows.push(missingWeather.length ? {key: 'weather', label: '날씨 기반 초기 품질 추정', ok: false, text: `아직 값이 없는 항목: ${missingWeather.join(', ')}. 네 값이 모두 있어야 추정해요. 기록은 남길 수 있어요.`}
       : hongroResult ? {key: 'weather', label: '날씨 기반 초기 품질 추정', ok: true, text: `경도 ${fmtNum(hongroResult.initial.firmness, 1)} N · 당도 ${fmtNum(hongroResult.initial.brix, 1)} °Brix · 산도 ${fmtNum(hongroResult.initial.acidity, 2)} % (날씨 기반 추정, 실측 아님)`}
       : {key: 'weather', label: '날씨 기반 초기 품질 추정', ok: false, text: hongroCalculation.error || '저장 시작일과 날씨 선택을 확인해 주세요.'});
     for (const m of visibleMetrics) {
@@ -536,7 +537,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           {hongro && temperatureField}
         </div>
         {form.mcpSelected && form.mcp === '미확인' && <p className="new-condition-note">처리 여부가 미확인이면 예측식은 적용하지 않으며 기록은 저장할 수 있어요.</p>}
-        {form.storage === '기타' && <p className="new-condition-note">기타 보관 방식은 확인된 예측식이 없지만 기록은 저장할 수 있어요.</p>}
+        {'preparing' in condition && condition.preparing && <p className="new-condition-note new-preparing" role="status"><b>서비스 준비 중</b> {condition.detail}</p>}
       </section>
       <section className="new-card" aria-labelledby="new-quality"><div className="new-card-head"><h2 id="new-quality"><span>2</span>{hongro ? '초기 품질' : '처음 측정한 품질'}</h2><small>{weatherMode ? '날씨로 추정 · 실측 아님' : '측정한 항목만 입력'}</small></div><p className="new-description">{weatherMode ? '수확 시점 품질을 재배기 날씨로 추정해요. 실제로 쟀다면 ‘직접 측정값 입력’을 골라 주세요.' : '측정한 사과의 평균값을 입력해 주세요.'}</p>
         {hongro && <fieldset className="qt3-q"><legend className="qt3-q-head">초기 품질 입력 방식</legend><div className="qt3-seg">{([['measured','직접 측정값 입력'],['weather','올해 날씨로 추정']] as const).map(([v,t]) => <label key={v} className={form.hongro.source===v?'active':''}><input type="radio" name="tf-hongro-source" checked={form.hongro.source===v} onChange={() => setForm(f=>({...f,hongro:{...f.hongro,source:v}}))} /><span>{t}</span></label>)}</div></fieldset>}
@@ -1056,7 +1057,7 @@ function MeasureInput({id, label, value, onValue, missing, onMissing, unit, err,
   </div>;
 }
 
-/** 홍로 날씨 선택: 항목마다 세 개의 선택 버튼. ‘보통’도 직접 골라야 하며, 다시 누르면 선택을 해제합니다. */
+/** 홍로 날씨 값: 수확한 해의 농업기상(거창읍) 일자료로 자동 계산해 채우고, 확인·직접 입력할 수 있습니다. */
 function WeatherChoices({form, setForm, errors, estimate, harvestDate}: {form: TrackerForm; setForm: (update: (f: TrackerForm) => TrackerForm) => void; errors: Partial<Record<string, string>>; estimate: Record<'firmness' | 'brix' | 'acidity', number> | null; harvestDate?: string}) {
   const harvest = harvestDate && isDate(harvestDate) ? {y: +harvestDate.slice(0, 4), m: +harvestDate.slice(5, 7), d: +harvestDate.slice(8, 10)} : null;
   // 수확한 해의 거창읍 농업기상 일자료로 네 값을 계산해 채웁니다(서버 경로 /api/weather/hongro). 비어 있는 값은 채우지 않습니다.
@@ -1079,9 +1080,8 @@ function WeatherChoices({form, setForm, errors, estimate, harvestDate}: {form: T
   const h = form.hongro;
   const setW = (key: string, v: string) => setForm(f => ({...f, hongro: {...f.hongro, weather: {...f.hongro.weather, [key]: v}}}));
   const picked = HONGRO_WEATHER_FIELDS.filter(f => String(h.weather[f.key] ?? '').trim() !== '').length;
-  const custom = HONGRO_WEATHER_FIELDS.some(f => { const v = String(h.weather[f.key] ?? '').trim(); return v !== '' && !HONGRO_WEATHER_PRESETS[f.key].options.some(o => o.value === Number(v)); });
   return <div className="qt-weather qt3-weather">
-    <div className="qt3-q-head"><p className="qt-weather-lead">{harvest ? `${harvest.y}년(수확한 해) 거창 재배기 날씨예요. 자동으로 채우지 못한 항목은 가까운 쪽을 골라 주세요.` : '올해 거창 날씨와 가까운 쪽을 골라 주세요.'}</p><span className="qt3-count" aria-live="polite">선택 {picked} / {HONGRO_WEATHER_FIELDS.length}</span></div>
+    <div className="qt3-q-head"><p className="qt-weather-lead">{harvest ? `${harvest.y}년(수확한 해) 거창 재배기 날씨로 초기 품질을 추정해요.` : '수확일을 넣으면 그 해 거창 농업기상 자료로 날씨 값을 채워요.'}</p><span className="qt3-count" aria-live="polite">입력 {picked} / {HONGRO_WEATHER_FIELDS.length}</span></div>
     {harvest && <div className={'qt-weather-auto' + (auto.state === 'error' ? ' err' : '')} role="status" aria-live="polite">
       {auto.state === 'loading' ? <p><Loader2 className="spin" size={15} aria-hidden="true" />{harvest.y}년 거창읍 농업기상 자료를 불러오는 중이에요…</p>
         : auto.state === 'error' ? <p>{auto.error}</p>
@@ -1091,24 +1091,13 @@ function WeatherChoices({form, setForm, errors, estimate, harvestDate}: {form: T
         </> : null}
       <button type="button" className="qt3-minibtn" disabled={auto.state === 'loading'} onClick={() => void load(harvest.y)}>{auto.state === 'ok' ? '농업기상 값으로 다시 채우기' : `${harvest.y}년 농업기상 자료 불러오기`}</button>
     </div>}
-    <div className="qt-weather-rows">{HONGRO_WEATHER_FIELDS.map(field => {
-      const preset = HONGRO_WEATHER_PRESETS[field.key], cur = String(h.weather[field.key] ?? '').trim();
-      const sel = cur === '' ? undefined : preset.options.find(o => o.value === Number(cur));
-      const [title, sub] = preset.question.split(/\s*\(|\)/);
-      return <div key={field.key} className={'qt-weather-row' + (errors[`hongro.weather.${field.key}`] ? ' has-err' : '')} role="radiogroup" aria-label={preset.question}>
-        <span className="qt-weather-q">{title}{sub && <small>{sub}</small>}{cur !== '' && !sel && <em>숫자 입력</em>}</span>
-        <div className="qt3-wbtns">{preset.options.map(o => <button key={o.id} type="button" role="radio" aria-checked={sel?.id === o.id} title={`${o.hint} · ${o.value.toLocaleString('ko-KR')} ${field.unit}`}
-          className={sel?.id === o.id ? 'active' : ''} onClick={() => setW(field.key, sel?.id === o.id ? '' : String(o.value))}>{sel?.id === o.id && <Check size={14} aria-hidden="true" />}{o.label}</button>)}</div>
-      </div>;
-    })}</div>
-    <p className="qt3-help">‘보통’도 직접 선택해 주세요. 기억나지 않는 항목은 비워 두고 기록할 수 있어요.</p>
     {harvest && harvest.m === 9 && <p className="qt3-note warn qt-weather-sept" role="note"><AlertTriangle size={16} aria-hidden="true" /><span>식의 ‘9월 강수량’은 9월 1~30일 전체 합계예요. 수확일(9월 {harvest.d}일) 뒤에 온 비도 들어가며, 9월이 끝나야 자동으로 계산돼요.</span></p>}
     {harvest && harvest.m < 9 && <p className="qt3-note warn qt-weather-sept" role="note"><AlertTriangle size={16} aria-hidden="true" /><span>9월 전에 수확했어요. 식에는 9월 강수량이 들어가지만 이 사과의 재배 기간에는 9월이 없어요. 추정값 해석에 주의해 주세요.</span></p>}
-    <div className="qt3-note info"><Info size={16} /><div><span>{fromApi ? '날씨 값은 농촌진흥청 농업기상 관측(거창읍) 일자료로 계산했어요: 4월 일최저기온 평균, 5~6월·7~8월 (일평균기온 − 5℃) 합계, 9월 강수량 합계. 초기 품질은 이 값으로 추정한 값이며 실측이 아니에요.' : '선택한 날씨는 초기 품질을 추정하기 위한 입력이에요. 실측값과 구분해 기록해요. ‘보통’ 같은 선택값은 모델 참고 범위 기준이고 거창의 실제 평년값이 아니에요.'}</span></div></div>
+    <div className="qt3-note info"><Info size={16} /><div><span>{fromApi ? '날씨 값은 농촌진흥청 농업기상 관측(거창읍) 일자료로 계산했어요: 4월 일최저기온 평균, 5~6월·7~8월 (일평균기온 − 5℃) 합계, 9월 강수량 합계. 초기 품질은 이 값으로 추정한 값이며 실측이 아니에요.' : '날씨 값은 초기 품질을 추정하기 위한 입력이에요. 직접 입력한 값은 실측 기상자료와 구분해 기록해요.'}</span></div></div>
     {estimate ? <><p className="qt3-estimate"><span className="qt3-tag">날씨 기반 추정</span>경도 {fmtNum(estimate.firmness, 1)} N · 당도 {fmtNum(estimate.brix, 1)} °Brix · 산도 {fmtNum(estimate.acidity, 2)} %</p><p>경도 추정식의 원단위(N/mm)와 저장 모델 단위(N)가 같게 쓰일 수 있는지 확인되지 않았습니다. 현재 변환 없이 연결하므로 경도 결과의 신뢰도는 미확인입니다.</p></>
-      : picked === HONGRO_WEATHER_FIELDS.length ? null : <p className="qt3-help">{HONGRO_WEATHER_FIELDS.length - picked}개 항목을 더 고르면 초기 품질을 추정해요.</p>}
-    <details className="qt3-more" open={custom || undefined}>
-      <summary>기상 값을 숫자로 입력 <small>자료가 있을 때</small></summary>
+      : picked === HONGRO_WEATHER_FIELDS.length ? null : <p className="qt3-help">{HONGRO_WEATHER_FIELDS.length - picked}개 값이 더 있어야 초기 품질을 추정해요.</p>}
+    <details className="qt3-more" open={auto.state === 'error' || (auto.state === 'idle' && !harvest) || (!fromApi && picked > 0) || undefined}>
+      <summary>날씨 값 확인·직접 입력</summary>
       <div className="qt3-grid2">{HONGRO_WEATHER_FIELDS.map(field => <F key={field.key} id={`hongro-weather-${field.key}`} label={field.label} unit={field.unit} hint={`참고 범위 ${field.reference.min.toLocaleString('ko-KR', {maximumFractionDigits: 1})}~${field.reference.max.toLocaleString('ko-KR', {maximumFractionDigits: 1})}`} err={errors[`hongro.weather.${field.key}`]}>
         <input id={`tf-hongro-weather-${field.key}`} type="number" step="any" value={h.weather[field.key]} placeholder="숫자 입력" onChange={e => setW(field.key, e.target.value)} /></F>)}</div>
     </details>

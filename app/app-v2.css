@@ -810,3 +810,5 @@ legend.qt3-q-head{padding:0;margin-bottom:8px;width:100%;display:flex}
 .qt-weather-auto li small{flex-basis:100%;color:#8a4310;font-size:12px}
 .qt-weather-auto .qt3-minibtn{align-self:flex-start}
 @media(max-width:700px){.qt-weather-auto ul{grid-template-columns:1fr}}
+.new-condition-note.new-preparing{background:#fdf6e8;border:1px solid #eedfbf;color:#5c4210;border-radius:10px;padding:10px 12px}
+.new-condition-note.new-preparing b{margin-right:4px}

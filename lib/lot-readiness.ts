@@ -23,10 +23,11 @@ export function baselineObservation(l: Lot, observations: Observation[]): Observ
 /** 품질 예측 화면과 같은 규칙: 품종·저장 방식·1-MCP·온도로 예측식을 고르고, 초기값과 측정일이 있어야 계산합니다. */
 export function lotReadiness(l: Lot): Readiness {
   const cultivar = normalizeQualityCultivar(l.variety);
-  if (!cultivar) return {status: 'unsupported', title: '기록 가능 · 예측 미지원', detail: `${l.variety || '이 품종'}은(는) 저장 예측식이 없어 측정 기록만 관리해요.`};
+  if (!cultivar) return {status: 'unsupported', title: '예측 서비스 준비 중', detail: `${l.variety || '이 품종'}의 저장 예측은 준비 중이에요. 측정 기록은 지금도 관리할 수 있어요.`};
   const h = l.details?.hongro, t = l.details?.storage_temperature ?? (cultivar === 'hongro' && h ? (h.storage === 'cold0' ? 0 : 4) : null);
   const sel = selectQualityModel({cultivar: l.variety, storage: l.storage === '일반 저온' ? 'cold' : l.storage === 'CA' ? 'ca' : 'other', temperature: typeof t === 'number' ? t : null, mcp: l.mcp === '처리' ? 'treated' : l.mcp === '미처리' ? 'untreated' : 'unknown', metric: 'firmness', day: 0});
-  if (!sel.model) return {status: 'conditions', title: '보관 조건 확인 필요', detail: (sel.reason ?? '이 조건에 적용할 예측식이 확인되지 않았어요.').replace(/^적용 모델 없음:\s*/, '') + ' 기록은 계속 남길 수 있어요.'};
+  if (!sel.model && l.mcp !== '처리' && l.mcp !== '미처리') return {status: 'conditions', title: '1-MCP 처리 여부 확인 필요', detail: '처리 여부를 모르면 예측식을 적용하지 않아요. 물량 정보에서 처리 여부를 고르면 예측할 수 있는지 다시 확인해요. 기록은 계속 남길 수 있어요.'};
+  if (!sel.model) return {status: 'conditions', title: '예측 서비스 준비 중', detail: '이 보관 조건의 예측은 준비 중이에요. ' + (sel.reason ?? '이 조건에 적용할 예측식이 확인되지 않았어요.').replace(/^적용 모델 없음:\s*/, '') + ' 기록은 계속 남길 수 있어요.'};
   if (!hasInitialValues(l) && !weatherInitial(l)) return {status: 'needs-initial', title: '초기 측정 필요', detail: '예측 기준 초기 측정(경도·당도·산도 중 하나 이상)을 기록해 주세요. 측정 기록을 추가할 때 ‘예측 기준 초기 측정으로 지정’을 선택하면 돼요.'};
   if (!weatherInitial(l) && !isDate(l.initial_measured_on)) return {status: 'needs-date', title: '초기 측정일 필요', detail: '초기 측정값은 있지만 측정일이 기록되지 않아 계산하지 않아요. 측정일을 입력하거나 저장 시작일에 측정했는지 확인해 주세요.'};
   return {status: 'ready', title: '예측 가능', detail: `${sel.model.label} 식으로 계산해요. 검증 전 시연용 계산이에요.`};
