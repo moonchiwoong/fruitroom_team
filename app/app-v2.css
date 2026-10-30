@@ -812,3 +812,24 @@ legend.qt3-q-head{padding:0;margin-bottom:8px;width:100%;display:flex}
 @media(max-width:700px){.qt-weather-auto ul{grid-template-columns:1fr}}
 .new-condition-note.new-preparing{background:#fdf6e8;border:1px solid #eedfbf;color:#5c4210;border-radius:10px;padding:10px 12px}
 .new-condition-note.new-preparing b{margin-right:4px}
+
+/* 홈 사진 위 서비스 미리보기: 로그인 전과 같은 계산 결과를 예시로 보여줍니다. */
+.ah-hero-photo{overflow:visible;position:relative}
+.ah-hero-photo>img{border-radius:4px}
+.ah-hero-preview{position:absolute;right:18px;bottom:18px;width:min(56%,310px);z-index:1}
+.ah-hero-preview .lv-preview{padding:14px;gap:7px;border:1px solid rgba(255,255,255,.7);border-radius:14px;background:rgba(249,252,249,.96);box-shadow:0 10px 28px rgba(15,35,22,.20)}
+.ah-hero-preview .lv-preview-head{gap:5px;font-size:11px;line-height:1.35}
+.ah-hero-preview .lv-preview-day{margin:0;font-size:12px}
+.ah-hero-preview .lv-preview-values{gap:5px}
+.ah-hero-preview .lv-preview-values>div{padding:7px 6px}
+.ah-hero-preview .lv-preview-values dt{font-size:11px}
+.ah-hero-preview .lv-preview-values dd{font-size:clamp(15px,1.5vw,19px);white-space:nowrap}
+.ah-hero-preview .lv-preview-values small{font-size:10px;margin-left:2px}
+.ah-hero-preview .lv-preview-sentence{font-size:12px;line-height:1.45}
+.ah-hero-preview .lv-preview svg{height:66px;object-fit:contain}
+.ah-hero-preview .lv-preview-foot{font-size:11px;line-height:1.35;gap:3px 5px}
+@media(max-width:600px){
+  .ah-hero-photo{display:grid;aspect-ratio:auto;background:transparent;margin-bottom:55px}
+  .ah-hero-photo>img{grid-area:1/1;aspect-ratio:16/10;height:auto}
+  .ah-hero-preview{position:relative;grid-area:1/1;justify-self:end;align-self:end;right:auto;bottom:auto;width:min(84%,310px);margin:0 12px -55px 0}
+}
