@@ -478,6 +478,18 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     if (anyInitial && !isDate(measuredOn)) statusFields.add('initial_measured_on');
     const missingRequired = statusFields.size;
     const valueNames = (['firmness', 'brix', 'acidity'] as const).filter(m => initialValue(m) !== null).map(m => metricMeta[m].label);
+    // ‘준비 완료’ 대신 지금 입력으로 실제 계산되는 항목을 그대로 보여 줍니다(예측식·계산 규칙은 바꾸지 않음).
+    const predictable = visibleMetrics.filter(m => supportRows.find(r => r.key === m)?.ok);
+    const lossOnlyNew = predictable.length === 1 && predictable[0] === 'loss';
+    const statusTitle = missingRequired ? `확인할 항목 ${missingRequired}개`
+      : !predictable.length ? '아직 예측할 수 있는 항목이 없어요'
+      : lossOnlyNew ? '감모율만 계산할 수 있어요'
+      : `계산 가능: ${predictable.map(m => metricMeta[m].label).join(' · ')}`;
+    const statusDetail = missingRequired ? (valueNames.length ? `${valueNames.join(' · ')} 입력됨` : '측정한 항목을 입력할 수 있어요.')
+      : !predictable.length ? (condition.ok ? '처음 측정한 경도·당도·산도 중 하나 이상을 넣으면 계산할 수 있어요. 기록은 저장할 수 있어요.' : [condition.title, condition.detail].filter(Boolean).join(' '))
+      : lossOnlyNew ? (anyInitial ? (supportRows.find(r => r.key !== 'loss' && r.key !== 'weather' && visibleMetrics.includes(r.key as MetricId) && !r.ok)?.text ?? '경도·당도·산도는 계산하지 않아요.') : '경도·당도·산도는 처음 측정한 값이 있어야 계산돼요. 감모율은 저장일수로 계산해요.')
+      : valueNames.length ? `${valueNames.join(' · ')} 입력됨` : '';
+    const temperatureField = <F id="temperature" label={hongro ? '저장고 온도' : '실제 저장고 온도'} unit="℃" err={shownErrors.temperature} hint={hongro?'홍로 예측식은 0℃ 또는 4℃에만 있어요. 다른 온도는 기록만 하고 계산하지 않아요.':'후지의 온도는 기록용이며 예측식을 보정하지 않아요.'}><input id="tf-temperature" type="number" step="any" value={form.temperature} onChange={e=>setForm(f=>({...f,temperature:e.target.value,hongro:{...f.hongro,storage:e.target.value==='0'?'cold0':e.target.value==='4'?'cold4':f.hongro.storage}}))} /></F>;
     const setStart = (value: string) => setForm(f => ({...f, storage_start_date: value, ...(f.sameStart ? {intake_date: value} : {})}));
     const setInitialSame = (checked: boolean) => setForm(f => ({...f, initialSameStart: checked, ...(!checked ? {initial_measured_on: effectiveInitialMeasuredOn(f)} : {})}));
     const checkNew = () => {
@@ -514,6 +526,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           <Seg id="tf-storage" legend="보관 방식" value={form.storage} options={[{value:'일반 저온',label:'일반 저온'},{value:'CA',label:'CA'},{value:'기타',label:'기타'}]} onChange={v => set('storage',v)} />
           <div><Seg id="tf-mcp" legend="1-MCP 처리 여부" value={mcpChosen ? form.mcp : ''} options={[{value:'처리',label:'처리함'},{value:'미처리',label:'미처리'}]} onChange={v => setForm(f => ({...f,mcp:v,mcpSelected:true}))} err={shownErrors.mcp} /><details className="new-explain"><summary>1-MCP가 무엇인가요?</summary><p>사과의 숙성을 늦추는 처리예요. 처리일과 제품 기록을 확인해 주세요.</p></details></div>
           <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-storage_start_date">저장 시작일</label></div><input id="tf-storage_start_date" className="qt3-input" type="date" max={today} value={startDate} onChange={e => setStart(e.target.value)} aria-invalid={!!shownErrors.storage_start_date} />{shownErrors.storage_start_date ? <span className="qf-err">{shownErrors.storage_start_date}</span> : <p className="qt3-help">실제로 저장고에 넣은 날이에요.</p>}</div>
+          {hongro && temperatureField}
         </div>
         {form.mcpSelected && form.mcp === '미확인' && <p className="new-condition-note">처리 여부가 미확인이면 예측식은 적용하지 않으며 기록은 저장할 수 있어요.</p>}
         {form.storage === '기타' && <p className="new-condition-note">기타 보관 방식은 확인된 예측식이 없지만 기록은 저장할 수 있어요.</p>}
@@ -527,12 +540,12 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         {weatherMode ? <WeatherChoices form={form} setForm={setForm} errors={errors} estimate={hongroResult ? hongroResult.initial : null} /> : <div className="new-grid3">{(['firmness','brix','acidity'] as const).map(metricInput)}</div>}
         <p className="new-description">기기의 단위를 확인해 주세요. kgf/cm²는 N·kgf와 다른 단위예요.</p>
       </section>
-      <details className="new-card new-extra" ref={optionalRef}><summary><strong>추가 기록</strong><span>선택 &nbsp; 입고 · 온도 · 수확 · 포장</span><Plus size={20} /></summary><div className="new-extra-body">
+      <details className="new-card new-extra" ref={optionalRef}><summary><strong>추가 기록</strong><span>선택 &nbsp; {hongro ? '입고 · 수확 · 포장' : '입고 · 온도 · 수확 · 포장'}</span><Plus size={20} /></summary><div className="new-extra-body">
         {!guest && <div><button type="button" className="qt3-minibtn" aria-expanded={storeOpen} onClick={() => setStoreOpen(v => !v)}><Warehouse size={15} aria-hidden="true" />저장고 조건 불러오기</button>{storeOpen && <div className="qt3-import"><label htmlFor="qt3-store-src">조건을 가져올 기존 물량</label><select id="qt3-store-src" defaultValue="" onChange={e => importStore(e.target.value)}><option value="">물량 고르기</option>{lots.map(l => <option key={l.id} value={l.id}>{l.name} · {l.storage}{l.details?.storage_temperature != null ? ` · ${l.details.storage_temperature}℃` : ''}{l.location ? ` · ${l.location}` : ''}</option>)}</select><p className="qt3-help">저장 방식·온도·위치만 가져와요. 처리 여부와 측정값은 물량마다 달라 가져오지 않아요.</p></div>}{storeFrom && <p className="qt3-source"><Check size={14} />불러온 출처: ‘{storeFrom}’</p>}</div>}
         <div className="new-grid2">
           <F id="name" label="물량 이름" err={shownErrors.name}><input id="tf-name" value={form.name_auto && !form.name.trim() ? suggestName(form) : form.name} onChange={e=>setForm(f=>({...f,name:e.target.value,name_auto:false}))} maxLength={120} /><p className="qt3-help">품종과 저장 시작일로 자동 생성되며 직접 수정할 수 있어요.</p></F>
           <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-intake_date">입고일</label></div><input id="tf-intake_date" type="date" className="qt3-input" max={today} value={form.sameStart ? startDate : form.intake_date} disabled={form.sameStart} onChange={e=>set('intake_date',e.target.value)} /><label className="qt-check"><input type="checkbox" checked={form.sameStart} onChange={e=>setForm(f=>({...f,sameStart:e.target.checked,...(e.target.checked ? {intake_date:f.storage_start_date || f.intake_date} : {storage_start_date:f.sameStart ? f.intake_date : f.storage_start_date})}))} />저장 시작일과 같음</label>{shownErrors.intake_date && <span className="qf-err">{shownErrors.intake_date}</span>}</div>
-          <F id="temperature" label="실제 저장고 온도" unit="℃" err={shownErrors.temperature} hint={hongro?'홍로는 정확히 0℃ 또는 4℃에서만 예측식이 있습니다.':'후지의 온도는 기록용이며 예측식을 보정하지 않아요.'}><input id="tf-temperature" type="number" step="any" value={form.temperature} onChange={e=>setForm(f=>({...f,temperature:e.target.value,hongro:{...f.hongro,storage:e.target.value==='0'?'cold0':e.target.value==='4'?'cold4':f.hongro.storage}}))} /></F>
+          {!hongro && temperatureField}
           <F id="location" label="저장고 이름·위치"><input id="tf-location" value={form.location} onChange={e=>set('location',e.target.value)} maxLength={120} /></F>
           <F id="harvest_date" label="수확일" err={shownErrors.harvest_date}><input id="tf-harvest_date" type="date" max={today} value={form.harvest_date} onChange={e=>set('harvest_date',e.target.value)} /></F>
           <F id="packaging" label="포장 형태"><input id="tf-packaging" value={form.packaging} onChange={e=>set('packaging',e.target.value)} maxLength={120} /></F>
@@ -550,7 +563,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         <details className="qt3-more"><summary>온습도 센서 연결 기록</summary><F id="sensor_id" label="온습도 센서 번호"><input id="tf-sensor_id" value={form.sensor_id} onChange={e=>set('sensor_id',e.target.value)} maxLength={60} /></F><p className="qt3-help">센서 번호는 기록용이며 예측식에 온습도 이력을 반영하지 않아요.</p></details>
         {session?.isTeam && <label className="qt-check"><input type="checkbox" checked={form.team_shared} onChange={e=>set('team_shared',e.target.checked)} />팀과 공유</label>}
       </div></details>
-      <div className="new-actions"><div className="new-status"><b>{missingRequired ? `확인할 항목 ${missingRequired}개` : '입력 준비 완료'}</b><p>{valueNames.length ? `${valueNames.join(' · ')} 입력됨` : '측정한 항목을 입력할 수 있어요.'}</p>{checkShown && uniqueErrors.length > 0 && <div className="new-action-errors" role="alert"><p>다음 항목을 확인해 주세요.</p><ul>{uniqueErrors.map(([id, text]) => <li key={id}><button type="button" onClick={() => focus(id === 'intake_date' && form.sameStart ? 'tf-storage_start_date' : id === 'initial_measured_on' && form.initialSameStart ? 'tf-initialSameStart' : 'tf-' + id.replaceAll('.', '-'))}>{text}</button></li>)}</ul></div>}{inputNotice && noticeSig === signature(form) && <div className="new-condition-note" role="status">{inputNotice}{hongro && form.temperature !== '0' && form.temperature !== '4' && <button type="button" className="linkbtn new-temperature-link" onClick={() => focus('tf-temperature')}>온도 입력하기</button>}</div>}</div><div className="new-actions-right"><button type="button" className="new-primary" onClick={checkNew}>예측 가능 여부 확인 <ArrowRight size={18} /></button><p>{guest && '기록 저장에는 로그인이 필요해요'} <button type="button" className="new-save" onClick={saveRecord} disabled={saving || !!loadError}>{saving ? '저장 중…' : '기록만 저장'}</button></p></div></div>
+      <div className="new-actions"><div className="new-status"><b>{statusTitle}</b>{statusDetail && <p>{statusDetail}</p>}{checkShown && uniqueErrors.length > 0 && <div className="new-action-errors" role="alert"><p>다음 항목을 확인해 주세요.</p><ul>{uniqueErrors.map(([id, text]) => <li key={id}><button type="button" onClick={() => focus(id === 'intake_date' && form.sameStart ? 'tf-storage_start_date' : id === 'initial_measured_on' && form.initialSameStart ? 'tf-initialSameStart' : 'tf-' + id.replaceAll('.', '-'))}>{text}</button></li>)}</ul></div>}{inputNotice && noticeSig === signature(form) && <div className="new-condition-note" role="status">{inputNotice}{hongro && form.temperature !== '0' && form.temperature !== '4' && <button type="button" className="linkbtn new-temperature-link" onClick={() => focus('tf-temperature')}>온도 입력하기</button>}</div>}</div><div className="new-actions-right"><button type="button" className="new-primary" onClick={checkNew}>예측 가능 여부 확인 <ArrowRight size={18} /></button><p>{guest && '기록 저장에는 로그인이 필요해요'} <button type="button" className="new-save" onClick={saveRecord} disabled={saving || !!loadError}>{saving ? '저장 중…' : '기록만 저장'}</button></p></div></div>
       {saveMsg && <p className={saveMsg.ok?'qt-ok':'auth-error'} role="status">{saveMsg.text}</p>}
       <p className="new-disclaimer">계산은 시연용입니다. 예측 정확도와 오차 범위는 아직 검증되지 않았어요.</p>
       <style jsx>{`
@@ -785,6 +798,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         <div className="qt3-note info" role="note"><Info size={16} /><div>현재는 측정 기록과 계산 결과를 비교해 보는 체험 단계입니다. 예측 정확도와 오차 범위는 아직 검증되지 않았으며, 출하·안전 여부를 판정하지 않습니다.</div></div>
         <div className="qt5-dash">
           <div className="qt5-head"><h2>{hongro ? '거창 홍로' : (form.variety || '사과')} 저장 품질 예측</h2><span>{lotName}</span></div>
+          {series.loss.ok && (['firmness', 'brix', 'acidity'] as MetricId[]).every(m => !series[m].ok) && <p className="qt5-lossonly" role="note"><Info size={15} aria-hidden="true" />{anyInitial ? '경도·당도·산도는 이 조건에서 계산하지 않아 감모율만 보여줘요.' : '경도·당도·산도는 처음 측정한 값이 있어야 계산돼요. 지금은 저장일수로 계산하는 감모율만 보여줘요.'}</p>}
           <div className="qt5-row" role="group" aria-labelledby="qt5-cond-label">
             <span id="qt5-cond-label" className="qt5-row-label">저장 조건</span>
             {hongro ? <div className="qt5-chips">

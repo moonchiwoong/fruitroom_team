@@ -600,6 +600,8 @@ legend.qt3-q-head{padding:0;margin-bottom:8px;width:100%;display:flex}
 /* ── 결과 대시보드: 조건 → 저장 일수 → 지표 4칸 → 그래프·3D → 안내 ── */
 .qt5-dash{margin-top:12px;background:#fff;border:1px solid var(--app-line);border-radius:20px;overflow:hidden}
 .qt5-head{display:flex;align-items:baseline;justify-content:space-between;gap:6px 16px;flex-wrap:wrap;padding:16px 22px;background:var(--ds-brand);color:#fff}
+.qt5-lossonly{display:flex;align-items:center;gap:8px;margin:0;padding:10px 22px;background:#fdf6e8;color:#5c4210;font-size:14px;line-height:1.5;border-bottom:1px solid #eedfbf}
+.qt5-lossonly svg{flex-shrink:0}
 .qt5-head h2{margin:0;font-size:19px;font-weight:800;letter-spacing:-.3px;color:#fff}
 .qt5-head span{font-size:14px;opacity:.85;overflow-wrap:anywhere}
 .qt5-row{display:flex;align-items:center;flex-wrap:wrap;gap:10px 16px;padding:14px 22px;border-bottom:1px solid var(--app-line)}
