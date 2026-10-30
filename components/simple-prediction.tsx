@@ -42,6 +42,9 @@ export default function SimplePrediction() {
       const cultivar=region==='geochang'?'hongro':'fuji';
       const query=new URLSearchParams({region,cultivar,harvest_date:harvest});
       const response=await fetch(`/api/weather/simple?${query}`,{signal:current.signal,cache:'no-store'});
+      if (controller.current!==current || current.signal.aborted) return;
+      // Netlify's rate limit response can be HTML, not the API's JSON envelope.
+      if (response.status===429) {setMessage('요청이 많아요. 잠시 후 다시 시도해 주세요.');return;}
       const body=await response.json() as WeatherResponse;
       if (controller.current!==current || current.signal.aborted) return;
       if (!response.ok) {setMessage(body.error || '날씨 자료를 불러오지 못했어요.');return;}
@@ -64,8 +67,9 @@ export default function SimplePrediction() {
       <div className={styles.cultivar}><span>적용 품종</span><strong>{region ? SIMPLE_REGIONS[region].cultivar : '지역을 선택해 주세요'}</strong></div>
       <button type="button" onClick={()=>void run()} disabled={pending}>{pending?'기상자료 확인 중…':'예측 보기'}</button>
     </div>
-    <p className={styles.small}>장수·영주는 후지, 거창은 홍로 연구 자료를 사용해요. 수확 당일 저장을 시작한다고 가정합니다. 아직 관측되지 않은 날씨는 과거 기후자료를 이용한 추정 기능을 준비하고 있어요.</p>
+    <p className={styles.small}>장수·영주는 후지, 거창은 홍로 연구 자료를 사용해요. 수확 당일 저장을 시작한다고 가정합니다. 아직 관측되지 않은 기간은 같은 관측소의 최근 5개 과거 연도 중 해당 기간 자료가 완전한 해가 3년 이상일 때 평균으로 추정해요. 추정값은 실제 날씨 예보가 아닙니다.</p>
     {region==='geochang' && <p className={styles.small}>거창 홍로의 초기 품질 회귀식은 합성자료로 만든 모델이며, 실제 과실에 대한 독립 검증이 완료되지 않았어요.</p>}
+    {harvest && harvest.slice(5) <= '09-30' && <p className={styles.notice} role="status">이 예측식은 9월 한 달 강수량이 필요해요. 수확 예정일이 9월 30일 이전이면 수확 당일이나 이후의 비가 포함될 수 있어 계산을 보류합니다.</p>}
     {message && <p className={styles.notice} role="status">{message}</p>}
     {data && <div className={styles.result} aria-live="polite">
       <div className={styles.resultHead}><div><span className={styles.eyebrow}>기상 기반 추정</span><h3>{SIMPLE_REGIONS[data.region].name} {SIMPLE_REGIONS[data.region].cultivar} 저장 품질</h3><p>{data.harvest} 수확 예정 · {data.weather.station.name} 기상자료</p></div></div>
