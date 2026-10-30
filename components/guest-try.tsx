@@ -1,6 +1,7 @@
 'use client';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import dynamic from 'next/dynamic';
+import SimplePrediction from '@/components/simple-prediction';
 import type {TrackerRequest} from '@/components/quality-tracker';
 import type {ModelInfoContext} from '@/components/model-info';
 
@@ -20,6 +21,7 @@ export default function GuestTry() {
   const [request, setRequest] = useState<TrackerRequest>(() => ({mode: readUrl().mode, lotId: 'new', n: 1}));
   const [modelContext, setModelContext] = useState<ModelInfoContext | undefined>();
   const [trackerVisited, setTrackerVisited] = useState(() => view === 'track');
+  const [detailOpen, setDetailOpen] = useState(true);
   const modeRef = useRef(mode);
   // 뒤로 가기·앞으로 가기에도 화면을 주소와 맞춥니다.
   useEffect(() => {
@@ -27,7 +29,7 @@ export default function GuestTry() {
       const next = readUrl();
       // 히스토리에는 결과 문맥이 저장되지 않으므로 오래된 결과를 일반 근거 화면에 남기지 않습니다.
       setModelContext(undefined);
-      if (next.mode !== modeRef.current) setRequest(r => ({mode: next.mode, lotId: 'new', n: r.n + 1}));
+      if (next.mode !== modeRef.current) { setDetailOpen(true); setRequest(r => ({mode: next.mode, lotId: 'new', n: r.n + 1})); }
       modeRef.current = next.mode;
       if (next.view === 'track') setTrackerVisited(true);
       setState(next);
@@ -40,7 +42,7 @@ export default function GuestTry() {
     history.pushState(null, '', '/try' + (q.toString() ? `?${q}` : ''));
     if (v === 'track') setTrackerVisited(true);
     setState({view: v, mode: m});
-    if (next.mode && m !== modeRef.current) setRequest(r => ({mode: m, lotId: 'new', n: r.n + 1}));
+    if (next.mode && m !== modeRef.current) { setDetailOpen(true); setRequest(r => ({mode: m, lotId: 'new', n: r.n + 1})); }
     modeRef.current = m;
     window.scrollTo({top: 0});
   }, []);
@@ -58,11 +60,14 @@ export default function GuestTry() {
     <main className="site-main">
       <div className="page-hero"><div className="page-hero-inner">
         <h1>{view === 'basis' ? '계산 근거·적용 범위' : '사과 품질을 확인해 보세요'}</h1>
-        {view !== 'basis' && <p>보관 조건을 기록하고, 초기 품질 입력 방식을 골라 주세요. 가입하지 않아도 써 볼 수 있어요.</p>}
+        {view !== 'basis' && <p>지역과 수확 예정일로 저장 품질을 살펴보세요. 가입하지 않아도 써 볼 수 있어요.</p>}
       </div></div>
       <div className="page-body">
-        {trackerVisited && <div hidden={view !== 'track'}><QualityTracker guest lots={[]} onLotsChanged={() => undefined} request={request} openModelInfo={context => {setModelContext(context); go({view: 'basis'});}} openLot={() => undefined}
-          onModeChange={m => go({mode: m})} onRequireLogin={() => toLogin()} /></div>}
+        {trackerVisited && <div hidden={view !== 'track'}><SimplePrediction />
+          <button type="button" className="btn btn-ghost" aria-expanded={detailOpen} onClick={() => setDetailOpen(v=>!v)}>{detailOpen ? '상세 예측 닫기' : '예시·측정값으로 상세 예측하기'}</button>
+          <div hidden={!detailOpen}><QualityTracker guest lots={[]} onLotsChanged={() => undefined} request={request} openModelInfo={context => {setModelContext(context); go({view: 'basis'});}} openLot={() => undefined}
+            onModeChange={m => go({mode: m})} onRequireLogin={() => toLogin()} /></div>
+        </div>}
         {view === 'basis' && <ModelInfo context={modelContext} />}
       </div>
     </main>
