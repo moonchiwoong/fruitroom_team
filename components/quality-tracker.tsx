@@ -392,6 +392,10 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
 
   // ── 입력 화면: 물량 전환 · 저장고 조건 불러오기 · 조건 판별 · 입력·예측 조건 확인 ──
   const [storeOpen, setStoreOpen] = useState(false), [storeFrom, setStoreFrom] = useState('');
+  // 새 홍로 물량: ‘수확 당일 바로 입고’를 고르면 저장 시작일을 수확일과 같게 둡니다. 체크하지 않으면 날짜를 따로 받습니다.
+  const [harvestSame, setHarvestSame] = useState(false);
+  // 날씨 추정값은 수확 시점 품질입니다. 사용자가 ‘수확 당일 바로 입고’를 고른 경우에만 그 추정 기준일을 저장 시작일로 둡니다.
+  useEffect(() => { if (firstInput && weatherMode && harvestSame && !form.initialSameStart) setForm(f => ({...f, initialSameStart: true})); }, [firstInput, weatherMode, harvestSame, form.initialSameStart]);
   const [checkShown, setCheckShown] = useState(false), [checkedSig, setCheckedSig] = useState<string | null>(null);
   const checkRef = useRef<HTMLElement>(null);
   useEffect(() => { setStoreOpen(false); setStoreFrom(''); setCheckShown(false); setCheckedSig(null); }, [scope]);
@@ -488,7 +492,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     const statusDetail = missingRequired ? (valueNames.length ? `${valueNames.join(' · ')} 입력됨` : '측정한 항목을 입력할 수 있어요.')
       : !predictable.length ? (condition.ok ? '처음 측정한 경도·당도·산도 중 하나 이상을 넣으면 계산할 수 있어요. 기록은 저장할 수 있어요.' : [condition.title, condition.detail].filter(Boolean).join(' '))
       : lossOnlyNew ? (anyInitial ? (supportRows.find(r => r.key !== 'loss' && r.key !== 'weather' && visibleMetrics.includes(r.key as MetricId) && !r.ok)?.text ?? '경도·당도·산도는 계산하지 않아요.') : '경도·당도·산도는 처음 측정한 값이 있어야 계산돼요. 감모율은 저장일수로 계산해요.')
-      : valueNames.length ? `${valueNames.join(' · ')} 입력됨` : '';
+      : weatherMode ? '초기 품질은 날씨로 추정한 값이에요(실측 아님).' : valueNames.length ? `${valueNames.join(' · ')} 입력됨` : '';
     const temperatureField = <F id="temperature" label={hongro ? '저장고 온도' : '실제 저장고 온도'} unit="℃" err={shownErrors.temperature} hint={hongro?'홍로 예측식은 0℃ 또는 4℃에만 있어요. 다른 온도는 기록만 하고 계산하지 않아요.':'후지의 온도는 기록용이며 예측식을 보정하지 않아요.'}><input id="tf-temperature" type="number" step="any" value={form.temperature} onChange={e=>setForm(f=>({...f,temperature:e.target.value,hongro:{...f.hongro,storage:e.target.value==='0'?'cold0':e.target.value==='4'?'cold4':f.hongro.storage}}))} /></F>;
     const setStart = (value: string) => setForm(f => ({...f, storage_start_date: value, ...(f.sameStart ? {intake_date: value} : {})}));
     const setInitialSame = (checked: boolean) => setForm(f => ({...f, initialSameStart: checked, ...(!checked ? {initial_measured_on: effectiveInitialMeasuredOn(f)} : {})}));
@@ -515,6 +519,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     return <div className="new-lot qt qt-refresh qt-v2">
       <p className="new-crumb">품질 예측 <span aria-hidden="true">›</span> 새 물량</p>
       <div className="new-heading"><div><h1>새 물량 입력</h1><p>보관 조건과 처음 측정한 품질로, 저장 중 변화를 확인하세요.</p></div>{guest && <span>저장 전까지 로그인 없이</span>}</div>
+      {hongro && <ol className="new-steps" aria-label="홍로 예측 순서"><li>사과와 보관 조건 <small>수확일 · 0℃/4℃</small></li><li>초기 품질 <small>직접 측정 또는 날씨로 추정</small></li><li>저장 중 변화 <small>초기 품질에서 이어 계산</small></li></ol>}
       {!guest && <div className="new-existing"><label htmlFor="qt-lot-select">기존 물량 불러오기</label><select id="qt-lot-select" value="" disabled={!lots.length} onChange={e => {if (e.target.value) {setLotKey(e.target.value); setBaseline(null); setSelectedDay(null);}}}><option value="">저장한 물량 고르기</option>{lots.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></div>}
       {loadError && <div className="qt-banner warn" role="alert"><AlertTriangle size={16} /><span>사과 기록을 불러오지 못했어요. {loadError}</span><button className="btn btn-ghost" onClick={() => {void onLotsChanged(); setReload(r => r + 1);}}>다시 불러오기</button></div>}
       {(draftNote || dirty) && <div className="qt-draftbar">{draftNote && <span className={'draft-' + draftNote.tone}>{draftNote.text}</span>}{dirty && <button type="button" className="linkbtn" onClick={discardDraft}>초안 지우기</button>}</div>}
@@ -525,29 +530,31 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           <Seg id="tf-variety" legend="품종" value={hongro ? '홍로' : '후지'} options={[{value:'후지',label:'후지'},{value:'홍로',label:'홍로'}]} onChange={switchCultivar} err={shownErrors.variety} />
           <Seg id="tf-storage" legend="보관 방식" value={form.storage} options={[{value:'일반 저온',label:'일반 저온'},{value:'CA',label:'CA'},{value:'기타',label:'기타'}]} onChange={v => set('storage',v)} />
           <div><Seg id="tf-mcp" legend="1-MCP 처리 여부" value={mcpChosen ? form.mcp : ''} options={[{value:'처리',label:'처리함'},{value:'미처리',label:'미처리'}]} onChange={v => setForm(f => ({...f,mcp:v,mcpSelected:true}))} err={shownErrors.mcp} /><details className="new-explain"><summary>1-MCP가 무엇인가요?</summary><p>사과의 숙성을 늦추는 처리예요. 처리일과 제품 기록을 확인해 주세요.</p></details></div>
-          <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-storage_start_date">저장 시작일</label></div><input id="tf-storage_start_date" className="qt3-input" type="date" max={today} value={startDate} onChange={e => setStart(e.target.value)} aria-invalid={!!shownErrors.storage_start_date} />{shownErrors.storage_start_date ? <span className="qf-err">{shownErrors.storage_start_date}</span> : <p className="qt3-help">실제로 저장고에 넣은 날이에요.</p>}</div>
+          {hongro && <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-harvest_date">수확일</label></div><input id="tf-harvest_date" className="qt3-input" type="date" max={today} value={form.harvest_date} onChange={e => { const v = e.target.value; setForm(f => ({...f, harvest_date: v, ...(harvestSame ? {storage_start_date: v, ...(f.sameStart ? {intake_date: v} : {})} : {})})); }} aria-invalid={!!shownErrors.harvest_date} />{shownErrors.harvest_date ? <span className="qf-err">{shownErrors.harvest_date}</span> : <p className="qt3-help">날씨를 고를 해(연도)와 9월 강수 해석에 써요. 계산식에 직접 들어가지는 않아요.</p>}
+            <label className="new-date-check"><input id="tf-harvestSame" type="checkbox" checked={harvestSame} onChange={e => { const c = e.target.checked; setHarvestSame(c); if (c && form.harvest_date) setStart(form.harvest_date); }} /><span>수확 당일 바로 저장고에 넣었어요</span></label></div>}
+          <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-storage_start_date">저장 시작일</label></div><input id="tf-storage_start_date" className="qt3-input" type="date" max={today} value={startDate} disabled={hongro && harvestSame} onChange={e => setStart(e.target.value)} aria-invalid={!!shownErrors.storage_start_date} />{shownErrors.storage_start_date ? <span className="qf-err">{shownErrors.storage_start_date}</span> : <p className="qt3-help">{hongro && harvestSame ? '수확일과 같게 두었어요. 저장일수는 이 날부터 세요.' : hongro ? '실제로 저장고에 넣은 날이에요. 수확~입고 사이 변화는 계산하지 않아요.' : '실제로 저장고에 넣은 날이에요.'}</p>}</div>
           {hongro && temperatureField}
         </div>
         {form.mcpSelected && form.mcp === '미확인' && <p className="new-condition-note">처리 여부가 미확인이면 예측식은 적용하지 않으며 기록은 저장할 수 있어요.</p>}
         {form.storage === '기타' && <p className="new-condition-note">기타 보관 방식은 확인된 예측식이 없지만 기록은 저장할 수 있어요.</p>}
       </section>
-      <section className="new-card" aria-labelledby="new-quality"><div className="new-card-head"><h2 id="new-quality"><span>2</span>처음 측정한 품질</h2><small>측정한 항목만 입력</small></div><p className="new-description">측정한 사과의 평균값을 입력해 주세요.</p>
+      <section className="new-card" aria-labelledby="new-quality"><div className="new-card-head"><h2 id="new-quality"><span>2</span>{hongro ? '초기 품질' : '처음 측정한 품질'}</h2><small>{weatherMode ? '날씨로 추정 · 실측 아님' : '측정한 항목만 입력'}</small></div><p className="new-description">{weatherMode ? '수확 시점 품질을 재배기 날씨로 추정해요. 실제로 쟀다면 ‘직접 측정값 입력’을 골라 주세요.' : '측정한 사과의 평균값을 입력해 주세요.'}</p>
         {hongro && <fieldset className="qt3-q"><legend className="qt3-q-head">초기 품질 입력 방식</legend><div className="qt3-seg">{([['measured','직접 측정값 입력'],['weather','올해 날씨로 추정']] as const).map(([v,t]) => <label key={v} className={form.hongro.source===v?'active':''}><input type="radio" name="tf-hongro-source" checked={form.hongro.source===v} onChange={() => setForm(f=>({...f,hongro:{...f.hongro,source:v}}))} /><span>{t}</span></label>)}</div></fieldset>}
         <div className="new-grid2">
-          <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-initial_measured_on">측정일</label></div><label className="new-date-check"><input id="tf-initialSameStart" type="checkbox" checked={!!form.initialSameStart} onChange={e => setInitialSame(e.target.checked)} /><span>저장 시작일과 같음</span><span>{form.initialSameStart && startOk ? fmtDate(startDate) : ''}</span></label>{!form.initialSameStart && <input id="tf-initial_measured_on" className="qt3-input" type="date" max={today} value={form.initial_measured_on} onChange={e => set('initial_measured_on',e.target.value)} aria-invalid={!!shownErrors.initial_measured_on} />}{shownErrors.initial_measured_on && <span className="qf-err">{shownErrors.initial_measured_on}</span>}</div>
-          <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-initial_sample_count">측정한 사과 수 <small>선택</small></label></div><div className="qt3-unit-input"><input id="tf-initial_sample_count" className="qt3-input" type="number" inputMode="numeric" min={1} step={1} value={form.initial_sample_count} onChange={e=>set('initial_sample_count',e.target.value)} /><span>개</span></div>{shownErrors.initial_sample_count && <span className="qf-err">{shownErrors.initial_sample_count}</span>}</div>
+          <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-initial_measured_on">{weatherMode ? '추정 기준일' : '측정일'}</label></div><label className="new-date-check"><input id="tf-initialSameStart" type="checkbox" checked={!!form.initialSameStart} onChange={e => setInitialSame(e.target.checked)} /><span>저장 시작일과 같음</span><span>{form.initialSameStart && startOk ? fmtDate(startDate) : ''}</span></label>{!form.initialSameStart && <input id="tf-initial_measured_on" className="qt3-input" type="date" max={today} value={form.initial_measured_on} onChange={e => set('initial_measured_on',e.target.value)} aria-invalid={!!shownErrors.initial_measured_on} />}{shownErrors.initial_measured_on && <span className="qf-err">{shownErrors.initial_measured_on}</span>}</div>
+          {!weatherMode && <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-initial_sample_count">측정한 사과 수 <small>선택</small></label></div><div className="qt3-unit-input"><input id="tf-initial_sample_count" className="qt3-input" type="number" inputMode="numeric" min={1} step={1} value={form.initial_sample_count} onChange={e=>set('initial_sample_count',e.target.value)} /><span>개</span></div>{shownErrors.initial_sample_count && <span className="qf-err">{shownErrors.initial_sample_count}</span>}</div>}
         </div>
-        {weatherMode ? <WeatherChoices form={form} setForm={setForm} errors={errors} estimate={hongroResult ? hongroResult.initial : null} /> : <div className="new-grid3">{(['firmness','brix','acidity'] as const).map(metricInput)}</div>}
+        {weatherMode ? <WeatherChoices form={form} setForm={setForm} errors={errors} estimate={hongroResult ? hongroResult.initial : null} harvestDate={form.harvest_date} /> : <div className="new-grid3">{(['firmness','brix','acidity'] as const).map(metricInput)}</div>}
         <p className="new-description">기기의 단위를 확인해 주세요. kgf/cm²는 N·kgf와 다른 단위예요.</p>
       </section>
-      <details className="new-card new-extra" ref={optionalRef}><summary><strong>추가 기록</strong><span>선택 &nbsp; {hongro ? '입고 · 수확 · 포장' : '입고 · 온도 · 수확 · 포장'}</span><Plus size={20} /></summary><div className="new-extra-body">
+      <details className="new-card new-extra" ref={optionalRef}><summary><strong>추가 기록</strong><span>선택 &nbsp; {hongro ? '입고 · 포장 · 측정 조건' : '입고 · 온도 · 수확 · 포장'}</span><Plus size={20} /></summary><div className="new-extra-body">
         {!guest && <div><button type="button" className="qt3-minibtn" aria-expanded={storeOpen} onClick={() => setStoreOpen(v => !v)}><Warehouse size={15} aria-hidden="true" />저장고 조건 불러오기</button>{storeOpen && <div className="qt3-import"><label htmlFor="qt3-store-src">조건을 가져올 기존 물량</label><select id="qt3-store-src" defaultValue="" onChange={e => importStore(e.target.value)}><option value="">물량 고르기</option>{lots.map(l => <option key={l.id} value={l.id}>{l.name} · {l.storage}{l.details?.storage_temperature != null ? ` · ${l.details.storage_temperature}℃` : ''}{l.location ? ` · ${l.location}` : ''}</option>)}</select><p className="qt3-help">저장 방식·온도·위치만 가져와요. 처리 여부와 측정값은 물량마다 달라 가져오지 않아요.</p></div>}{storeFrom && <p className="qt3-source"><Check size={14} />불러온 출처: ‘{storeFrom}’</p>}</div>}
         <div className="new-grid2">
           <F id="name" label="물량 이름" err={shownErrors.name}><input id="tf-name" value={form.name_auto && !form.name.trim() ? suggestName(form) : form.name} onChange={e=>setForm(f=>({...f,name:e.target.value,name_auto:false}))} maxLength={120} /><p className="qt3-help">품종과 저장 시작일로 자동 생성되며 직접 수정할 수 있어요.</p></F>
           <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-intake_date">입고일</label></div><input id="tf-intake_date" type="date" className="qt3-input" max={today} value={form.sameStart ? startDate : form.intake_date} disabled={form.sameStart} onChange={e=>set('intake_date',e.target.value)} /><label className="qt-check"><input type="checkbox" checked={form.sameStart} onChange={e=>setForm(f=>({...f,sameStart:e.target.checked,...(e.target.checked ? {intake_date:f.storage_start_date || f.intake_date} : {storage_start_date:f.sameStart ? f.intake_date : f.storage_start_date})}))} />저장 시작일과 같음</label>{shownErrors.intake_date && <span className="qf-err">{shownErrors.intake_date}</span>}</div>
           {!hongro && temperatureField}
           <F id="location" label="저장고 이름·위치"><input id="tf-location" value={form.location} onChange={e=>set('location',e.target.value)} maxLength={120} /></F>
-          <F id="harvest_date" label="수확일" err={shownErrors.harvest_date}><input id="tf-harvest_date" type="date" max={today} value={form.harvest_date} onChange={e=>set('harvest_date',e.target.value)} /></F>
+          {!hongro && <F id="harvest_date" label="수확일" err={shownErrors.harvest_date}><input id="tf-harvest_date" type="date" max={today} value={form.harvest_date} onChange={e=>set('harvest_date',e.target.value)} /></F>}
           <F id="packaging" label="포장 형태"><input id="tf-packaging" value={form.packaging} onChange={e=>set('packaging',e.target.value)} maxLength={120} /></F>
           <F id="probe_mm" label="탐침 직경" unit="mm" err={shownErrors.probe_mm}><input id="tf-probe_mm" type="number" step="0.1" value={form.measure.probe_mm} onChange={e=>setSub('measure','probe_mm',e.target.value)} /></F>
           <F id="peeled" label="껍질 제거 여부"><select id="tf-peeled" value={form.measure.peeled} onChange={e=>setSub('measure','peeled',e.target.value)}><option value="">미기록</option><option>껍질 제거</option><option>껍질 포함</option></select></F>
@@ -705,7 +712,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
                 <label key={v} className={'qt3-choice' + (form.hongro.source === v ? ' active' : '')}><input type="radio" name="tf-hongro-source" id={v === 'measured' ? 'tf-hongro-source' : undefined} checked={form.hongro.source === v}
                   onChange={() => setForm(f => ({...f, hongro: {...f.hongro, source: v}}))} /><b>{form.hongro.source === v && <Check size={15} />}{t}</b><span>{d}</span></label>)}
             </div></fieldset>}
-          {weatherMode ? <WeatherChoices form={form} setForm={setForm} errors={errors} estimate={hongroResult ? hongroResult.initial : null} />
+          {weatherMode ? <WeatherChoices form={form} setForm={setForm} errors={errors} estimate={hongroResult ? hongroResult.initial : null} harvestDate={form.harvest_date} />
           : <>
             <div className="qt3-grid2">
               <div className="qt3-q">
@@ -798,6 +805,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         <div className="qt3-note info" role="note"><Info size={16} /><div>현재는 측정 기록과 계산 결과를 비교해 보는 체험 단계입니다. 예측 정확도와 오차 범위는 아직 검증되지 않았으며, 출하·안전 여부를 판정하지 않습니다.</div></div>
         <div className="qt5-dash">
           <div className="qt5-head"><h2>{hongro ? '거창 홍로' : (form.variety || '사과')} 저장 품질 예측</h2><span>{lotName}</span></div>
+          {weatherMode && (['firmness', 'brix', 'acidity'] as MetricId[]).some(m => series[m].ok) && <p className="qt5-lossonly qt5-estimated" role="note"><Info size={15} aria-hidden="true" />초기 품질은 날씨로 추정한 값이에요(실측 아님). 경도·당도·산도는 그 추정값에서 이어 계산해요. 실제로 한 번 재면 측정값으로 바꿀 수 있어요.</p>}
           {series.loss.ok && (['firmness', 'brix', 'acidity'] as MetricId[]).every(m => !series[m].ok) && <p className="qt5-lossonly" role="note"><Info size={15} aria-hidden="true" />{anyInitial ? '경도·당도·산도는 이 조건에서 계산하지 않아 감모율만 보여줘요.' : '경도·당도·산도는 처음 측정한 값이 있어야 계산돼요. 지금은 저장일수로 계산하는 감모율만 보여줘요.'}</p>}
           <div className="qt5-row" role="group" aria-labelledby="qt5-cond-label">
             <span id="qt5-cond-label" className="qt5-row-label">저장 조건</span>
@@ -830,7 +838,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
                 <span className="qt4-tile-label">{metricMeta[m].label}</span>
                 <span className="qt4-tile-value">{ok ? <>{fmtNum(r.value!, metricMeta[m].digits)}<small>{displayUnit(m)}</small></> : '계산 없음'}</span>
                 {hongro && ok && <span className="qt5-tile-seg">{hongroSegment(m)}</span>}
-                <span className="qt4-tile-note">{!ok ? (r.reason ?? '자료 부족').replace(/^적용 모델 없음:\s*/, '') : m === 'loss' ? (actualLoss ? `실측 ${fmtNum(actualLoss.value, 2)} %` : `${r.kind} · 저장일수로 계산`) : an ? `${an.source === 'latest' ? '계산 시작점' : '처음'}보다 ${describeChange(m, r.value!, an.value).short}` : r.kind}</span>
+                <span className="qt4-tile-note">{!ok ? (r.reason ?? '자료 부족').replace(/^적용 모델 없음:\s*/, '') : m === 'loss' ? (actualLoss ? `실측 ${fmtNum(actualLoss.value, 2)} %` : `${r.kind} · 저장일수로 계산`) : an ? `${an.source === 'latest' ? '계산 시작점' : weatherMode ? '처음 추정값' : '처음'}보다 ${describeChange(m, r.value!, an.value).short}` : r.kind}</span>
               </button>; })}
           </div>
           <div className="qt5-main qt5-main-full">
@@ -1049,13 +1057,40 @@ function MeasureInput({id, label, value, onValue, missing, onMissing, unit, err,
 }
 
 /** 홍로 날씨 선택: 항목마다 세 개의 선택 버튼. ‘보통’도 직접 골라야 하며, 다시 누르면 선택을 해제합니다. */
-function WeatherChoices({form, setForm, errors, estimate}: {form: TrackerForm; setForm: (update: (f: TrackerForm) => TrackerForm) => void; errors: Partial<Record<string, string>>; estimate: Record<'firmness' | 'brix' | 'acidity', number> | null}) {
+function WeatherChoices({form, setForm, errors, estimate, harvestDate}: {form: TrackerForm; setForm: (update: (f: TrackerForm) => TrackerForm) => void; errors: Partial<Record<string, string>>; estimate: Record<'firmness' | 'brix' | 'acidity', number> | null; harvestDate?: string}) {
+  const harvest = harvestDate && isDate(harvestDate) ? {y: +harvestDate.slice(0, 4), m: +harvestDate.slice(5, 7), d: +harvestDate.slice(8, 10)} : null;
+  // 수확한 해의 거창읍 농업기상 일자료로 네 값을 계산해 채웁니다(서버 경로 /api/weather/hongro). 비어 있는 값은 채우지 않습니다.
+  type Fetched = {year: number; station: {code: string; name: string}; source: string; variables: {key: string; value: number | null; period: [string, string]; reason: string | null}[]};
+  const [auto, setAuto] = useState<{state: 'idle' | 'loading' | 'ok' | 'error'; data?: Fetched; error?: string; year?: number}>({state: 'idle'});
+  const allEmpty = HONGRO_WEATHER_FIELDS.every(f => String(form.hongro.weather[f.key] ?? '').trim() === '');
+  const load = useCallback(async (year: number) => {
+    setAuto({state: 'loading', year});
+    try {
+      const r = await fetch(`/api/weather/hongro?year=${year}`);
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { setAuto({state: 'error', year, error: j.error || '날씨 자료를 불러오지 못했어요.'}); return; }
+      const data = j as Fetched;
+      setAuto({state: 'ok', year, data});
+      setForm(f => ({...f, hongro: {...f.hongro, weather: {...f.hongro.weather, ...Object.fromEntries(data.variables.filter(v => v.value !== null).map(v => [v.key, String(v.value)]))}}}));
+    } catch { setAuto({state: 'error', year, error: '날씨 자료를 불러오지 못했어요. 날씨를 직접 골라 주세요.'}); }
+  }, [setForm]);
+  useEffect(() => { if (harvest && allEmpty && auto.year !== harvest.y && auto.state !== 'loading') void load(harvest.y); }, [harvest?.y, allEmpty]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fromApi = auto.state === 'ok' && !!auto.data && auto.data.variables.every(v => v.value === null || String(form.hongro.weather[v.key as keyof typeof form.hongro.weather] ?? '') === String(v.value));
   const h = form.hongro;
   const setW = (key: string, v: string) => setForm(f => ({...f, hongro: {...f.hongro, weather: {...f.hongro.weather, [key]: v}}}));
   const picked = HONGRO_WEATHER_FIELDS.filter(f => String(h.weather[f.key] ?? '').trim() !== '').length;
   const custom = HONGRO_WEATHER_FIELDS.some(f => { const v = String(h.weather[f.key] ?? '').trim(); return v !== '' && !HONGRO_WEATHER_PRESETS[f.key].options.some(o => o.value === Number(v)); });
   return <div className="qt-weather qt3-weather">
-    <div className="qt3-q-head"><p className="qt-weather-lead">올해 거창 날씨와 가까운 쪽을 골라 주세요.</p><span className="qt3-count" aria-live="polite">선택 {picked} / {HONGRO_WEATHER_FIELDS.length}</span></div>
+    <div className="qt3-q-head"><p className="qt-weather-lead">{harvest ? `${harvest.y}년(수확한 해) 거창 재배기 날씨예요. 자동으로 채우지 못한 항목은 가까운 쪽을 골라 주세요.` : '올해 거창 날씨와 가까운 쪽을 골라 주세요.'}</p><span className="qt3-count" aria-live="polite">선택 {picked} / {HONGRO_WEATHER_FIELDS.length}</span></div>
+    {harvest && <div className={'qt-weather-auto' + (auto.state === 'error' ? ' err' : '')} role="status" aria-live="polite">
+      {auto.state === 'loading' ? <p><Loader2 className="spin" size={15} aria-hidden="true" />{harvest.y}년 거창읍 농업기상 자료를 불러오는 중이에요…</p>
+        : auto.state === 'error' ? <p>{auto.error}</p>
+        : auto.state === 'ok' && auto.data ? <>
+          <p><b>{auto.data.year}년 · 농업기상 {auto.data.station.name} 관측</b>{fromApi ? ' 자료로 계산해 채웠어요.' : ' 자료와 다른 값이 들어 있어요(직접 고친 값).'}</p>
+          <ul>{auto.data.variables.map(v => { const f = HONGRO_WEATHER_FIELDS.find(x => x.key === v.key); return <li key={v.key}><span>{f?.label ?? v.key}</span><b>{v.value === null ? '계산 안 함' : `${v.value.toLocaleString('ko-KR', {maximumFractionDigits: 1})} ${f?.unit ?? ''}`}</b>{v.reason && <small>{v.reason}</small>}</li>; })}</ul>
+        </> : null}
+      <button type="button" className="qt3-minibtn" disabled={auto.state === 'loading'} onClick={() => void load(harvest.y)}>{auto.state === 'ok' ? '농업기상 값으로 다시 채우기' : `${harvest.y}년 농업기상 자료 불러오기`}</button>
+    </div>}
     <div className="qt-weather-rows">{HONGRO_WEATHER_FIELDS.map(field => {
       const preset = HONGRO_WEATHER_PRESETS[field.key], cur = String(h.weather[field.key] ?? '').trim();
       const sel = cur === '' ? undefined : preset.options.find(o => o.value === Number(cur));
@@ -1067,7 +1102,9 @@ function WeatherChoices({form, setForm, errors, estimate}: {form: TrackerForm; s
       </div>;
     })}</div>
     <p className="qt3-help">‘보통’도 직접 선택해 주세요. 기억나지 않는 항목은 비워 두고 기록할 수 있어요.</p>
-    <div className="qt3-note info"><Info size={16} /><div><span>선택한 날씨는 초기 품질을 추정하기 위한 입력이에요. 실측값과 구분해 기록하며, 자동으로 조회한 기상자료가 아닙니다. 선택값은 모델 참고 범위 기준이고 거창의 실제 평년값이 아니에요.</span></div></div>
+    {harvest && harvest.m === 9 && <p className="qt3-note warn qt-weather-sept" role="note"><AlertTriangle size={16} aria-hidden="true" /><span>식의 ‘9월 강수량’은 9월 1~30일 전체 합계예요. 수확일(9월 {harvest.d}일) 뒤에 온 비도 들어가며, 9월이 끝나야 자동으로 계산돼요.</span></p>}
+    {harvest && harvest.m < 9 && <p className="qt3-note warn qt-weather-sept" role="note"><AlertTriangle size={16} aria-hidden="true" /><span>9월 전에 수확했어요. 식에는 9월 강수량이 들어가지만 이 사과의 재배 기간에는 9월이 없어요. 추정값 해석에 주의해 주세요.</span></p>}
+    <div className="qt3-note info"><Info size={16} /><div><span>{fromApi ? '날씨 값은 농촌진흥청 농업기상 관측(거창읍) 일자료로 계산했어요: 4월 일최저기온 평균, 5~6월·7~8월 (일평균기온 − 5℃) 합계, 9월 강수량 합계. 초기 품질은 이 값으로 추정한 값이며 실측이 아니에요.' : '선택한 날씨는 초기 품질을 추정하기 위한 입력이에요. 실측값과 구분해 기록해요. ‘보통’ 같은 선택값은 모델 참고 범위 기준이고 거창의 실제 평년값이 아니에요.'}</span></div></div>
     {estimate ? <><p className="qt3-estimate"><span className="qt3-tag">날씨 기반 추정</span>경도 {fmtNum(estimate.firmness, 1)} N · 당도 {fmtNum(estimate.brix, 1)} °Brix · 산도 {fmtNum(estimate.acidity, 2)} %</p><p>경도 추정식의 원단위(N/mm)와 저장 모델 단위(N)가 같게 쓰일 수 있는지 확인되지 않았습니다. 현재 변환 없이 연결하므로 경도 결과의 신뢰도는 미확인입니다.</p></>
       : picked === HONGRO_WEATHER_FIELDS.length ? null : <p className="qt3-help">{HONGRO_WEATHER_FIELDS.length - picked}개 항목을 더 고르면 초기 품질을 추정해요.</p>}
     <details className="qt3-more" open={custom || undefined}>
