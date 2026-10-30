@@ -792,3 +792,11 @@ legend.qt3-q-head{padding:0;margin-bottom:8px;width:100%;display:flex}
 .ld-restored{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-radius:10px;background:#EEF4FF;color:#2a4a7a;font-size:13px}
 @media(max-width:600px){.ld-grid{grid-template-columns:minmax(0,1fr)}.ld-head,.ld-body{padding-left:16px;padding-right:16px}.ld-foot{padding-left:16px;padding-right:16px;flex-wrap:wrap}.ld-foot-note{flex-basis:100%}.ld-foot .btn{flex:1}.ld-dialog{max-height:calc(100dvh - 16px)}}
 .site-main.tab-lots{padding-top:0}.site-main.tab-lots .page-body{padding-top:16px}
+/* 새 홍로 물량: 예측 순서 안내 */
+.new-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:-16px 0 28px;padding:0;list-style:none;counter-reset:ns}
+.new-steps li{counter-increment:ns;display:flex;flex-direction:column;gap:2px;padding:12px 14px 12px 46px;position:relative;background:#fff;border:1px solid var(--app-line);border-radius:12px;font-size:14px;font-weight:700;color:#1f3a28}
+.new-steps li::before{content:counter(ns);position:absolute;left:14px;top:12px;width:22px;height:22px;border-radius:50%;background:#e3eee0;color:#24572f;font-size:13px;display:grid;place-items:center}
+.new-steps small{font-size:12px;font-weight:500;color:#556358}
+.qt5-estimated{background:#eef0fb;color:#2b3570;border-bottom-color:#d3d8f2}
+.qt-weather-sept{margin-top:10px}
+@media(max-width:700px){.new-steps{grid-template-columns:1fr;margin-top:0}}
