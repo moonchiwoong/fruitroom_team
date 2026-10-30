@@ -939,7 +939,7 @@ function FujiWeather({form, setForm, estimate}: {form: TrackerForm; setForm: (up
       const v = Object.fromEntries((j.variables as {key: string; value: number | null}[]).map(x => [x.key, x.value]));
       const reasons = (j.variables as {reason: string | null}[]).map(x => x.reason).filter(Boolean);
       setForm(f => ({...f, fuji: {...(f.fuji ?? emptyFujiForm()), year: String(year), weather: {rain9: v.chang_9rain == null ? '' : String(v.chang_9rain), lc56: v.chang_LC56 == null ? '' : String(v.chang_LC56), lc78: v.chang_LC78 == null ? '' : String(v.chang_LC78), min4: v.chang_min4 == null ? '' : String(v.chang_min4)}}}));
-      setSt({state: reasons.length ? 'error' : 'ok', key, msg: reasons.length ? `${reasons[0]} 지금은 예측할 수 없어요.` : undefined});
+      setSt({state: reasons.length ? 'error' : 'ok', key, msg: reasons.length ? (year && todayKST() < `${year}-10-01` ? '9월 강수량은 9월이 끝나야 집계돼서, 10월 1일부터 날씨로 추정할 수 있어요. 지금 당도나 단단함을 재서 넣으면 바로 예측돼요. 그대로 저장해 두면 10월부터 자동으로 추정해요.' : `${reasons[0]} 지금은 예측할 수 없어요.`) : undefined});
     }).catch(() => { if (live) setSt({state: 'error', key, msg: '날씨 자료를 불러오지 못해 지금은 예측할 수 없어요. 잠시 뒤 다시 시도해 주세요.'}); });
     return () => { live = false; };
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -949,7 +949,7 @@ function FujiWeather({form, setForm, estimate}: {form: TrackerForm; setForm: (up
     <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-harvest_date">수확일</label></div><input id="tf-harvest_date" className="qt3-input" type="date" max={todayKST()} value={form.harvest_date} onChange={e => { const v = e.target.value; setForm(f => ({...f, harvest_date: v})); }} /></div>
     {key && <div className={'qt-weather-auto' + (st.state === 'error' ? ' err' : '')} role="status" aria-live="polite">
       {st.state === 'loading' ? <p><Loader2 className="spin" size={15} aria-hidden="true" />{year}년 {region?.station} 농업기상 자료를 불러오는 중이에요…</p>
-        : st.state === 'error' ? <><p>{st.msg}</p><button type="button" className="qt3-minibtn" onClick={() => setSt({state: 'idle'})}>다시 불러오기</button></>
+        : st.state === 'error' ? <><p>{st.msg}</p><div className="ld-row"><button type="button" className="qt3-minibtn" onClick={() => setForm(f => ({...f, fuji: {...(f.fuji ?? emptyFujiForm()), source: 'measured'}}))}>측정값 입력으로 바꾸기</button><button type="button" className="qt3-minibtn" onClick={() => setSt({state: 'idle'})}>다시 불러오기</button></div></>
         : estimate ? <><p><b>{year}년 · 농업기상 {region?.station} 관측</b> 자료로 추정했어요 (실측 아님).</p>
           <ul><li><span>단맛(당도)</span><b>{fmtNum(estimate.brix, 1)} °Brix</b></li><li><span>신맛(산도)</span><b>{fmtNum(estimate.acidity, 2)} %</b></li><li><span>중량</span><b>{fmtNum(estimate.weight, 0)} g</b></li><li><span>횡경</span><b>{fmtNum(estimate.diameter, 1)} mm</b></li><li><span>단단함(참고)</span><b>{fmtNum(estimate.firmness, 1)} N/mm</b><small>단위가 저장식(N)과 달라 저장 중 변화는 계산하지 않아요.</small></li></ul></> : null}
     </div>}
@@ -975,7 +975,8 @@ function WeatherChoices({form, setForm, errors, estimate, harvestDate}: {form: T
       setForm(f => ({...f, hongro: {...f.hongro, weather: {...f.hongro.weather, ...Object.fromEntries(data.variables.filter(v => v.value !== null).map(v => [v.key, String(v.value)]))}}}));
     } catch { setAuto({state: 'error', year, error: '날씨 자료를 불러오지 못해 지금은 예측할 수 없어요. 잠시 뒤 다시 시도해 주세요.'}); }
   }, [setForm]);
-  useEffect(() => { if (harvest && allEmpty && auto.year !== harvest.y && auto.state !== 'loading') void load(harvest.y); }, [harvest?.y, allEmpty]); // eslint-disable-line react-hooks/exhaustive-deps
+  const anyEmpty = HONGRO_WEATHER_FIELDS.some(f => String(form.hongro.weather[f.key] ?? '').trim() === '');
+  useEffect(() => { if (harvest && anyEmpty && auto.year !== harvest.y && auto.state !== 'loading') void load(harvest.y); }, [harvest?.y, anyEmpty]); // eslint-disable-line react-hooks/exhaustive-deps
   const fromApi = auto.state === 'ok' && !!auto.data && auto.data.variables.every(v => v.value === null || String(form.hongro.weather[v.key as keyof typeof form.hongro.weather] ?? '') === String(v.value));
   const h = form.hongro;
   const setW = (key: string, v: string) => setForm(f => ({...f, hongro: {...f.hongro, weather: {...f.hongro.weather, [key]: v}}}));
@@ -987,6 +988,7 @@ function WeatherChoices({form, setForm, errors, estimate, harvestDate}: {form: T
         : auto.state === 'error' ? <p>{auto.error}</p>
         : auto.state === 'ok' && auto.data ? <>
           <p><b>{auto.data.year}년 · 농업기상 {auto.data.station.name} 관측</b>{fromApi ? ' 자료로 계산해 채웠어요.' : ' 자료와 다른 값이 들어 있어요(직접 고친 값).'}</p>
+          {auto.data.variables.some(v => v.value === null) && <div className="qt3-note warn" role="note"><AlertTriangle size={16} aria-hidden="true" /><div><span>9월 강수량은 9월이 끝나야 집계돼서, 10월 1일부터 날씨로 추정할 수 있어요. 지금 당도나 단단함을 재서 넣으면 바로 예측돼요. 그대로 저장해 두면 10월부터 자동으로 추정해요.</span> <button type="button" className="qt3-minibtn" onClick={() => setForm(f => ({...f, hongro: {...f.hongro, source: 'measured'}}))}>측정값 입력으로 바꾸기</button></div></div>}
           <details className="qt-weather-vals"><summary>값 보기</summary><ul>{auto.data.variables.map(v => { const f = HONGRO_WEATHER_FIELDS.find(x => x.key === v.key); return <li key={v.key}><span>{f?.label ?? v.key}</span><b>{v.value === null ? '계산 안 함' : `${v.value.toLocaleString('ko-KR', {maximumFractionDigits: 1})} ${f?.unit ?? ''}`}</b>{v.reason && <small>{v.reason}</small>}</li>; })}</ul></details>
         </> : null}
       <button type="button" className="qt3-minibtn" disabled={auto.state === 'loading'} onClick={() => void load(harvest.y)}>{auto.state === 'ok' ? '농업기상 값으로 다시 채우기' : `${harvest.y}년 농업기상 자료 불러오기`}</button>
