@@ -19,6 +19,7 @@ const QualityTracker = dynamic(() => import('@/components/quality-tracker'), {ss
 const LotsPage = dynamic(() => import('@/components/lots-page'), {ssr: false, loading: () => <div className="loading-strip">물량을 불러오는 중…</div>});
 const ModelInfo = dynamic(() => import('@/components/model-info'), {ssr: false, loading: () => <div className="loading-strip">모델 정보를 불러오는 중…</div>});
 const Account = dynamic(() => import('@/components/account'), {ssr: false});
+const ServicePreview = dynamic(() => import('@/components/landing').then(m => m.ServicePreview), {ssr: false});
 
 type Page = 'home' | 'track' | 'lots' | 'model' | 'account';
 const pages: {id: Page; label: string; icon: typeof Apple; kicker: string; title: string; desc: string; hidden?: boolean}[] = [
@@ -153,7 +154,7 @@ function HomePage({lots, loaded, error, retry, openTracker, setTab, onAskAI, ope
           <button className="ah-textlink" onClick={() => openTracker('example')}>처음이라면 예시로 체험하기<ArrowRight size={17} /></button>
         </div>
       </div>
-      <figure className="ah-hero-photo"><img src="/assets/photos/hero-orchard.svg" alt="나무 상자에서 사과를 고르는 손" /></figure>
+      <figure className="ah-hero-photo"><img src="/assets/photos/hero-orchard.svg" alt="나무 상자에서 사과를 고르는 손" /><div className="ah-hero-preview"><ServicePreview animate={false} /></div></figure>
     </section>
 
     <section className="ah-section" aria-labelledby="ah-my">
