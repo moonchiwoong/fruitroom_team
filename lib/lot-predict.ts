@@ -8,6 +8,7 @@ import {calculateHongroForm} from './hongro-tracker';
 import {isHongroVariety} from './cultivar';
 import {daysBetween, isDate, fmtNum, metricMeta, todayKST, type MetricId} from './tracker';
 import {storageStart} from './lot-readiness';
+import {predictAll} from './initial-quality';
 
 export const EASY_LABEL: Record<MetricId, string> = {firmness: '단단함', brix: '단맛(당도)', acidity: '신맛(산도)', loss: '무게 감소'};
 export const EASY_METRICS: MetricId[] = ['firmness', 'loss', 'brix', 'acidity'];
@@ -27,11 +28,28 @@ const num = (s: unknown) => { const t = String(s ?? '').trim(); if (t === '') re
 
 export type LotPoint = {ok: true; value: number; first: number | null; from: 'initial' | 'measured' | 'weather' | 'model'} | {ok: false; reason: string};
 
-export function lotPredictor(lot: Lot, observations: Observation[] = []) {
+export type WeatherValues = {chang_min4: number | null; chang_LC56: number | null; chang_LC78: number | null; chang_9rain: number | null};
+/** 날씨로 추정하는 물량인데 저장할 때 날씨 값이 다 없었던 경우(예: 9월 수확 직후). 지역과 연도를 돌려줍니다. */
+export function weatherPending(lot: Lot): {region: 'geochang' | 'cheongsong' | 'jangsu' | 'yeongju'; year: number} | null {
+  const d = lot.details ?? {}, start = storageStart(lot), yearOf = (s?: string | null) => s && isDate(s) ? +s.slice(0, 4) : null;
+  if (isHongroVariety(lot.variety) && d.hongro?.source === 'weather') {
+    const w = d.hongro.weather as Record<string, unknown>, y = yearOf(lot.harvest_date) ?? yearOf(start);
+    return y && Object.values(w ?? {}).some(v => v === null || v === undefined || v === '') ? {region: 'geochang', year: y} : null;
+  }
+  const f = d.fuji_weather;
+  if (f && (!f.estimate || Object.values(f.inputs).some(v => v === null))) { const y = f.year ?? yearOf(lot.harvest_date) ?? yearOf(start); return y ? {region: f.region, year: y} : null; }
+  return null;
+}
+
+/** 9월이 끝난 뒤 받은 날씨 값(override)이 있으면, 저장된 빈 값 대신 그 값으로 처음 품질을 추정합니다(기존 식 그대로). */
+export function lotPredictor(lot: Lot, observations: Observation[] = [], override?: WeatherValues | null) {
   const form = formFromLot(lot);
   const hongro = isHongroVariety(form.variety);
   const start = storageStart(lot);
   const weather = hongro && form.hongro.source === 'weather';
+  if (override && weather) form.hongro.weather = Object.fromEntries(Object.entries(override).map(([k, v]) => [k, v === null ? '' : String(v)])) as typeof form.hongro.weather;
+  const fujiOverride = !hongro && override && lot.details?.fuji_weather && Object.values(override).every(v => v !== null)
+    ? predictAll(lot.details.fuji_weather.region, {rain9: override.chang_9rain!, lc56: override.chang_LC56!, lc78: override.chang_LC78!, min4: override.chang_min4!}) : null;
   const measuredOn = effectiveInitialMeasuredOn(form);
   let initial: Record<'firmness' | 'brix' | 'acidity', number | null> = {firmness: null, brix: null, acidity: null};
   if (weather) {
@@ -40,8 +58,9 @@ export function lotPredictor(lot: Lot, observations: Observation[] = []) {
     const src = hongro ? form.hongro.initial : form;
     initial = {firmness: form.missing.firmness ? null : firmnessToN(String(src.firmness ?? ''), form.firmness_unit), brix: form.missing.brix ? null : num(src.brix), acidity: form.missing.acidity ? null : num(src.acidity)};
   }
-  const t0 = !isDate(start) ? null : weather ? 0 : isDate(measuredOn) ? daysBetween(start, measuredOn) : null;
-  const baseDate = weather ? start : measuredOn;
+  if (fujiOverride) initial = {firmness: null, brix: fujiOverride.brix, acidity: fujiOverride.acidity};
+  const t0 = !isDate(start) ? null : weather || fujiOverride ? 0 : isDate(measuredOn) ? daysBetween(start, measuredOn) : null;
+  const baseDate = weather || fujiOverride ? start : measuredOn;
   const latest = (m: 'firmness' | 'brix' | 'acidity') => [...observations]
     .filter(o => o[m] !== null && o[m] !== undefined && isDate(o.date) && (!isDate(baseDate) || o.date > baseDate))
     .sort((a, b) => a.date.localeCompare(b.date)).pop() ?? null;

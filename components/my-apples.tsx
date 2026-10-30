@@ -6,7 +6,7 @@ import {ArrowLeft, ArrowRight, Loader2, Pencil, Plus} from 'lucide-react';
 import type {Lot, Observation} from '@/lib/lot-types';
 import {requestJson} from '@/components/lot-forms';
 import {LotEditor, MeasurementForm} from '@/components/lot-dialogs';
-import {lotPredictor, easyChange, EASY_LABEL, EASY_METRICS} from '@/lib/lot-predict';
+import {lotPredictor, easyChange, EASY_LABEL, EASY_METRICS, weatherPending, type WeatherValues} from '@/lib/lot-predict';
 import {lotReadiness, baselineObservation, storageStart} from '@/lib/lot-readiness';
 import {fmtNum, metricMeta, todayKST, addDays} from '@/lib/tracker';
 
@@ -35,7 +35,9 @@ function AppleCard({lot, onOpen}: {lot: Lot; onOpen: () => void}) {
   const firm = d !== null ? p.at('firmness', d) : null, loss = d !== null ? p.at('loss', d) : null;
   // 목록에서는 측정 기록을 불러오지 않으므로, 측정값에 따라 달라지는 단단함은 상세 화면에서만 보여 줍니다.
   const parts = [loss?.ok ? `무게 ${easyChange('loss', loss.value, 0)}` : null].filter(Boolean);
+  const pend = weatherPending(lot), waitSept = !!pend && todayKST() < `${pend.year}-10-01`;
   const hint = ready.status === 'unsupported' || ready.status === 'conditions' ? {tone: 'muted', text: '기록만 · 예측은 준비 중이에요'}
+    : waitSept ? {tone: 'warn', text: '10월부터 날씨로 자동 추정 · 당도나 단단함을 재면 바로 예측돼요'}
     : !firm?.ok && loss?.ok ? {tone: 'warn', text: '당도나 단단함을 한 번 재 주세요'} : null;
   return <button type="button" className="ma-card" onClick={onOpen}>
     <span className="ma-card-top"><b>{lot.name}</b><span>{d !== null && d >= 0 ? `${d}일째` : ''}</span></span>
@@ -53,7 +55,21 @@ function AppleDetail({lot, onBack, reload, openTracker}: {lot: Lot; onBack: () =
     requestJson<{observations: Observation[]}>(`/api/lots/${lot.id}/analysis?asOf=${todayKST()}`).then(r => { if (live) setObs(r.observations ?? []); }).catch(e => { if (live) { setObs([]); setErr((e as Error).message); } });
     return () => { live = false; };
   }, [lot.id, n]);
-  const p = useMemo(() => lotPredictor(lot, obs ?? []), [lot, obs]);
+  // 날씨 값이 비어 있던 물량(9월 수확 직후 저장 등): 9월이 끝났으면 그 해 자료를 받아 화면에서 추정합니다. 끝나기 전에는 측정을 안내합니다.
+  const pend = useMemo(() => weatherPending(lot), [lot]);
+  const waitSept = !!pend && todayKST() < `${pend.year}-10-01`;
+  const [override, setOverride] = useState<WeatherValues | null>(null);
+  useEffect(() => {
+    if (!pend || waitSept) return;
+    let live = true;
+    fetch(`/api/weather/hongro?year=${pend.year}&region=${pend.region}`).then(r => r.ok ? r.json() : null).then(j => {
+      if (!live || !j) return;
+      const v = Object.fromEntries((j.variables as {key: string; value: number | null}[]).map(x => [x.key, x.value])) as WeatherValues;
+      if (Object.values(v).every(x => x !== null)) setOverride(v);
+    }).catch(() => {});
+    return () => { live = false; };
+  }, [pend?.region, pend?.year, waitSept]); // eslint-disable-line react-hooks/exhaustive-deps
+  const p = useMemo(() => lotPredictor(lot, obs ?? [], override), [lot, obs, override]);
   const hongro = /홍로/.test(lot.variety || '');
   const days = [...new Set([...(p.todayDay !== null && p.todayDay >= 0 ? [p.todayDay] : []), 30, 60, 90, 120])].sort((a, b) => a - b);
   const [day, setDay] = useState<number | null>(null);
@@ -65,6 +81,8 @@ function AppleDetail({lot, onBack, reload, openTracker}: {lot: Lot; onBack: () =
     <button type="button" className="ma-back" onClick={onBack}><ArrowLeft size={18} aria-hidden="true" />내 사과</button>
     <div className="ma-title"><h1>{lot.name}</h1><p>{[lot.variety, lot.location, lot.storage, lot.details?.storage_temperature != null ? `${lot.details.storage_temperature}℃` : null].filter(Boolean).join(' · ')}{p.todayDay !== null && p.todayDay >= 0 ? ` · 저장 ${p.todayDay}일째` : ''}</p></div>
     {(ready.status === 'unsupported' || ready.status === 'conditions') && <p className="ma-hint muted">{ready.title} · {ready.detail}</p>}
+    {waitSept && <p className="ma-hint warn">9월 강수량은 9월이 끝나야 집계돼서, 10월 1일부터 날씨로 자동 추정해요. 지금 당도나 단단함을 재서 ‘측정 추가’로 넣으면 바로 예측돼요.</p>}
+    {override && <p className="ma-hint">{pend?.year}년 농업기상 자료로 처음 품질을 자동 추정했어요(실측 아님).</p>}
     <div className="ma-days" role="group" aria-label="저장 일수">{days.map(d => <button key={d} type="button" aria-pressed={sel === d} className={sel === d ? 'active' : ''} onClick={() => setDay(d)}>{d === p.todayDay ? '오늘' : `${d}일`}</button>)}</div>
     <p className="ma-date">{p.start ? `${md(addDays(p.start, sel))} 기준 (저장 ${sel}일째)` : ''}</p>
     <div className="ma-tiles">{EASY_METRICS.map(m => { const r = p.at(m, sel);
