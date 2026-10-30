@@ -1059,12 +1059,38 @@ function MeasureInput({id, label, value, onValue, missing, onMissing, unit, err,
 /** 홍로 날씨 선택: 항목마다 세 개의 선택 버튼. ‘보통’도 직접 골라야 하며, 다시 누르면 선택을 해제합니다. */
 function WeatherChoices({form, setForm, errors, estimate, harvestDate}: {form: TrackerForm; setForm: (update: (f: TrackerForm) => TrackerForm) => void; errors: Partial<Record<string, string>>; estimate: Record<'firmness' | 'brix' | 'acidity', number> | null; harvestDate?: string}) {
   const harvest = harvestDate && isDate(harvestDate) ? {y: +harvestDate.slice(0, 4), m: +harvestDate.slice(5, 7), d: +harvestDate.slice(8, 10)} : null;
+  // 수확한 해의 거창읍 농업기상 일자료로 네 값을 계산해 채웁니다(서버 경로 /api/weather/hongro). 비어 있는 값은 채우지 않습니다.
+  type Fetched = {year: number; station: {code: string; name: string}; source: string; variables: {key: string; value: number | null; period: [string, string]; reason: string | null}[]};
+  const [auto, setAuto] = useState<{state: 'idle' | 'loading' | 'ok' | 'error'; data?: Fetched; error?: string; year?: number}>({state: 'idle'});
+  const allEmpty = HONGRO_WEATHER_FIELDS.every(f => String(form.hongro.weather[f.key] ?? '').trim() === '');
+  const load = useCallback(async (year: number) => {
+    setAuto({state: 'loading', year});
+    try {
+      const r = await fetch(`/api/weather/hongro?year=${year}`);
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { setAuto({state: 'error', year, error: j.error || '날씨 자료를 불러오지 못했어요.'}); return; }
+      const data = j as Fetched;
+      setAuto({state: 'ok', year, data});
+      setForm(f => ({...f, hongro: {...f.hongro, weather: {...f.hongro.weather, ...Object.fromEntries(data.variables.filter(v => v.value !== null).map(v => [v.key, String(v.value)]))}}}));
+    } catch { setAuto({state: 'error', year, error: '날씨 자료를 불러오지 못했어요. 날씨를 직접 골라 주세요.'}); }
+  }, [setForm]);
+  useEffect(() => { if (harvest && allEmpty && auto.year !== harvest.y && auto.state !== 'loading') void load(harvest.y); }, [harvest?.y, allEmpty]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fromApi = auto.state === 'ok' && !!auto.data && auto.data.variables.every(v => v.value === null || String(form.hongro.weather[v.key as keyof typeof form.hongro.weather] ?? '') === String(v.value));
   const h = form.hongro;
   const setW = (key: string, v: string) => setForm(f => ({...f, hongro: {...f.hongro, weather: {...f.hongro.weather, [key]: v}}}));
   const picked = HONGRO_WEATHER_FIELDS.filter(f => String(h.weather[f.key] ?? '').trim() !== '').length;
   const custom = HONGRO_WEATHER_FIELDS.some(f => { const v = String(h.weather[f.key] ?? '').trim(); return v !== '' && !HONGRO_WEATHER_PRESETS[f.key].options.some(o => o.value === Number(v)); });
   return <div className="qt-weather qt3-weather">
-    <div className="qt3-q-head"><p className="qt-weather-lead">{harvest ? `${harvest.y}년(수확한 해) 거창 재배기 날씨와 가까운 쪽을 골라 주세요.` : '올해 거창 날씨와 가까운 쪽을 골라 주세요.'}</p><span className="qt3-count" aria-live="polite">선택 {picked} / {HONGRO_WEATHER_FIELDS.length}</span></div>
+    <div className="qt3-q-head"><p className="qt-weather-lead">{harvest ? `${harvest.y}년(수확한 해) 거창 재배기 날씨예요. 자동으로 채우지 못한 항목은 가까운 쪽을 골라 주세요.` : '올해 거창 날씨와 가까운 쪽을 골라 주세요.'}</p><span className="qt3-count" aria-live="polite">선택 {picked} / {HONGRO_WEATHER_FIELDS.length}</span></div>
+    {harvest && <div className={'qt-weather-auto' + (auto.state === 'error' ? ' err' : '')} role="status" aria-live="polite">
+      {auto.state === 'loading' ? <p><Loader2 className="spin" size={15} aria-hidden="true" />{harvest.y}년 거창읍 농업기상 자료를 불러오는 중이에요…</p>
+        : auto.state === 'error' ? <p>{auto.error}</p>
+        : auto.state === 'ok' && auto.data ? <>
+          <p><b>{auto.data.year}년 · 농업기상 {auto.data.station.name} 관측</b>{fromApi ? ' 자료로 계산해 채웠어요.' : ' 자료와 다른 값이 들어 있어요(직접 고친 값).'}</p>
+          <ul>{auto.data.variables.map(v => { const f = HONGRO_WEATHER_FIELDS.find(x => x.key === v.key); return <li key={v.key}><span>{f?.label ?? v.key}</span><b>{v.value === null ? '계산 안 함' : `${v.value.toLocaleString('ko-KR', {maximumFractionDigits: 1})} ${f?.unit ?? ''}`}</b>{v.reason && <small>{v.reason}</small>}</li>; })}</ul>
+        </> : null}
+      <button type="button" className="qt3-minibtn" disabled={auto.state === 'loading'} onClick={() => void load(harvest.y)}>{auto.state === 'ok' ? '농업기상 값으로 다시 채우기' : `${harvest.y}년 농업기상 자료 불러오기`}</button>
+    </div>}
     <div className="qt-weather-rows">{HONGRO_WEATHER_FIELDS.map(field => {
       const preset = HONGRO_WEATHER_PRESETS[field.key], cur = String(h.weather[field.key] ?? '').trim();
       const sel = cur === '' ? undefined : preset.options.find(o => o.value === Number(cur));
@@ -1076,9 +1102,9 @@ function WeatherChoices({form, setForm, errors, estimate, harvestDate}: {form: T
       </div>;
     })}</div>
     <p className="qt3-help">‘보통’도 직접 선택해 주세요. 기억나지 않는 항목은 비워 두고 기록할 수 있어요.</p>
-    {harvest && harvest.m === 9 && <p className="qt3-note warn qt-weather-sept" role="note"><AlertTriangle size={16} aria-hidden="true" /><span>수확일이 9월 {harvest.d}일이에요. 식의 ‘9월 강수량’이 9월 전체인지 수확일까지인지는 확인되지 않았어요. 수확 뒤에 온 비는 이 사과에 영향을 주지 않으니 고를 때 참고해 주세요.</span></p>}
+    {harvest && harvest.m === 9 && <p className="qt3-note warn qt-weather-sept" role="note"><AlertTriangle size={16} aria-hidden="true" /><span>식의 ‘9월 강수량’은 9월 1~30일 전체 합계예요. 수확일(9월 {harvest.d}일) 뒤에 온 비도 들어가며, 9월이 끝나야 자동으로 계산돼요.</span></p>}
     {harvest && harvest.m < 9 && <p className="qt3-note warn qt-weather-sept" role="note"><AlertTriangle size={16} aria-hidden="true" /><span>9월 전에 수확했어요. 식에는 9월 강수량이 들어가지만 이 사과의 재배 기간에는 9월이 없어요. 추정값 해석에 주의해 주세요.</span></p>}
-    <div className="qt3-note info"><Info size={16} /><div><span>선택한 날씨는 초기 품질을 추정하기 위한 입력이에요. 실측값과 구분해 기록하며, 자동으로 조회한 기상자료가 아닙니다. 선택값은 모델 참고 범위 기준이고 거창의 실제 평년값이 아니에요.</span></div></div>
+    <div className="qt3-note info"><Info size={16} /><div><span>{fromApi ? '날씨 값은 농촌진흥청 농업기상 관측(거창읍) 일자료로 계산했어요: 4월 일최저기온 평균, 5~6월·7~8월 (일평균기온 − 5℃) 합계, 9월 강수량 합계. 초기 품질은 이 값으로 추정한 값이며 실측이 아니에요.' : '선택한 날씨는 초기 품질을 추정하기 위한 입력이에요. 실측값과 구분해 기록해요. ‘보통’ 같은 선택값은 모델 참고 범위 기준이고 거창의 실제 평년값이 아니에요.'}</span></div></div>
     {estimate ? <><p className="qt3-estimate"><span className="qt3-tag">날씨 기반 추정</span>경도 {fmtNum(estimate.firmness, 1)} N · 당도 {fmtNum(estimate.brix, 1)} °Brix · 산도 {fmtNum(estimate.acidity, 2)} %</p><p>경도 추정식의 원단위(N/mm)와 저장 모델 단위(N)가 같게 쓰일 수 있는지 확인되지 않았습니다. 현재 변환 없이 연결하므로 경도 결과의 신뢰도는 미확인입니다.</p></>
       : picked === HONGRO_WEATHER_FIELDS.length ? null : <p className="qt3-help">{HONGRO_WEATHER_FIELDS.length - picked}개 항목을 더 고르면 초기 품질을 추정해요.</p>}
     <details className="qt3-more" open={custom || undefined}>

@@ -800,3 +800,13 @@ legend.qt3-q-head{padding:0;margin-bottom:8px;width:100%;display:flex}
 .qt5-estimated{background:#eef0fb;color:#2b3570;border-bottom-color:#d3d8f2}
 .qt-weather-sept{margin-top:10px}
 @media(max-width:700px){.new-steps{grid-template-columns:1fr;margin-top:0}}
+/* 홍로 날씨: 농업기상 자동 조회 결과 */
+.qt-weather-auto{display:flex;flex-direction:column;gap:8px;margin:10px 0 14px;padding:12px 14px;border:1px solid #c9dcc4;border-radius:12px;background:#f3f8f1;font-size:14px;color:#1f3a28}
+.qt-weather-auto.err{background:var(--ds-warn-bg);border-color:var(--ds-warn-line);color:var(--ds-warn-text)}
+.qt-weather-auto p{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0;line-height:1.5}
+.qt-weather-auto ul{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 16px;margin:0;padding:0;list-style:none}
+.qt-weather-auto li{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 8px}
+.qt-weather-auto li span{color:#44574a}
+.qt-weather-auto li small{flex-basis:100%;color:#8a4310;font-size:12px}
+.qt-weather-auto .qt3-minibtn{align-self:flex-start}
+@media(max-width:700px){.qt-weather-auto ul{grid-template-columns:1fr}}
