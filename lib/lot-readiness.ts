@@ -12,7 +12,7 @@ export const quantityUnit = (l: Lot): 'kg' | '상자' => l.details?.quantity_uni
 
 /** 물량에 저장된 예측 기준 초기값(경도·당도·산도) 중 하나라도 있는지. 날씨 기반 홍로 추정은 따로 봅니다. */
 export const hasInitialValues = (l: Lot) => [l.firmness, l.brix, l.acidity].some(v => v !== null && v !== undefined);
-export const weatherInitial = (l: Lot) => l.details?.hongro?.source === 'weather';
+export const weatherInitial = (l: Lot) => l.details?.hongro?.source === 'weather' || !!l.details?.fuji_weather;
 
 /** 예측 기준 기록으로 지정된 측정 기록. 지정하지 않았으면 null이며, 가장 오래된 기록을 대신 쓰지 않습니다. */
 export function baselineObservation(l: Lot, observations: Observation[]): Observation | null {

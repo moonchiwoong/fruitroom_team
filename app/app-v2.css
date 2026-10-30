@@ -836,3 +836,36 @@ legend.qt3-q-head{padding:0;margin-bottom:8px;width:100%;display:flex}
 .qt3-seg label.disabled{opacity:.55;cursor:not-allowed}
 .qt3-seg .seg-tag{margin-left:6px;font-size:11px;font-weight:700;color:#8a4310}
 .new-fixed-cond{margin:6px 0 4px;padding:12px 14px;border-radius:10px;background:#f3f6f1;font-weight:700;color:#1f3a28}
+/* 내 사과 (농가용 단순 화면) */
+.ma{max-width:640px;margin:0 auto;padding:8px 0 48px;display:flex;flex-direction:column;gap:14px}
+.ma-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.ma h1{margin:0;font-size:26px}
+.ma-primary{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:48px;padding:0 18px;border:0;border-radius:12px;background:#2d6a3a;color:#fff;font:inherit;font-size:16px;font-weight:700;cursor:pointer}
+.ma-primary.big{min-height:56px;font-size:17px;flex:1}
+.ma-ghost{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:56px;padding:0 16px;border:1px solid #c4d0c0;border-radius:12px;background:#fff;color:#1d4a27;font:inherit;font-weight:700;cursor:pointer}
+.ma-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.ma-card{width:100%;text-align:left;display:flex;flex-direction:column;gap:6px;padding:16px;border:1px solid #d9e2d5;border-radius:16px;background:#fff;font:inherit;color:inherit;cursor:pointer}
+.ma-card:hover{border-color:#2d6a3a}
+.ma-card-top{display:flex;justify-content:space-between;gap:10px}.ma-card-top b{font-size:17px}.ma-card-top span{font-size:14px;color:#4a5a4d;white-space:nowrap}
+.ma-card-sub{font-size:13px;color:#4a5a4d}
+.ma-card-line{font-size:16px;font-weight:700;color:#1f3a28}
+.ma-hint{font-size:14px;border-radius:8px;padding:6px 10px;background:#e8f2e5;color:#1d4a27}
+.ma-hint.warn{background:#fdf0e3;color:#8a4310}.ma-hint.muted{background:#eceeea;color:#4a5a4d}
+.ma-empty{padding:28px;border:1px dashed #c4d0c0;border-radius:16px;text-align:center;background:#fff}
+.ma-back{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;min-height:44px;border:0;background:none;color:#1d4a27;font:inherit;font-weight:700;cursor:pointer;padding:0}
+.ma-title p{margin:4px 0 0;color:#4a5a4d;font-size:14px}
+.ma-days{display:flex;gap:8px;flex-wrap:wrap}
+.ma-days button{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid #c4d0c0;background:#fff;font:inherit;font-size:15px;cursor:pointer}
+.ma-days button.active{background:#2d6a3a;border-color:#2d6a3a;color:#fff;font-weight:700}
+.ma-date{margin:0;font-size:13px;color:#4a5a4d}
+.ma-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ma-tile{display:flex;flex-direction:column;gap:4px;padding:14px;border-radius:14px;background:#fff;border:1px solid #e1e8dd}
+.ma-tile>span{font-size:14px;color:#4a5a4d}.ma-tile b{font-size:19px;line-height:1.3}.ma-tile b.na{font-size:16px;color:#6b776d}.ma-tile small{font-size:13px;color:#4a5a4d}
+.ma-actions{display:flex;gap:10px;flex-wrap:wrap}
+.ma-ok{margin:0;color:#1d4a27;font-weight:700}
+.ma-records{background:#fff;border-radius:14px;padding:14px;border:1px solid #e1e8dd}.ma-records h2{margin:0 0 8px;font-size:16px}
+.ma-records ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:15px}.ma-records p{margin:0;color:#4a5a4d;display:flex;align-items:center;gap:6px}
+.ma-foot{font-size:12px;color:#556358;text-align:center;margin:0}
+.ma-foot .linkbtn{display:inline-flex;align-items:center;gap:3px;margin-left:6px}
+@media(max-width:520px){.ma-tiles{grid-template-columns:1fr 1fr}.ma-tile b{font-size:17px}.ma-actions>*{flex:1 1 100%}}
+.ma-card-line small{font-size:13px;font-weight:500;color:#4a5a4d}
