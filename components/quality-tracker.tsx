@@ -395,6 +395,10 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   // 새 홍로 물량: ‘수확 당일 바로 입고’를 고르면 저장 시작일을 수확일과 같게 둡니다. 체크하지 않으면 날짜를 따로 받습니다.
   const [harvestSame, setHarvestSame] = useState(false);
   const [quickDay, setQuickDay] = useState(60);
+  // 새 물량 화면은 예측식이 있는 조합만 고르게 합니다. 홍로는 일반 저온·1-MCP 미처리 한 가지라 그 조건으로 둡니다.
+  useEffect(() => {
+    if (firstInput && hongro && (form.storage !== '일반 저온' || form.mcp !== '미처리' || !form.mcpSelected)) setForm(f => ({...f, storage: '일반 저온', mcp: '미처리', mcpSelected: true}));
+  }, [firstInput, hongro, form.storage, form.mcp, form.mcpSelected, setForm]);
   // 새 홍로 물량: 수확일을 넣고 측정값이 없으면 한 번만 ‘날씨로 추정’으로 바꿔 수확일·온도만으로 결과가 나오게 합니다. 다시 바꾸면 그대로 둡니다.
   const autoWeatherRef = useRef(false);
   useEffect(() => {
@@ -537,12 +541,13 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
       <section id="qt-input-editor" className="new-card" aria-labelledby="new-condition"><div className="new-card-head"><h2 id="new-condition"><span>1</span>사과와 보관 조건</h2><small>예측 조건 확인에 필요</small></div>
         <div className="new-grid2">
           <Seg id="tf-variety" legend="품종" value={hongro ? '홍로' : '후지'} options={[{value:'후지',label:'후지'},{value:'홍로',label:'홍로'}]} onChange={switchCultivar} err={shownErrors.variety} />
-          <Seg id="tf-storage" legend="보관 방식" value={form.storage} options={[{value:'일반 저온',label:'일반 저온'},{value:'CA',label:'CA'},{value:'기타',label:'기타'}]} onChange={v => set('storage',v)} />
-          <div><Seg id="tf-mcp" legend="1-MCP 처리 여부" value={mcpChosen ? form.mcp : ''} options={[{value:'처리',label:'처리함'},{value:'미처리',label:'미처리'}]} onChange={v => setForm(f => ({...f,mcp:v,mcpSelected:true}))} err={shownErrors.mcp} /><details className="new-explain"><summary>1-MCP가 무엇인가요?</summary><p>사과의 숙성을 늦추는 처리예요. 처리일과 제품 기록을 확인해 주세요.</p></details></div>
+          {hongro ? <div className="qt3-q"><div className="qt3-q-head"><span>보관 조건</span></div><p className="new-fixed-cond">일반 저온 · 1-MCP 미처리</p><p className="qt3-help">홍로는 이 조건의 예측식만 있어요. 다른 조건(CA·1-MCP 처리 등)은 준비 중이며, 물량 관리에서 기록할 수 있어요.</p></div>
+          : <><Seg id="tf-storage" legend="보관 방식" value={form.storage} options={[{value:'일반 저온',label:'일반 저온'},{value:'CA',label:'CA'},...(form.storage === '기타' ? [{value:'기타' as const,label:'기타',disabled:true,tag:'준비 중'}] : [])]} onChange={v => setForm(f => ({...f, storage: v, ...(v === 'CA' && f.mcp === '처리' ? {mcp: '미확인', mcpSelected: false} : {})}))} />
+          <div><Seg id="tf-mcp" legend="1-MCP 처리 여부" value={mcpChosen ? form.mcp : ''} options={[{value:'처리',label:'처리함',disabled:form.storage === 'CA',tag:form.storage === 'CA' ? '준비 중' : undefined},{value:'미처리',label:'미처리'}]} onChange={v => setForm(f => ({...f,mcp:v,mcpSelected:true}))} err={shownErrors.mcp} />{form.storage === 'CA' && <p className="qt3-help">CA + 1-MCP 처리 예측은 준비 중이에요. 기록은 물량 관리에서 남길 수 있어요.</p>}<details className="new-explain"><summary>1-MCP가 무엇인가요?</summary><p>사과의 숙성을 늦추는 처리예요. 처리일과 제품 기록을 확인해 주세요.</p></details></div></>}
           {hongro && <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-harvest_date">수확일</label></div><input id="tf-harvest_date" className="qt3-input" type="date" max={today} value={form.harvest_date} onChange={e => { const v = e.target.value; setForm(f => ({...f, harvest_date: v, ...(harvestSame ? {storage_start_date: v, ...(f.sameStart ? {intake_date: v} : {})} : {})})); }} aria-invalid={!!shownErrors.harvest_date} />{shownErrors.harvest_date ? <span className="qf-err">{shownErrors.harvest_date}</span> : <p className="qt3-help">날씨를 고를 해(연도)와 9월 강수 해석에 써요. 계산식에 직접 들어가지는 않아요.</p>}
             <label className="new-date-check"><input id="tf-harvestSame" type="checkbox" checked={harvestSame} onChange={e => { const c = e.target.checked; setHarvestSame(c); if (c && form.harvest_date) setStart(form.harvest_date); }} /><span>수확 당일 바로 저장고에 넣었어요</span></label></div>}
           <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-storage_start_date">저장 시작일</label></div><input id="tf-storage_start_date" className="qt3-input" type="date" max={today} value={startDate} disabled={hongro && harvestSame} onChange={e => setStart(e.target.value)} aria-invalid={!!shownErrors.storage_start_date} />{shownErrors.storage_start_date ? <span className="qf-err">{shownErrors.storage_start_date}</span> : <p className="qt3-help">{hongro && harvestSame ? '수확일과 같게 두었어요. 저장일수는 이 날부터 세요.' : hongro ? '실제로 저장고에 넣은 날이에요. 수확~입고 사이 변화는 계산하지 않아요.' : '실제로 저장고에 넣은 날이에요.'}</p>}</div>
-          {hongro && temperatureField}
+          {hongro && <Seg id="tf-temperature" legend="저장고 온도" value={form.temperature === '0' || form.temperature === '4' ? form.temperature as '0' | '4' : ''} options={[{value:'0',label:'0℃'},{value:'4',label:'4℃'}]} onChange={v => setForm(f => ({...f, temperature: v, hongro: {...f.hongro, storage: v === '0' ? 'cold0' : 'cold4'}}))} err={shownErrors.temperature} />}
         </div>
         {form.mcpSelected && form.mcp === '미확인' && <p className="new-condition-note">처리 여부가 미확인이면 예측식은 적용하지 않으며 기록은 저장할 수 있어요.</p>}
         {'preparing' in condition && condition.preparing && <p className="new-condition-note new-preparing" role="status"><b>서비스 준비 중</b> {condition.detail}</p>}
@@ -1054,12 +1059,12 @@ function Apple3DFold({day, cultivar, metrics}: {day: number; cultivar: string; m
 }
 
 /** 한눈에 고르는 선택 버튼 묶음. 실제 라디오 입력이라 화살표 키로도 바꿀 수 있습니다. */
-function Seg<T extends string>({id, legend, value, options, onChange, err}: {id: string; legend: ReactNode; value: T | ''; options: {value: T; label: string}[]; onChange: (v: T) => void; err?: string}) {
+function Seg<T extends string>({id, legend, value, options, onChange, err}: {id: string; legend: ReactNode; value: T | ''; options: {value: T; label: string; disabled?: boolean; tag?: string}[]; onChange: (v: T) => void; err?: string}) {
   return <fieldset className={'qt3-q' + (err ? ' has-err' : '')}>
     <legend className="qt3-q-head">{legend}</legend>
-    <div className="qt3-seg">{options.map((o, i) => <label key={o.value} className={value === o.value ? 'active' : ''}>
-      <input type="radio" name={id} id={i === 0 ? id : undefined} value={o.value} checked={value === o.value} onChange={() => onChange(o.value)} />
-      <span>{value === o.value && <Check size={15} aria-hidden="true" />}{o.label}</span></label>)}</div>
+    <div className="qt3-seg">{options.map((o, i) => <label key={o.value} className={(value === o.value ? 'active' : '') + (o.disabled ? ' disabled' : '')}>
+      <input type="radio" name={id} id={i === 0 ? id : undefined} value={o.value} checked={value === o.value} disabled={o.disabled} onChange={() => onChange(o.value)} />
+      <span>{value === o.value && <Check size={15} aria-hidden="true" />}{o.label}{o.tag && <small className="seg-tag">{o.tag}</small>}</span></label>)}</div>
     {err && <span className="qf-err" role="alert">{err}</span>}
   </fieldset>;
 }
