@@ -21,6 +21,7 @@ export async function GET(req:Request) {
   if(year<2000 || year>currentYear+5) return Response.json({error:'조회할 수확 연도를 확인해 주세요.'},{status:400});
   const key=process.env.RDA_SERVICE_KEY;
   if(!key) return Response.json({error:'농업기상 자동 조회가 설정되지 않았어요.'},{status:503});
+  const serviceKey: string = key;
   const station=SIMPLE_STATIONS[region], controller=new AbortController();
   const timeout=setTimeout(()=>controller.abort(),TOTAL_TIMEOUT_MS);
   const onAbort=()=>controller.abort();
@@ -38,7 +39,7 @@ export async function GET(req:Request) {
         if(controller.signal.aborted || calls>=MAX_CALLS) {failed++;continue;}
         calls++;
         try {
-          const params=new URLSearchParams({serviceKey:key,Page_No:'1',Page_Size:'31',search_Year:String(task.year),search_Month:String(task.month).padStart(2,'0'),obsr_Spot_Cd:station.code});
+          const params=new URLSearchParams({serviceKey,Page_No:'1',Page_Size:'31',search_Year:String(task.year),search_Month:String(task.month).padStart(2,'0'),obsr_Spot_Cd:station.code});
           const response=await fetch(`${RDA_DAILY_URL}?${params}`,{signal:controller.signal,next:{revalidate:task.year < currentYear ? 7*86400 : 3*3600}});
           if(!response.ok) throw new Error('weather request failed');
           const parsed=parseDailyXml(await response.text(),station.code);
