@@ -3,6 +3,7 @@ import {useEffect, useState} from 'react';
 import {Check, Loader2, LogOut, Mail, MapPin, Save, ShieldCheck, Users, X} from 'lucide-react';
 import {useTeamSession} from '@/components/team-auth';
 import {PROFILE_REGIONS} from '@/lib/profile-regions';
+import {authMessage, supabaseBrowser} from '@/lib/supabase-browser';
 import {countPredictions} from '@/lib/my-predictions';
 import {inputInfo, inputKeys, regionIds, regions, type RegionId} from '@/lib/initial-quality';
 
@@ -64,6 +65,7 @@ export default function Account({onOpenPredict}: {onOpenPredict: () => void}) {
         <p className="account-sub">{session.isTeam ? '팀원 계정입니다. 내 개인 물량과 함께 팀 공유 물량을 볼 수 있고, 새 물량을 팀과 공유할 수 있어요.' : '개인 계정입니다. 내가 등록한 물량·기록·예측은 나만 볼 수 있어요.'}</p>
       </section>
       <button className="btn btn-ghost account-logout" onClick={() => void session.signOut()}><LogOut size={15} />로그아웃</button>
+      <LoginChange email={session.email} />
       <Withdraw onDone={() => void session.signOut()} />
     </div>
   </div>;
@@ -92,5 +94,46 @@ function Withdraw({onDone}: {onDone: () => void}) {
       <button type="button" className="btn btn-ghost" onClick={() => { setOpen(false); setText(''); setErr(''); }}>취소</button>
       <button type="button" className="btn account-withdraw-go" disabled={busy || text.trim() !== '탈퇴'} onClick={() => void go()}>{busy && <Loader2 className="spin" size={15} />}탈퇴하기</button>
     </div>
+  </section>;
+}
+
+/** 아이디(이메일)·비밀번호 바꾸기. 바꾸기 전에 지금 비밀번호로 본인 확인을 한 번 더 합니다. */
+function LoginChange({email}: {email: string}) {
+  const [open, setOpen] = useState<'' | 'email' | 'password'>(''), [busy, setBusy] = useState(false), [msg, setMsg] = useState<{ok: boolean; text: string} | null>(null);
+  const [cur, setCur] = useState(''), [nextEmail, setNextEmail] = useState(''), [pw, setPw] = useState(''), [pw2, setPw2] = useState('');
+  const reset = (o: typeof open) => { setOpen(o); setCur(''); setNextEmail(''); setPw(''); setPw2(''); setMsg(null); };
+  async function submit(e: React.FormEvent) {
+    e.preventDefault(); setMsg(null);
+    if (!cur) return setMsg({ok: false, text: '지금 비밀번호를 넣어 주세요.'});
+    if (open === 'email') { const n = nextEmail.trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(n)) return setMsg({ok: false, text: '새 이메일 주소를 확인해 주세요.'}); if (n === email.toLowerCase()) return setMsg({ok: false, text: '지금 쓰는 이메일과 같아요.'}); }
+    if (open === 'password') { if (pw.length < 8) return setMsg({ok: false, text: '새 비밀번호는 8자 이상으로 정해 주세요.'}); if (pw !== pw2) return setMsg({ok: false, text: '새 비밀번호 두 칸이 서로 달라요.'}); if (pw === cur) return setMsg({ok: false, text: '지금 비밀번호와 다르게 정해 주세요.'}); }
+    setBusy(true);
+    try {
+      const c = supabaseBrowser();
+      const check = await c.auth.signInWithPassword({email, password: cur});
+      if (check.error) { setMsg({ok: false, text: '지금 비밀번호가 맞지 않아요.'}); return; }
+      if (open === 'email') {
+        const r = await c.auth.updateUser({email: nextEmail.trim()}, {emailRedirectTo: window.location.origin});
+        if (r.error) { setMsg({ok: false, text: authMessage(r.error)}); return; }
+        reset('email'); setOpen(''); setMsg({ok: true, text: `${nextEmail.trim()}로 확인 메일을 보냈어요. 메일의 링크를 누르면 아이디가 바뀌어요. (설정에 따라 지금 메일함에도 확인 메일이 가요.)`});
+      } else {
+        const r = await c.auth.updateUser({password: pw});
+        if (r.error) { setMsg({ok: false, text: authMessage(r.error)}); return; }
+        reset('password'); setOpen(''); setMsg({ok: true, text: '비밀번호를 바꿨어요. 다음 로그인부터 새 비밀번호를 쓰세요.'});
+      }
+    } catch (x) { setMsg({ok: false, text: (x as Error).message || '처리하지 못했어요.'}); } finally { setBusy(false); }
+  }
+  return <section className="iq-card account-login">
+    <h3 className="account-h"><ShieldCheck size={17} />로그인 정보</h3>
+    <p className="account-sub">아이디(이메일) <b>{email}</b></p>
+    {!open && <div className="account-login-btns"><button type="button" className="btn btn-ghost" onClick={() => reset('email')}>아이디(이메일) 바꾸기</button><button type="button" className="btn btn-ghost" onClick={() => reset('password')}>비밀번호 바꾸기</button></div>}
+    {open && <form className="account-form" onSubmit={submit}>
+      {open === 'email' ? <label>새 이메일<input type="email" autoComplete="email" value={nextEmail} onChange={e => setNextEmail(e.target.value)} required /></label>
+        : <><label>새 비밀번호 (8자 이상)<input type="password" autoComplete="new-password" value={pw} onChange={e => setPw(e.target.value)} required /></label>
+          <label>새 비밀번호 한 번 더<input type="password" autoComplete="new-password" value={pw2} onChange={e => setPw2(e.target.value)} required /></label></>}
+      <label>지금 비밀번호 (본인 확인)<input type="password" autoComplete="current-password" value={cur} onChange={e => setCur(e.target.value)} required /></label>
+      <div className="account-login-btns"><button type="button" className="btn btn-ghost" onClick={() => reset('')}>취소</button><button className="btn btn-primary" disabled={busy}>{busy && <Loader2 className="spin" size={15} />}{open === 'email' ? '확인 메일 보내기' : '비밀번호 바꾸기'}</button></div>
+    </form>}
+    {msg && <p className={msg.ok ? 'account-ok' : 'auth-error'} role="status">{msg.ok && <Check size={15} />}{msg.text}</p>}
   </section>;
 }
