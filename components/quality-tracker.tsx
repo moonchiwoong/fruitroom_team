@@ -252,6 +252,8 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     if (hongro) return [m, predictionSeries({...modelInput(m, selDay), anchor: {day: ia.day, value: ia.value}}, asOfDay, maxDays)];
     return [m, computeSeries({variety:form.variety,temperature:num(form.temperature),metric:m,anchor:ia,recorded:recorded.id,recordedReason:recorded.reason,future:future.id,futureReason:future.reason,asOfDay})];
   })) as Record<MetricId, Series | null>, [initialAnchors, hongro, form, recorded.id, recorded.reason, future.id, future.reason, asOfDay, maxDays]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** 고른 날의 비교 기준: 최근 측정일보다 앞선 날은 처음 값과 비교합니다. */
+  const shownAnchor = (m:MetricId, d=selDay):Anchor|null => { const a=anchors[m]; return a?.source==='latest' && d<a.day && initialAnchors[m] ? initialAnchors[m] : a; };
   const at = (m:MetricId, d=selDay):ValueAt => {
     let r=valueAt(series[m],d);
     const a=anchors[m], s0=initialSeries[m];
@@ -334,7 +336,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const [showObsCompare, setShowObsCompare] = useState(false);
 
   const summary = startOk ? summarySentence({
-    metric, day:selDay, date:selDate, at:at(metric), anchor:anchors[metric],
+    metric, day:selDay, date:selDate, at:at(metric), anchor:shownAnchor(metric),
     measuredToday:measured[metric].find(p=>p.day===selDay) ?? null,
     baseline:baseline && compatible && !sameAsBaseline ? {label:`${baseline.label} · ${baseline.conditionLabel}`,at:valueAt(baseline.series[metric],selDay)} : null,
     changeLabel:futureLabel,
@@ -399,7 +401,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
       if (b.status === 'ok') { const c = describeChange(metric, v.value, b.value); out.push(c.diff === 0 ? `비교 기준(${baseline.label})과 같습니다.` : `비교 기준(${baseline.label})보다 ${c.text}.`); }
       else out.push('비교 기준의 값이 없어 차이를 계산하지 않았어요.');
     } else {
-      const an = anchors[metric];
+      const an = shownAnchor(metric);
       if (an?.source === 'latest') { const c = describeChange(metric, v.value, an.value); const from = `계산 시작점(${fmtDate(an.date)} 측정값)`; out.push(c.diff === 0 ? `${from}과 같습니다.` : `${from}보다 ${c.text}.`); }
     }
     const today = measured[metric].find(p => p.day === selDay);
@@ -782,7 +784,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
               onChange={e => { if (!e.target.value) setSelectedDay(Number.NaN); else if (startOk && isDate(e.target.value)) setSelectedDay(daysBetween(startDate,e.target.value)); }} /></label>
           </div>
           <div className="qt4-tiles" role="group" aria-label="지표 요약 · 누르면 그래프가 바뀌어요">
-            {visibleMetrics.map(m => { const r = modelResults[m], an = anchors[m], ok = r.ok && r.value !== null;
+            {visibleMetrics.map(m => { const r = modelResults[m], an = shownAnchor(m), ok = r.ok && r.value !== null;
               return <button key={m} type="button" className={'qt4-tile' + (metric === m ? ' active' : '')} aria-pressed={metric === m} onClick={() => setMetric(m)}>
                 <span className="qt4-tile-label">{EASY_LABEL[m]}</span>
                 <span className="qt4-tile-value">{ok ? <>{fmtNum(r.value!, metricMeta[m].digits)}<small>{displayUnit(m)}</small></> : '계산 없음'}</span>
