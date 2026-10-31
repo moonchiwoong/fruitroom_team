@@ -199,5 +199,5 @@ function SiteFooter({setTab}: {setTab: (p: Page) => void}) {
   return <footer className="site-footer"><div className="site-footer-inner">
     <div className="footer-brand"><div><img src="/assets/appletrack-logo.svg" alt="애플트랙" width={170} height={42} style={{display:'block', width:'clamp(132px, 16vw, 170px)', height:'auto'}} /><p>수확일만 넣으면 저장 중 사과 품질 변화를 보여줘요. 직접 잰 값과 계산값을 구분해 표시하며, 출하·안전 판정은 하지 않아요.</p></div></div>
     <nav aria-label="하단 메뉴">{pages.filter(p => !p.hidden).map(p => <button key={p.id} onClick={() => setTab(p.id)}>{p.label}</button>)}</nav>
-  </div><div className="site-footer-bottom"><ShieldCheck size={14} />사과 품질 예측·저장 관리 · FarmBridge</div></footer>;
+  </div><div className="site-footer-bottom"><ShieldCheck size={14} />사과 품질 예측·저장 관리 · FarmBridge</div><div className="site-footer-legal"><a href="/privacy"><b>개인정보처리방침</b></a><a href="/terms">이용약관</a><a href="mailto:mooncw@jbnu.ac.kr">문의</a></div></footer>;
 }
