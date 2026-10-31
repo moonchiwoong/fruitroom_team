@@ -144,7 +144,9 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     if (next === cultivar) return;
     // 품종과 무관한 보관 기록은 새 품종 입력으로 이어 갑니다(측정값·날씨 선택은 품종별로 따로 보관).
     const {name, name_auto, storage, mcp, mcpSelected, temperature, intake_date, storage_start_date, sameStart, harvest_date, location, packaging, sensor_id, mcpd, ca, team_shared} = form;
-    carryRef.current = {name, name_auto, storage, mcp, mcpSelected, temperature, intake_date, storage_start_date, sameStart, harvest_date, location, packaging, sensor_id, mcpd, ca, team_shared};
+    carryRef.current = {name, name_auto, storage, mcp, mcpSelected, temperature, intake_date, storage_start_date, sameStart, harvest_date, location, packaging, sensor_id, mcpd, ca, team_shared,
+      // 홍로 예측식은 일반 저온·1-MCP 미처리만 있어요. 다른 조건을 그대로 넘기면 ‘준비 중’ 조건이 선택된 채로 남습니다.
+      ...(next === 'hongro' ? {storage: '일반 저온' as const, mcp: '미처리' as const, mcpSelected: true} : {})};
     setSelectionDateRaw(null); setSelectedDayState(null); setCultivar(next); setMetric('firmness'); setBaseline(null); setUseLatest(true); setFutureId('same');
     setShowConditions(false); setShowObsCompare(false); setSaveMsg(null); setSaveErrors({});
     setEditing(true); setShowResults(false);
@@ -649,15 +651,19 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           </div>
           <div className="qt3-grid2">
             <Seg id="tf-variety" legend="어떤 품종인가요?" value={hongro ? '홍로' : '후지'} options={[{value: '후지', label: '후지'}, {value: '홍로', label: '홍로'}]} onChange={v => switchCultivar(v)} err={saveErrors.variety} />
-            <Seg id="tf-storage" legend="어떻게 보관하나요?" value={form.storage} options={[{value: '일반 저온', label: '일반 저온'}, {value: 'CA', label: 'CA'}, {value: '기타', label: '기타'}]} onChange={v => set('storage', v)} />
+            {/* 예측식이 없는 조합은 처음부터 ‘준비 중’으로 막아 둡니다(PC·모바일 같음). 홍로: 일반 저온·미처리만, 후지: CA+1-MCP 처리 준비 중. */}
+            <Seg id="tf-storage" legend="어떻게 보관하나요?" value={form.storage} options={[{value: '일반 저온', label: '일반 저온'}, {value: 'CA', label: 'CA', disabled: hongro, tag: hongro ? '준비 중' : undefined}, {value: '기타', label: '기타', disabled: true, tag: '준비 중'}]}
+              onChange={v => setForm(f => ({...f, storage: v, ...(v === 'CA' && f.mcp === '처리' ? {mcp: '미처리', mcpSelected: true} : {})}))} />
             <Seg id="tf-mcp" legend={<>1-MCP 처리를 했나요?<span className="qt3-hint" title="1-MCP는 사과의 숙성을 늦추는 처리예요. 처리 기록(처리일·제품)을 확인해 주세요.">무엇인가요?</span></>} value={form.mcpSelected ? form.mcp : ''}
-              options={[{value: '처리', label: '처리함'}, {value: '미처리', label: '미처리'}]} onChange={v => setForm(f => ({...f, mcp: v, mcpSelected: true}))} />
-            <div className="qt3-q">
+              options={[{value: '처리', label: '처리함', disabled: hongro || form.storage === 'CA', tag: hongro || form.storage === 'CA' ? '준비 중' : undefined}, {value: '미처리', label: '미처리'}]} onChange={v => setForm(f => ({...f, mcp: v, mcpSelected: true}))} />
+            {hongro ? <Seg id="tf-temperature" legend="저장고 온도" value={form.temperature === '0' || form.temperature === '4' ? form.temperature as '0' | '4' : ''} options={[{value: '0', label: '0℃'}, {value: '4', label: '4℃'}]}
+              onChange={v => setForm(f => ({...f, temperature: v, hongro: {...f.hongro, storage: v === '0' ? 'cold0' : 'cold4'}}))} err={errors.temperature} />
+            : <div className="qt3-q">
               <div className="qt3-q-head"><label htmlFor="tf-temperature">실제 저장고 온도</label></div>
               <div className="qt3-unit-input"><input id="tf-temperature" className="qt3-input" type="number" step="any" inputMode="decimal" placeholder="실제로 보관한 온도" value={form.temperature}
                 onChange={e => setForm(f => ({...f, temperature: e.target.value, hongro: {...f.hongro, storage: e.target.value === '0' ? 'cold0' : e.target.value === '4' ? 'cold4' : f.hongro.storage}}))} /><span>℃</span></div>
               {errors.temperature ? <span className="qf-err" role="alert">{errors.temperature}</span> : <p className="qt3-help">{hongro ? '기록한 온도를 0℃·4℃에 맞춰 바꾸지 않아요. 홍로 식은 정확히 0℃·4℃에만 있어요.' : '후지 식에는 저장 온도가 정해져 있지 않아, 온도는 기록으로만 남아요.'}</p>}
-            </div>
+            </div>}
             <div className="qt3-q">
               <div className="qt3-q-head"><label htmlFor="tf-intake_date">입고일</label></div>
               <input id="tf-intake_date" className="qt3-input" type="date" max={today} value={form.intake_date} onChange={e => set('intake_date', e.target.value)} />
