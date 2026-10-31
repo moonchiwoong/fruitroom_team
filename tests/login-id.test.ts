@@ -2,17 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {toAuthEmail, validId, displayLogin, isIdAccount, ID_DOMAIN} from '../lib/login-id';
 
-test('아이디는 메일이 가지 않는 주소로, 예전 이메일은 그대로', () => {
-  assert.equal(toAuthEmail(' Apple_Farm01 '), `apple_farm01@${ID_DOMAIN}`);
+test('아무 아이디나 메일이 가지 않는 주소로 바꾸고 다시 읽을 수 있다', () => {
+  for (const id of ['사과농가', 'Apple-Farm 01', '홍길동!', 'ab', '거창사과농장123']) {
+    const e = toAuthEmail(id);
+    assert.ok(e.endsWith('@' + ID_DOMAIN) && e.split('@')[0].length <= 64, e);
+    assert.match(e, /^[a-z0-9]+@/);
+    assert.equal(displayLogin(e), id.normalize('NFC').trim().toLowerCase());
+  }
   assert.equal(toAuthEmail('Farmer@Naver.com'), 'farmer@naver.com');
-  assert.ok(ID_DOMAIN.endsWith('.invalid'));
-});
-test('아이디 규칙', () => {
-  for (const ok of ['abcd', 'apple_farm01', 'a1234567890123456789']) assert.ok(validId(ok), ok);
-  for (const bad of ['abc', '_abcd', 'Abcd', '사과농가', 'a b c d', 'a12345678901234567890', 'ab-cd']) assert.ok(!validId(bad), bad);
-});
-test('화면 표시', () => {
-  assert.equal(displayLogin(`apple01@${ID_DOMAIN}`), 'apple01');
   assert.equal(displayLogin('farmer@naver.com'), 'farmer@naver.com');
-  assert.ok(isIdAccount(`x1234@${ID_DOMAIN.toUpperCase()}`));
+  assert.ok(isIdAccount(toAuthEmail('사과')));
+});
+test('아이디 길이 제한', () => {
+  assert.ok(validId('사과')); assert.ok(validId('가'.repeat(10))); assert.ok(validId('a'.repeat(30)));
+  assert.ok(!validId('가')); assert.ok(!validId('가'.repeat(11))); assert.ok(!validId('a'.repeat(32))); assert.ok(!validId('a@b')); assert.ok(!validId('   '));
 });

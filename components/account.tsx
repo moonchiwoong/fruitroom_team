@@ -130,7 +130,7 @@ function LoginChange({email}: {email: string}) {
     <p className="account-sub">아이디 <b>{displayLogin(email)}</b></p>
     {!open && <div className="account-login-btns"><button type="button" className="btn btn-ghost" onClick={() => reset('email')}>아이디 바꾸기</button><button type="button" className="btn btn-ghost" onClick={() => reset('password')}>비밀번호 바꾸기</button></div>}
     {open && <form className="account-form" onSubmit={submit}>
-      {open === 'email' ? <label>새 아이디 <small>{ID_RULE}</small><input type="text" autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={20} autoComplete="username" value={nextEmail} onChange={e => setNextEmail(e.target.value)} required /></label>
+      {open === 'email' ? <label>새 아이디 <small>{ID_RULE}</small><input type="text" autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={30} autoComplete="username" value={nextEmail} onChange={e => setNextEmail(e.target.value)} required /></label>
         : <><label>새 비밀번호 (8자 이상)<input type="password" autoComplete="new-password" value={pw} onChange={e => setPw(e.target.value)} required /></label>
           <label>새 비밀번호 한 번 더<input type="password" autoComplete="new-password" value={pw2} onChange={e => setPw2(e.target.value)} required /></label></>}
       <label>지금 비밀번호 (본인 확인)<input type="password" autoComplete="current-password" value={cur} onChange={e => setCur(e.target.value)} required /></label>
