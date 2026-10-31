@@ -75,8 +75,8 @@ export function LotEditor({open, lot, onClose, onSaved}: {open: boolean; lot?: L
     } catch (e) { setError((e as Error).message); } // 실패해도 입력한 내용은 그대로 둡니다.
     finally { setBusy(false); }
   }
-  return <Shell open={open} onClose={onClose} busy={busy} title={lot ? '사과 정보 수정' : '새 사과'} desc={lot ? `${lot.name} · 측정 기록은 그대로 두고 기본 정보만 바꿔요.` : '기본 정보만 입력하면 물량을 관리할 수 있어요. 측정값은 등록한 뒤 추가해요.'}
-    footer={<><p className="ld-foot-note">{lot ? '저장하면 목록·상세·예측 준비 상태가 함께 바뀌어요.' : '물량 관리에 바로 추가돼요.'}</p><button type="button" className="btn btn-outline" onClick={onClose} disabled={busy}>취소</button><button type="button" className="btn btn-primary" onClick={() => void save()} disabled={busy}>{busy ? <Loader2 size={16} className="spin" /> : <Save size={16} />}{lot ? '저장' : '물량 등록'}</button></>}>
+  return <Shell open={open} onClose={onClose} busy={busy} title={lot ? '사과 정보 수정' : '새 사과'} desc={lot ? `${lot.name} · 측정 기록은 그대로 두고 기본 정보만 바꿔요.` : '기본 정보만 입력하면 사과를 관리할 수 있어요. 측정값은 등록한 뒤 추가해요.'}
+    footer={<><p className="ld-foot-note">{lot ? '저장하면 목록과 예측이 함께 바뀌어요.' : '내 사과에 바로 추가돼요.'}</p><button type="button" className="btn btn-outline" onClick={onClose} disabled={busy}>취소</button><button type="button" className="btn btn-primary" onClick={() => void save()} disabled={busy}>{busy ? <Loader2 size={16} className="spin" /> : <Save size={16} />}{lot ? '저장' : '물량 등록'}</button></>}>
     <div className="ld-grid">
       <Field id="le-name" label="이름" wide><input id="le-name" value={f.name} maxLength={120} placeholder="예: 후지 1차 입고" onChange={e => set('name', e.target.value)} /></Field>
       <Field id="le-variety" label="품종"><select id="le-variety" value={f.varietyPick} onChange={e => set('varietyPick', e.target.value)}>{VARIETIES.map(v => <option key={v}>{v}</option>)}<option value="기타">기타 (직접 입력)</option></select>
@@ -85,9 +85,12 @@ export function LotEditor({open, lot, onClose, onSaved}: {open: boolean; lot?: L
       <Field id="le-qty" label="수량" hint="선택 · 무게 감소를 상자 수로도 보여 줘요."><div className="ld-row"><input id="le-qty" type="number" inputMode="decimal" min={0.1} step="any" value={f.quantity} placeholder="예: 120" onChange={e => set('quantity', e.target.value)} />
         {f.unit === 'kg' && <select aria-label="저장 수량 단위" value={f.unit} onChange={e => set('unit', e.target.value as 'kg' | '상자')}><option>상자</option><option>kg</option></select>}{f.unit !== 'kg' && <span className="ld-unit">상자</span>}</div></Field>
       <Field id="le-start" label="저장 시작일" hint="저장고에 넣어 보관을 시작한 날 · 예측의 0일차"><input id="le-start" type="date" max={today()} value={f.start} onChange={e => set('start', e.target.value)} /></Field>
-      <Field id="le-storage" label="보관 방식"><select id="le-storage" value={f.storage} onChange={e => set('storage', e.target.value)}><option>일반 저온</option><option value="CA">CA 저장</option><option value="기타">기타 (예측 준비 중)</option></select></Field>
+      <Field id="le-storage" label="보관 방식"><select id="le-storage" value={f.storage} onChange={e => set('storage', e.target.value)}><option>일반 저온</option><option value="CA">CA 저장</option>{f.storage === '기타' && <option value="기타">기타 (예측 준비 중)</option>}</select></Field>
       <Field id="le-mcp" label="1-MCP 처리" hint="모르면 ‘모름’으로 두세요. ‘미처리’로 바꿔 계산하지 않아요."><select id="le-mcp" value={f.mcp} onChange={e => set('mcp', e.target.value)}><option value="미확인">모름</option><option value="처리">처리함</option><option value="미처리">미처리</option></select></Field>
-      <Field id="le-temp" label={<>실제 저장고 온도 <small>℃ · 선택</small></>} hint="기록한 온도를 지원 온도로 바꾸지 않아요."><input id="le-temp" type="number" inputMode="decimal" step="any" value={f.temperature} placeholder="예: 0" onChange={e => set('temperature', e.target.value)} /></Field>
+      {variety === '홍로' && (f.temperature === '' || f.temperature === '0' || f.temperature === '4')
+        ? <Field id="le-temp" label="저장고 온도"><select id="le-temp" value={f.temperature} onChange={e => set('temperature', e.target.value)}><option value="">선택</option><option value="0">0℃</option><option value="4">4℃</option></select></Field>
+        : <Field id="le-temp" label={<>실제 저장고 온도 <small>℃ · 선택</small></>} hint="기록한 온도를 지원 온도로 바꾸지 않아요."><input id="le-temp" type="number" inputMode="decimal" step="any" value={f.temperature} placeholder="예: 0" onChange={e => set('temperature', e.target.value)} /></Field>}
+      {lot && (lot.details?.fuji_weather || lot.details?.hongro?.source === 'weather') && <p className="ld-hint ld-wide">생산지: {({cheongsong: '청송', jangsu: '장수', yeongju: '영주'} as Record<string, string>)[lot.details?.fuji_weather?.region ?? ''] ?? '거창'} · 처음 품질은 수확한 해 날씨로 추정했어요. 생산지나 추정 방식을 바꾸려면 새 사과로 등록해 주세요.</p>}
       {session?.isTeam && <Field id="le-share" label="공유 범위" hint={!session?.isTeam ? '팀 계정에서만 팀과 공유할 수 있어요.' : !owner ? '공유 범위는 물량을 등록한 사람만 바꿀 수 있어요.' : '팀과 공유하면 팀원이 기록을 보고 추가·수정할 수 있어요.'}>
         <select id="le-share" value={f.team ? 'team' : 'me'} disabled={!canShare} onChange={e => set('team', e.target.value === 'team')}><option value="me">나만 보기</option><option value="team">팀과 공유</option></select></Field>}
     </div>

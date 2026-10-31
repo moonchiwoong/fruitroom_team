@@ -49,9 +49,13 @@ export function firmnessToN(raw: string, unit: 'N' | 'kgf'): number | null {
   return unit === 'kgf' ? p.value * KGF_TO_N : p.value;
 }
 /** 자동 이름: ‘홍로 · 10월 27일 저장’, 저장 시작일이 없으면 ‘홍로 · 새 물량’. */
-export function suggestName(f: Pick<TrackerForm, 'variety' | 'sameStart' | 'intake_date' | 'storage_start_date'>): string {
-  const v = isHongroVariety(f.variety) ? '홍로' : (f.variety || '후지'), d = f.sameStart ? f.intake_date : f.storage_start_date;
-  if (!isDate(d)) return `${v} · 새 물량`;
+const REGION_LABEL: Record<string, string> = {cheongsong: '청송', jangsu: '장수', yeongju: '영주'};
+/** 자동 이름: ‘품종 9/12 수확 · 생산지’. 수확일이 없으면 저장 시작일로 만듭니다. */
+export function suggestName(f: Pick<TrackerForm, 'variety' | 'sameStart' | 'intake_date' | 'storage_start_date'> & Partial<Pick<TrackerForm, 'harvest_date' | 'fuji'>>): string {
+  const hongro = isHongroVariety(f.variety), v = hongro ? '홍로' : (f.variety || '후지'), d = f.sameStart ? f.intake_date : f.storage_start_date;
+  const region = hongro ? '거창' : REGION_LABEL[f.fuji?.source === 'weather' ? f.fuji.region : ''] ?? '';
+  if (f.harvest_date && isDate(f.harvest_date)) { const [, m, day] = f.harvest_date.split('-').map(Number); return `${v} ${m}/${day} 수확${region ? ` · ${region}` : ''}`; }
+  if (!isDate(d)) return `${v} · 새 사과`;
   const [, m, day] = d.split('-').map(Number); return `${v} · ${m}월 ${day}일 저장`;
 }
 export const effectiveName = (f: TrackerForm) => f.name_auto && !f.name.trim() ? suggestName(f) : f.name;

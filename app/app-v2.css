@@ -897,3 +897,5 @@ p.ma-hint{margin:0;padding:10px 12px;border-radius:12px;background:#fff;font-wei
 .ma-target-row{display:flex;align-items:center;gap:8px}.ma-target-row label{font-size:15px}
 .ma-target-row input{width:96px;height:44px;border:1px solid #cfd8cc;border-radius:12px;padding:0 10px;font:inherit;font-size:16px}
 .ma-target-row .ma-ghost{min-height:44px;margin-left:auto}
+.ma-howto{margin:8px auto 16px;padding-left:20px;text-align:left;max-width:360px;font-size:14px;color:var(--c-sub);line-height:1.7}
+.ld-wide{grid-column:1/-1;margin:0}
