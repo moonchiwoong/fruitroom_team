@@ -10,6 +10,7 @@ import {lotPredictor, easyChange, EASY_LABEL, EASY_METRICS, weatherPending, type
 import {lotReadiness, baselineObservation, storageStart, quantityUnit} from '@/lib/lot-readiness';
 import {fmtNum, metricMeta, todayKST, addDays} from '@/lib/tracker';
 
+const REGION: Record<string, string> = {cheongsong: '청송', jangsu: '장수', yeongju: '영주'};
 const SHORT: Record<string, string> = {firmness: '단단함', loss: '무게', brix: '단맛', acidity: '신맛'};
 const md = (d: string) => { const [, m, day] = d.split('-').map(Number); return `${m}/${day}`; };
 const unit = (m: string, hongro: boolean) => m === 'firmness' ? (hongro ? 'N (Ø11 mm)' : 'N') : metricMeta[m as 'brix'].unit;
@@ -42,7 +43,7 @@ function AppleCard({lot, onOpen}: {lot: Lot; onOpen: () => void}) {
     : !firm?.ok && loss?.ok ? {tone: 'warn', text: '당도나 단단함을 한 번 재 주세요'} : null;
   return <button type="button" className="ma-card" onClick={onOpen}>
     <span className="ma-card-top"><b>{lot.name}</b><span>{d !== null && d >= 0 ? `${d}일째` : ''}</span></span>
-    <span className="ma-card-sub">{[lot.variety, lot.location, lot.storage].filter(Boolean).join(' · ')}</span>
+    <span className="ma-card-sub">{[lot.variety, REGION[lot.details?.fuji_weather?.region ?? ''] ?? (lot.details?.hongro?.source === 'weather' ? '거창' : null), lot.location, lot.storage].filter(Boolean).join(' · ')}</span>
     {parts.length > 0 && <span className="ma-card-line">{parts.join(' · ')}<small> · 눌러서 단단함·단맛 보기</small></span>}
     {hint && <span className={'ma-hint ' + hint.tone}>{hint.text}</span>}
   </button>;
@@ -81,7 +82,7 @@ function AppleDetail({lot, onBack, reload, openTracker}: {lot: Lot; onBack: () =
   useEffect(() => { if (!msg) return; const t = setTimeout(() => setMsg(''), 2400); return () => clearTimeout(t); }, [msg]);
   return <div className="ma ma-detail">
     <button type="button" className="ma-back" onClick={onBack}><ArrowLeft size={18} aria-hidden="true" />내 사과</button>
-    <div className="ma-title"><h1>{lot.name}</h1><p>{[lot.variety, lot.location, lot.storage, lot.details?.storage_temperature != null ? `${lot.details.storage_temperature}℃` : null].filter(Boolean).join(' · ')}{p.todayDay !== null && p.todayDay >= 0 ? ` · 저장 ${p.todayDay}일째` : ''}</p></div>
+    <div className="ma-title"><h1>{lot.name}</h1><p>{[lot.variety, REGION[lot.details?.fuji_weather?.region ?? ''] ?? (lot.details?.hongro?.source === 'weather' ? '거창' : null), lot.location, lot.storage, lot.details?.storage_temperature != null ? `${lot.details.storage_temperature}℃` : null].filter(Boolean).join(' · ')}{p.todayDay !== null && p.todayDay >= 0 ? ` · 저장 ${p.todayDay}일째` : ''}</p></div>
     {(ready.status === 'unsupported' || ready.status === 'conditions') && <p className="ma-hint muted">{ready.title} · {ready.detail}</p>}
     {waitSept && <p className="ma-hint warn">9월 강수량은 9월이 끝나야 집계돼서, 10월 1일부터 날씨로 자동 추정해요. 지금 당도나 단단함을 재서 ‘측정 추가’로 넣으면 바로 예측돼요.</p>}
     {override && <p className="ma-hint">{pend?.year}년 농업기상 자료로 처음 품질을 자동 추정했어요(실측 아님).</p>}

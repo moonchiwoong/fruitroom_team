@@ -877,3 +877,8 @@ p.ma-hint{margin:0;padding:10px 12px;border-radius:12px;background:#fff;font-wei
 .ma-sk{display:block;border-radius:8px;background:linear-gradient(90deg,#e6ebe3 0,#f3f6f1 80px,#e6ebe3 160px);background-size:400px 100%;animation:ma-sk 1.4s linear infinite}
 @keyframes ma-sk{0%{background-position:-200px 0}100%{background-position:200px 0}}
 @media(prefers-reduced-motion:reduce){.ma-detail,.ma-row,.ma-toast,.ma-sk{animation:none}.ma-toast{opacity:1}}
+.ma-foot .linkbtn{min-height:44px}
+.new-lot .new-save,.new-lot .qt-draftbar .linkbtn{min-height:44px;display:inline-flex;align-items:center}
+.new-quick .new-card-head{flex-wrap:wrap}
+.new-quick-tile b{font-size:18px;line-height:1.35}
+@media(max-width:560px){.new-quick .new-card-head{flex-direction:column;align-items:flex-start}.new-quick-days{width:100%}.new-quick-days button{flex:1}.new-quick-grid{grid-template-columns:1fr 1fr}}

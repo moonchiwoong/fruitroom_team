@@ -144,7 +144,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     // 품종과 무관한 보관 기록은 새 품종 입력으로 이어 갑니다(측정값·날씨 선택은 품종별로 따로 보관).
     const {name, name_auto, storage, mcp, mcpSelected, temperature, intake_date, storage_start_date, sameStart, harvest_date, location, packaging, sensor_id, mcpd, ca, team_shared} = form;
     carryRef.current = {name, name_auto, storage, mcp, mcpSelected, temperature, intake_date, storage_start_date, sameStart, harvest_date, location, packaging, sensor_id, mcpd, ca, team_shared};
-    setSelectionDateRaw(isDate(selDate) ? selDate : null); setSelectedDayState(selDay); setCultivar(next); setMetric('firmness'); setBaseline(null); setUseLatest(true); setFutureId('same');
+    setSelectionDateRaw(null); setSelectedDayState(null); setCultivar(next); setMetric('firmness'); setBaseline(null); setUseLatest(true); setFutureId('same');
     setShowConditions(false); setShowObsCompare(false); setSaveMsg(null); setSaveErrors({});
     setEditing(true); setShowResults(false);
   }
@@ -556,15 +556,15 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         {form.mcpSelected && form.mcp === '미확인' && <p className="new-condition-note">처리 여부가 미확인이면 예측식은 적용하지 않으며 기록은 저장할 수 있어요.</p>}
         {'preparing' in condition && condition.preparing && <p className="new-condition-note new-preparing" role="status"><b>서비스 준비 중</b> {condition.detail}</p>}
       </section>
-      <section className="new-card" aria-labelledby="new-quality"><div className="new-card-head"><h2 id="new-quality"><span>2</span>{hongro ? '초기 품질' : '처음 측정한 품질'}</h2><small>{weatherMode ? '날씨로 추정 · 실측 아님' : '측정한 항목만 입력'}</small></div><p className="new-description">{weatherMode ? '수확 시점 품질을 재배기 날씨로 추정해요. 실제로 쟀다면 ‘직접 측정값 입력’을 골라 주세요.' : '측정한 사과의 평균값을 입력해 주세요.'}</p>
+      <section className="new-card" aria-labelledby="new-quality"><div className="new-card-head"><h2 id="new-quality"><span>2</span>{hongro || estMode ? '초기 품질' : '처음 측정한 품질'}</h2><small>{estMode ? '날씨로 추정 · 실측 아님' : '측정한 항목만 입력'}</small></div><p className="new-description">{estMode ? '수확 시점 품질을 재배기 날씨로 추정해요. 실제로 쟀다면 ‘직접 측정값 입력’을 골라 주세요.' : '측정한 사과의 평균값을 입력해 주세요.'}</p>
         {!hongro && <fieldset className="qt3-q"><legend className="qt3-q-head">초기 품질 입력 방식</legend><div className="qt3-seg">{([['measured','직접 측정값 입력'],['weather','수확한 해 날씨로 추정']] as const).map(([v,t]) => <label key={v} className={(form.fuji?.source ?? 'measured')===v?'active':''}><input type="radio" name="tf-fuji-source" checked={(form.fuji?.source ?? 'measured')===v} onChange={() => setForm(f=>({...f,fuji:{...(f.fuji ?? emptyFujiForm()),source:v}}))} /><span>{t}</span></label>)}</div></fieldset>}
         {hongro && <fieldset className="qt3-q"><legend className="qt3-q-head">초기 품질 입력 방식</legend><div className="qt3-seg">{([['measured','직접 측정값 입력'],['weather','올해 날씨로 추정']] as const).map(([v,t]) => <label key={v} className={form.hongro.source===v?'active':''}><input type="radio" name="tf-hongro-source" checked={form.hongro.source===v} onChange={() => setForm(f=>({...f,hongro:{...f.hongro,source:v}}))} /><span>{t}</span></label>)}</div></fieldset>}
         <div className="new-grid2">
-          <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-initial_measured_on">{estMode ? '추정 기준일' : '측정일'}</label></div><label className="new-date-check"><input id="tf-initialSameStart" type="checkbox" checked={!!form.initialSameStart} onChange={e => setInitialSame(e.target.checked)} /><span>저장 시작일과 같음</span><span>{form.initialSameStart && startOk ? fmtDate(startDate) : ''}</span></label>{!form.initialSameStart && <input id="tf-initial_measured_on" className="qt3-input" type="date" max={today} value={form.initial_measured_on} onChange={e => set('initial_measured_on',e.target.value)} aria-invalid={!!shownErrors.initial_measured_on} />}{shownErrors.initial_measured_on && <span className="qf-err">{shownErrors.initial_measured_on}</span>}</div>
+          {!(estMode && form.initialSameStart) && <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-initial_measured_on">{estMode ? '추정 기준일' : '측정일'}</label></div><label className="new-date-check"><input id="tf-initialSameStart" type="checkbox" checked={!!form.initialSameStart} onChange={e => setInitialSame(e.target.checked)} /><span>저장 시작일과 같음</span><span>{form.initialSameStart && startOk ? fmtDate(startDate) : ''}</span></label>{!form.initialSameStart && <input id="tf-initial_measured_on" className="qt3-input" type="date" max={today} value={form.initial_measured_on} onChange={e => set('initial_measured_on',e.target.value)} aria-invalid={!!shownErrors.initial_measured_on} />}{shownErrors.initial_measured_on && <span className="qf-err">{shownErrors.initial_measured_on}</span>}</div>}
         </div>
         {weatherMode ? <WeatherChoices form={form} setForm={setForm} errors={errors} estimate={hongroResult ? hongroResult.initial : null} harvestDate={form.harvest_date} /> : fujiWeather ? <FujiWeather form={form} setForm={setForm} estimate={fujiEst} /> : <div className="new-grid3">{(['firmness','brix','acidity'] as const).map(metricInput)}</div>}
       </section>
-      <details className="new-card new-extra" ref={optionalRef}><summary><strong>추가 기록</strong><span>선택 &nbsp; {hongro ? '입고 · 포장 · 측정 조건' : '입고 · 온도 · 수확 · 포장'}</span><Plus size={20} /></summary><div className="new-extra-body">
+      <details className="new-card new-extra" ref={optionalRef}><summary><strong>추가 기록</strong><span>선택 &nbsp; {hongro ? '이름 · 저장고' : '이름 · 저장고 · 온도'}</span><Plus size={20} /></summary><div className="new-extra-body">
         <div className="new-grid2">
           <F id="name" label="물량 이름" err={shownErrors.name}><input id="tf-name" value={form.name_auto && !form.name.trim() ? suggestName(form) : form.name} onChange={e=>setForm(f=>({...f,name:e.target.value,name_auto:false}))} maxLength={120} /><p className="qt3-help">품종과 저장 시작일로 자동 생성되며 직접 수정할 수 있어요.</p></F>
           {!hongro && temperatureField}
@@ -605,7 +605,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
 
     {!guest && !exampleMode && activeLot && <div className="qt-backbar"><button type="button" className="qt3-minibtn" onClick={() => openLot(activeLot.id)}><ArrowLeft size={15} aria-hidden="true" />‘{activeLot.name}’ 물량 상세로 돌아가기</button><span>예측 기준: {activeLot.initial_measured_on ? `${activeLot.initial_measured_on} 초기 측정` : activeLot.details?.hongro?.source === 'weather' ? '날씨 기반 추정 초기값' : '초기 측정일 미기록'} · 측정 기록 {activeLot.observation_count ?? 0}건</span></div>}
     {/* ── 상단: 물량 선택 · 이름 ── */}
-    <section className="qt3-card qt3-lotbar" aria-label="물량 선택">
+    <section className="qt3-card qt3-lotbar" aria-label="물량 선택" hidden={!guest}>
       <div className="qt3-lotbar-top">
         <div className="qt3-lotbtns" role="group" aria-label="물량 고르기">
           <button type="button" className={'qt3-pill' + (!exampleMode && lotKey === 'new' ? ' active' : '')} aria-pressed={!exampleMode && lotKey === 'new'} onClick={startNewLot}><Plus size={16} />새 물량</button>
@@ -761,7 +761,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
                 <span className="qt4-tile-label">{EASY_LABEL[m]}</span>
                 <span className="qt4-tile-value">{ok ? <>{fmtNum(r.value!, metricMeta[m].digits)}<small>{displayUnit(m)}</small></> : '계산 없음'}</span>
                 {hongro && ok && <span className="qt5-tile-seg">{hongroSegment(m)}</span>}
-                <span className="qt4-tile-note">{!ok ? (r.reason ?? '자료 부족').replace(/^적용 모델 없음:\s*/, '') : m === 'loss' ? (actualLoss ? `실측 ${fmtNum(actualLoss.value, 2)} %` : `${r.kind} · 저장일수로 계산`) : an ? `${an.source === 'latest' ? '계산 시작점' : weatherMode ? '처음 추정값' : '처음'}보다 ${describeChange(m, r.value!, an.value).short}` : r.kind}</span>
+                <span className="qt4-tile-note">{!ok ? (r.reason ?? '자료 부족').replace(/^적용 모델 없음:\s*/, '') : m === 'loss' ? (actualLoss ? `실측 ${fmtNum(actualLoss.value, 2)} %` : `${r.kind} · 저장일수로 계산`) : an ? `${an.source === 'latest' ? '최근 측정' : estMode ? '수확 때(추정)' : '첫 측정'}보다 ${describeChange(m, r.value!, an.value).short}` : r.kind}</span>
               </button>; })}
           </div>
           <div className="qt5-main qt5-main-full">

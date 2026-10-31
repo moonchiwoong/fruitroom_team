@@ -59,7 +59,7 @@ export function LotEditor({open, lot, onClose, onSaved}: {open: boolean; lot?: L
     details: {...(lot?.details ?? {}), storage_temperature: f.temperature.trim() === '' ? null : Number(f.temperature)}} as Lot);
   async function save() {
     setError('');
-    if (!f.name.trim()) return setError('물량 이름을 입력해 주세요.');
+    if (!f.name.trim()) return setError('이름을 입력해 주세요.');
     if (!variety) return setError('품종을 입력해 주세요.');
     if (!isDate(f.start)) return setError('저장 시작일을 입력해 주세요.');
     if (!isDate(intake)) return setError('입고일을 입력하거나 ‘저장 시작일과 같은 날 입고’를 선택해 주세요.');
@@ -75,14 +75,14 @@ export function LotEditor({open, lot, onClose, onSaved}: {open: boolean; lot?: L
     } catch (e) { setError((e as Error).message); } // 실패해도 입력한 내용은 그대로 둡니다.
     finally { setBusy(false); }
   }
-  return <Shell open={open} onClose={onClose} busy={busy} title={lot ? '물량 정보 수정' : '새 물량 등록'} desc={lot ? `${lot.name} · 측정 기록은 그대로 두고 기본 정보만 바꿔요.` : '기본 정보만 입력하면 물량을 관리할 수 있어요. 측정값은 등록한 뒤 추가해요.'}
+  return <Shell open={open} onClose={onClose} busy={busy} title={lot ? '사과 정보 수정' : '새 사과'} desc={lot ? `${lot.name} · 측정 기록은 그대로 두고 기본 정보만 바꿔요.` : '기본 정보만 입력하면 물량을 관리할 수 있어요. 측정값은 등록한 뒤 추가해요.'}
     footer={<><p className="ld-foot-note">{lot ? '저장하면 목록·상세·예측 준비 상태가 함께 바뀌어요.' : '물량 관리에 바로 추가돼요.'}</p><button type="button" className="btn btn-outline" onClick={onClose} disabled={busy}>취소</button><button type="button" className="btn btn-primary" onClick={() => void save()} disabled={busy}>{busy ? <Loader2 size={16} className="spin" /> : <Save size={16} />}{lot ? '저장' : '물량 등록'}</button></>}>
     <div className="ld-grid">
-      <Field id="le-name" label="물량 이름" wide><input id="le-name" value={f.name} maxLength={120} placeholder="예: 후지 1차 입고" onChange={e => set('name', e.target.value)} /></Field>
+      <Field id="le-name" label="이름" wide><input id="le-name" value={f.name} maxLength={120} placeholder="예: 후지 1차 입고" onChange={e => set('name', e.target.value)} /></Field>
       <Field id="le-variety" label="품종"><select id="le-variety" value={f.varietyPick} onChange={e => set('varietyPick', e.target.value)}>{VARIETIES.map(v => <option key={v}>{v}</option>)}<option value="기타">기타 (직접 입력)</option></select>
         {f.varietyPick === '기타' && <input aria-label="품종 직접 입력" value={f.varietyOther} maxLength={60} placeholder="품종 이름" onChange={e => set('varietyOther', e.target.value)} />}</Field>
       <Field id="le-location" label="저장고"><input id="le-location" value={f.location} maxLength={120} placeholder="예: A저장고" onChange={e => set('location', e.target.value)} /></Field>
-      <Field id="le-qty" label="저장 수량" hint="선택 · 상자와 kg는 따로 합산해요."><div className="ld-row"><input id="le-qty" type="number" inputMode="decimal" min={0.1} step="any" value={f.quantity} placeholder="예: 120" onChange={e => set('quantity', e.target.value)} />
+      <Field id="le-qty" label="수량" hint="선택 · 무게 감소를 상자 수로도 보여 줘요."><div className="ld-row"><input id="le-qty" type="number" inputMode="decimal" min={0.1} step="any" value={f.quantity} placeholder="예: 120" onChange={e => set('quantity', e.target.value)} />
         {f.unit === 'kg' && <select aria-label="저장 수량 단위" value={f.unit} onChange={e => set('unit', e.target.value as 'kg' | '상자')}><option>상자</option><option>kg</option></select>}{f.unit !== 'kg' && <span className="ld-unit">상자</span>}</div></Field>
       <Field id="le-start" label="저장 시작일" hint="저장고에 넣어 보관을 시작한 날 · 예측의 0일차"><input id="le-start" type="date" max={today()} value={f.start} onChange={e => set('start', e.target.value)} /></Field>
       <Field id="le-storage" label="보관 방식"><select id="le-storage" value={f.storage} onChange={e => set('storage', e.target.value)}><option>일반 저온</option><option value="CA">CA 저장</option><option value="기타">기타 (예측 준비 중)</option></select></Field>

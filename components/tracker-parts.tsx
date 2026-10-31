@@ -81,7 +81,7 @@ export function TrackerChart({metric, series, baseline, measured, startDate, asO
     onPointerMove={e => { if (dragging.current) pick(e.clientX); }} onPointerUp={() => { dragging.current = false; }}>
     {yt.map((v, i) => <g key={i}><line x1={L} x2={W - R} y1={y(v)} y2={y(v)} className="g" /><text x={L - 8} y={y(v) + 4} textAnchor="end" className="tk">{fmtNum(v, meta.digits === 3 ? 2 : meta.digits)}</text></g>)}
     {ticks.map(t => <g key={t}><text x={x(t)} y={H - B + 18} textAnchor="middle" className="tk">{t}일</text><text x={x(t)} y={H - B + 33} textAnchor="middle" className="tk dim">{fmtDate(addDays(startDate, t)).slice(5)}</text></g>)}
-    <text x={L - 8} y={T - 10} textAnchor="end" className="ax">{meta.unit}</text>
+    <text x={4} y={T - 10} textAnchor="start" className="ax">{meta.unit}</text>
     <text x={(L + W - R) / 2} y={H - 6} textAnchor="middle" className="ax">{compact ? `경과일 / 날짜 (${fmtDate(startDate)} = 0일)` : `저장 경과일 / 날짜 (저장 시작일 ${fmtDate(startDate)} = 0일)`}</text>
     {asOfDay >= 0 && asOfDay <= H_DAYS && <g><line x1={x(asOfDay)} x2={x(asOfDay)} y1={T} y2={H - B} className="asof" /><text x={x(asOfDay) + 5} y={T + 11} className="asof-t">분석 기준일</text>
       {!compact && <><text x={x(asOfDay) - 5} y={H - B - 6} textAnchor="end" className="zone">과거 관측</text><text x={x(asOfDay) + 5} y={H - B - 6} className="zone">미래 가정 →</text></>}</g>}
