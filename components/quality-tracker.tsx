@@ -816,7 +816,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
               {hongro && metric === 'firmness' && modelResults.firmness.ok && <p className="qt4-line">홍로 경도 식은 저장 60일 이후 하루 감소 폭이 조금 커지는 형태예요.</p>}
               {hongro && metric === 'acidity' && modelResults.acidity.ok && <p className="qt4-line">홍로 산도 식은 60일까지 처음 값을 유지하고, 그 뒤 줄어드는 형태예요.</p>}
             <div className="qt4-summary-actions">
-          {!exampleMode && activeLot && !guest ? <ObservationForm lot={activeLot} label="오늘 측정값 기록" className="btn btn-primary" onSaved={() => setReload(r => r + 1)} disabled={false} />
+          {!exampleMode && activeLot && !guest ? <ObservationForm lot={activeLot} label="오늘 측정값 기록" className="btn btn-primary" onSaved={() => { setReload(r => r + 1); void onLotsChanged(); }} disabled={false} />
             : guest && !exampleMode ? <button className="btn btn-primary" onClick={handoffToLogin}><Save size={16} />로그인하고 저장하기</button>
             : exampleMode ? <button className="btn btn-primary" onClick={() => changeMode('real')}>내 측정값 입력하기</button>
             : <button className="btn btn-primary" onClick={() => { setEditing(true); requestAnimationFrame(() => document.getElementById('qt-input-editor')?.scrollIntoView({behavior: 'smooth', block: 'start'})); }}>입력 정보 수정</button>}

@@ -148,3 +148,58 @@ test('Hongro draft restores nested inputs, isolates identity and upgrades old dr
     assert.deepEqual(loadDraft('user-A','real','hongro-A')?.form.hongro,emptyHongroForm());
   }finally{if(prior)Object.defineProperty(globalThis,'window',prior);else Reflect.deleteProperty(globalThis,'window');}
 });
+
+test('switching to Hongro weather input ignores invalid inactive measurements when saving',()=>{
+  for(const key of ['firmness','brix','acidity','weight','diameter'] as const)for(const value of ['-1','invalid','1e999']){
+    const f=measuredForm();
+    f.hongro.initial[key]=value;
+    f.hongro.source='weather';
+    f.hongro.weather={chang_min4:'5',chang_LC56:'950',chang_LC78:'1300',chang_9rain:'200'};
+    const before=signature(f);
+    assert.deepEqual(validateForm(f,true),{});
+    assert.doesNotThrow(()=>calculateHongroForm(f.hongro,30));
+    const p=payloadFromForm(f),h=p.details.hongro;assert.ok(h);
+    assert.equal(h.initial[key],null);
+    assert.deepEqual(h.weather,{chang_min4:5,chang_LC56:950,chang_LC78:1300,chang_9rain:200});
+    assert.deepEqual([p.firmness,p.brix,p.acidity,p.weight],[null,null,null,null]);
+    const restored=formFromLot(asLot(p));
+    assert.equal(restored.hongro.initial[key],'');
+    assert.deepEqual(restored.hongro.weather,f.hongro.weather);
+    assert.equal(signature(f),before,'serialization must not change the working draft');
+  }
+});
+
+test('switching to Hongro measured input ignores malformed inactive weather when saving',()=>{
+  for(const key of ['chang_min4','chang_LC56','chang_LC78','chang_9rain'] as const)for(const value of ['invalid','1e999']){
+    const f=measuredForm();f.hongro.source='weather';f.hongro.weather[key]=value;
+    f.hongro.source='measured';
+    const before=signature(f);
+    assert.deepEqual(validateForm(f,true),{});
+    assert.doesNotThrow(()=>calculateHongroForm(f.hongro,30));
+    const p=payloadFromForm(f),h=p.details.hongro;assert.ok(h);
+    assert.equal(h.weather[key],null);
+    assert.deepEqual([p.firmness,p.brix,p.acidity,p.weight],[68,14.2,0.18,null]);
+    const restored=formFromLot(asLot(p));
+    assert.equal(restored.hongro.weather[key],'');
+    assert.deepEqual(restored.hongro.initial,f.hongro.initial);
+    assert.equal(signature(f),before);
+  }
+});
+
+test('inactive Hongro values that are valid survive saving, including zero and negative weather',()=>{
+  const f=measuredForm();
+  f.hongro.weather={chang_min4:'-2',chang_LC56:'0',chang_LC78:'1300',chang_9rain:'200'};
+  assert.deepEqual(formFromLot(asLot(payloadFromForm(f))).hongro,f.hongro);
+  f.hongro.source='weather';f.hongro.initial={firmness:'0',brix:'0',acidity:'0',weight:'0',diameter:'0'};
+  assert.deepEqual(formFromLot(asLot(payloadFromForm(f))).hongro,f.hongro);
+});
+
+test('active Hongro input errors remain visible and block calculation after source switching',()=>{
+  const f=measuredForm();f.hongro.initial.weight='-1';
+  assert.ok(validateForm(f,true)['hongro.initial.weight']);
+  assert.throws(()=>calculateHongroForm(f.hongro,30));
+  f.hongro.source='weather';f.hongro.weather={chang_min4:'invalid',chang_LC56:'950',chang_LC78:'1300',chang_9rain:'200'};
+  assert.ok(validateForm(f,true)['hongro.weather.chang_min4']);
+  assert.throws(()=>calculateHongroForm(f.hongro,30));
+  assert.throws(()=>payloadFromForm(f));
+});

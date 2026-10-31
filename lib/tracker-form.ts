@@ -134,6 +134,12 @@ export function payloadFromForm(f: TrackerForm, mode: 'real' | 'example' = 'real
   if(mode==='example')throw new Error('예시 데이터는 실제 물량 기록으로 저장할 수 없습니다.');
   const isHongro=isHongroVariety(f.variety);
   const h=f.hongro;
+  // 비활성 출처(측정↔날씨)의 잘못된 값이 현재 출처의 저장을 막지 않게 합니다. 유효한 값은 보존합니다. (PR #4에서 옮김)
+  const hongroNum=(value:string,source:HongroTrackerForm['source'])=>{
+    if(h.source===source)return num(value);
+    const p=parseOptionalNumber(value);
+    return p.status==='valid'&&(source==='weather'||p.value>=0)?p.value:null;
+  };
   const legacyHongro=isHongro && f.legacyHongro;
   const quality=legacyHongro ? {firmness:h.initial.firmness.trim()||f.firmness,brix:h.initial.brix.trim()||f.brix,acidity:h.initial.acidity.trim()||f.acidity,weight:h.initial.weight.trim()||f.weight} : isHongro ? (h.source==='measured' ? h.initial : {firmness:'',brix:'',acidity:'',weight:''}) : f;
   const fujiEst = !isHongro ? fujiWeatherEstimate(f.fuji ?? emptyFujiForm()) : null;
@@ -162,8 +168,8 @@ export function payloadFromForm(f: TrackerForm, mode: 'real' | 'example' = 'real
       tracked: {sample_id:txt(f.tracked.sample_id),count:num(f.tracked.count),initial_weight:num(f.tracked.initial_weight)},
       ...(isHongro && !legacyHongro ? {hongro: {
         schemaVersion: 1, modelVersion: HONGRO_MODEL_VERSION, cultivar:'hongro', region:'geochang', mode:'real', source:h.source, storage:h.storage,
-        initial: {firmness:f.missing.firmness?null:firmnessToN(h.initial.firmness,f.firmness_unit),brix:f.missing.brix?null:num(h.initial.brix),acidity:f.missing.acidity?null:num(h.initial.acidity),weight:num(h.initial.weight),diameter:num(h.initial.diameter)},
-        weather: {chang_min4:num(h.weather.chang_min4),chang_LC56:num(h.weather.chang_LC56),chang_LC78:num(h.weather.chang_LC78),chang_9rain:num(h.weather.chang_9rain)},
+        initial: {firmness:f.missing.firmness?null:h.source==='measured'?firmnessToN(h.initial.firmness,f.firmness_unit):hongroNum(h.initial.firmness,'measured'),brix:f.missing.brix?null:hongroNum(h.initial.brix,'measured'),acidity:f.missing.acidity?null:hongroNum(h.initial.acidity,'measured'),weight:hongroNum(h.initial.weight,'measured'),diameter:hongroNum(h.initial.diameter,'measured')},
+        weather: {chang_min4:hongroNum(h.weather.chang_min4,'weather'),chang_LC56:hongroNum(h.weather.chang_LC56,'weather'),chang_LC78:hongroNum(h.weather.chang_LC78,'weather'),chang_9rain:hongroNum(h.weather.chang_9rain,'weather')},
         units: {...HONGRO_UNITS},
       }} : {}),
     },
