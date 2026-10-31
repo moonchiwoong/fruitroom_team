@@ -127,8 +127,8 @@ function LoginChange({email}: {email: string}) {
   }
   return <section className="iq-card account-login">
     <h3 className="account-h"><ShieldCheck size={17} />로그인 정보</h3>
-    <p className="account-sub">아이디 <b>{displayLogin(email)}</b></p>
-    {!open && <div className="account-login-btns"><button type="button" className="btn btn-ghost" onClick={() => reset('email')}>아이디 바꾸기</button><button type="button" className="btn btn-ghost" onClick={() => reset('password')}>비밀번호 바꾸기</button></div>}
+    <p className="account-sub">아이디 <b>{displayLogin(email)}</b> · 아이디는 바꿀 수 없어요. 보이는 이름은 위에서 바꿀 수 있어요.</p>
+    {!open && <div className="account-login-btns"><button type="button" className="btn btn-ghost" onClick={() => reset('password')}>비밀번호 바꾸기</button></div>}
     {open && <form className="account-form" onSubmit={submit}>
       {open === 'email' ? <label>새 아이디 <small>{ID_RULE}</small><input type="text" autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={30} autoComplete="username" value={nextEmail} onChange={e => setNextEmail(e.target.value)} required /></label>
         : <><label>새 비밀번호 (8자 이상)<input type="password" autoComplete="new-password" value={pw} onChange={e => setPw(e.target.value)} required /></label>
