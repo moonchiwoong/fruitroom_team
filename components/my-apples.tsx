@@ -20,6 +20,12 @@ export default function MyApples({lots, loadError, reload, openTracker, focus}: 
   // 다른 화면에서 특정 사과를 열도록 요청하면(새 사과 저장 직후 등) 그 사과 상세를 엽니다.
   useEffect(() => { if (focus) setOpenId(focus.id); }, [focus?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showDone, setShowDone] = useState(false);
+  // 휴대폰 속도: 목록을 보는 동안 ‘새 사과’·‘그래프’ 화면 코드를 미리 받아 두어, 눌렀을 때 바로 열리게 합니다.
+  useEffect(() => {
+    const load = () => { void import('@/components/quality-tracker'); };
+    const w = window as Window & {requestIdleCallback?: (cb: () => void) => number};
+    if (w.requestIdleCallback) w.requestIdleCallback(load); else setTimeout(load, 1500);
+  }, []);
   const all = useMemo(() => [...lots].sort((a, b) => (storageStart(a) || '').localeCompare(storageStart(b) || '')), [lots]);
   const done = all.filter(l => l.details?.archived_on), viewDone = showDone && done.length > 0, sorted = viewDone ? done : all.filter(l => !l.details?.archived_on);
   const lot = lots.find(l => l.id === openId) ?? null;
@@ -122,6 +128,16 @@ function AppleDetail({lot, onBack, reload, openTracker}: {lot: Lot; onBack: () =
   async function archive(on: boolean) {
     setBusy(true); try { await post('update', {details: {archived_on: on ? todayKST() : null}}); setMsg(on ? '출하 완료로 옮겼어요.' : '다시 저장 중 목록으로 옮겼어요.'); await reload(); if (on) onBack(); } catch (e) { window.alert((e as Error).message); } finally { setBusy(false); }
   }
+  // 보관용 내려받기: 사과 정보, 측정 기록, 기간별 예상 품질(엑셀에서 한글이 깨지지 않게 BOM 포함).
+  function exportCsv() {
+    const q = (v: unknown) => { const t = v === null || v === undefined ? '' : String(v); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+    const rows: unknown[][] = [['사과', lot.name], ['품종', lot.variety], ['보관', [lot.storage, lot.mcp ? `1-MCP ${lot.mcp}` : '', lot.details?.storage_temperature != null ? `${lot.details.storage_temperature}℃` : ''].filter(Boolean).join(' · ')], ['저장 시작일', p.start ?? ''], ['내려받은 날', todayKST()], [],
+      ['측정 기록'], ['날짜', '단맛(°Brix)', '단단함(N)', '신맛(%)', '메모'], ...sortedObs.map(o => [o.date, o.brix, o.firmness, o.acidity, o.notes]), [],
+      ['예상 품질 (시연용 계산 · 출하 판정 아님)'], ['저장 일수', '날짜', '단단함(N)', '무게 감소(%)', '단맛(°Brix)', '신맛(%)'],
+      ...days.map(d => { const v = (m: 'firmness' | 'loss' | 'brix' | 'acidity') => { const r = p.at(m, d); return r.ok ? Number(r.value.toFixed(metricMeta[m].digits)) : ''; }; return [d, p.start ? addDays(p.start, d) : '', v('firmness'), v('loss'), v('brix'), v('acidity')]; })];
+    const blob = new Blob(['\ufeff' + rows.map(r => r.map(q).join(',')).join('\r\n')], {type: 'text/csv;charset=utf-8'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${lot.name.replace(/[\\/:*?"<>|]/g, '_')}.csv`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
   async function remove() {
     if (!window.confirm(`‘${lot.name}’을(를) 지울까요? 측정 기록도 모두 지워지고 되돌릴 수 없어요.`)) return;
     if (!window.confirm('정말 지울까요? 다 판 사과라면 ‘출하 완료’로 옮겨 두는 걸 추천해요.')) return;
@@ -161,7 +177,7 @@ function AppleDetail({lot, onBack, reload, openTracker}: {lot: Lot; onBack: () =
     <p className="ma-foot">{p.weather ? '처음 품질은 날씨로 추정 · ' : ''}{fromMeasured ? '내가 잰 값부터 이어 계산 · ' : ''}시연용 계산 · 출하·안전 판정 아님 <button type="button" className="linkbtn" onClick={() => setEdit(true)}><Pencil size={13} aria-hidden="true" />사과 정보 수정</button></p>
     {measure && <MeasurementForm open lot={lot} isBaseline={false} hasBaseline={!!baselineObservation(lot, obs ?? [])} onClose={() => setMeasure(false)} onSaved={m => { setMeasure(false); setMsg(m); setN(x => x + 1); void reload(); }} />}
     {editObs && <MeasurementForm open lot={lot} observation={editObs} isBaseline={baselineObservation(lot, obs ?? [])?.id === editObs.id} hasBaseline={!!baselineObservation(lot, obs ?? [])} onClose={() => setEditObs(null)} onSaved={m => { setEditObs(null); setMsg(m); setN(x => x + 1); void reload(); }} />}
-    <div className="ma-manage"><button type="button" className="ma-ghost" disabled={busy} onClick={() => void archive(!lot.details?.archived_on)}>{lot.details?.archived_on ? '저장 중 목록으로 되돌리기' : '출하 완료로 옮기기'}</button><button type="button" className="linkbtn ma-danger" disabled={busy} onClick={() => void remove()}>이 사과 지우기</button></div>
+    <div className="ma-manage"><button type="button" className="ma-ghost" disabled={busy} onClick={() => void archive(!lot.details?.archived_on)}>{lot.details?.archived_on ? '저장 중 목록으로 되돌리기' : '출하 완료로 옮기기'}</button><button type="button" className="ma-ghost" onClick={exportCsv}>기록 내려받기 (엑셀)</button><button type="button" className="linkbtn ma-danger" disabled={busy} onClick={() => void remove()}>이 사과 지우기</button></div>
     {edit && <LotEditor open lot={lot} onClose={() => setEdit(false)} onSaved={() => { setEdit(false); setMsg('사과 정보를 저장했어요.'); void reload(); }} />}
   </div>;
 }
