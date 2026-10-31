@@ -882,3 +882,7 @@ p.ma-hint{margin:0;padding:10px 12px;border-radius:12px;background:#fff;font-wei
 .new-quick .new-card-head{flex-wrap:wrap}
 .new-quick-tile b{font-size:18px;line-height:1.35}
 @media(max-width:560px){.new-quick .new-card-head{flex-direction:column;align-items:flex-start}.new-quick-days{width:100%}.new-quick-days button{flex:1}.new-quick-grid{grid-template-columns:1fr 1fr}}
+.ma-rec{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.ma-rec-btns{display:flex;gap:4px}.ma-rec-btns .linkbtn,.ma-records>.linkbtn{min-height:40px;padding:0 8px}
+.ma-manage{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:8px}.ma-manage .ma-ghost{width:100%}
+.ma-danger{color:#b42318;min-height:44px}

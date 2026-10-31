@@ -134,6 +134,13 @@ export function MeasurementForm({open, lot, observation, prefill, isBaseline, ha
     if (!isDate(f.date)) return setError('측정일을 입력해 주세요.');
     const fn = firmN(); if (Number.isNaN(fn)) return setError('경도는 숫자로 입력해 주세요.');
     const n = (v: string) => v.trim() === '' ? null : v.trim();
+    // 흔히 나오는 범위를 크게 벗어나면 한 번 더 확인만 합니다(값을 바꾸거나 막지 않음).
+    const odd: string[] = [];
+    const bx = Number(f.brix), ac = Number(f.acidity);
+    if (f.brix.trim() && Number.isFinite(bx) && (bx < 5 || bx > 25)) odd.push(`단맛 ${f.brix} °Brix`);
+    if (f.acidity.trim() && Number.isFinite(ac) && (ac < 0.05 || ac > 1.5)) odd.push(`신맛 ${f.acidity} %`);
+    if (fn !== null && (fn < 10 || fn > 150)) odd.push(`단단함 ${fn.toFixed(1)} N`);
+    if (odd.length && !window.confirm(`${odd.join(', ')} — 평소보다 많이 다른 값이에요. 이대로 저장할까요?`)) return;
     const body = {observation_id: observation?.id, date: f.date, sample_count: n(f.count), firmness: fn === null ? null : Number(fn.toFixed(4)), brix: n(f.brix), acidity: n(f.acidity), weight: n(f.weight), tracked_weight: n(f.trackedWeight), defects: f.defects, notes: f.notes,
       set_initial: f.setInitial || undefined,
       details: {tracked: {sample_id: n(f.trackedId), count: n(f.trackedCount)}, measure: {probe_mm: n(f.probe), peeled: f.peeled || null, position: n(f.position), fruit_temp: n(f.fruitTemp), instrument: n(f.instrument)}}};
