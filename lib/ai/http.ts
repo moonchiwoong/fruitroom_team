@@ -7,7 +7,10 @@ export function fail(error:unknown){
 }
 export function sameOrigin(req:Request){
   const origin=req.headers.get('origin');
-  if(origin&&origin!==new URL(req.url).origin)throw new AIError('origin_denied','같은 사이트에서 다시 요청해 주세요.',403);
+  // 배포 환경에서는 req.url 주소가 실제 접속 주소와 다를 수 있어, 브라우저가 보낸 Host와 비교합니다.
+  const hosts=[req.headers.get('x-forwarded-host'),req.headers.get('host'),new URL(req.url).host].filter(Boolean).flatMap(h=>String(h).split(',').map(x=>x.trim()));
+  let oh='';try{oh=origin?new URL(origin).host:'';}catch{oh='invalid';}
+  if(origin&&!hosts.includes(oh))throw new AIError('origin_denied','같은 사이트에서 다시 요청해 주세요.',403);
   if(req.headers.get('sec-fetch-site')==='cross-site')throw new AIError('origin_denied','같은 사이트에서 다시 요청해 주세요.',403);
 }
 export async function readBody(req:Request){

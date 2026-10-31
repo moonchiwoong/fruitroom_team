@@ -10,7 +10,10 @@ function checked<T>(r:{data:T;error:unknown}):T{if(r.error)throw r.error;return 
 async function storage(){return (await client()).storage.from(process.env.SUPABASE_STORAGE_BUCKET||'fruitroom_files');}
 export function json(value:unknown,status=200){return Response.json(value,{status,headers:{'Cache-Control':'private, no-store'}});}
 export function errorResponse(e:unknown){if(e instanceof InputError)return json({error:e.message,...(e.rows?{rows:e.rows}:{})},400);console.error('Storage request failed',e instanceof Error?e.message:'Unknown');return json({error:'기록을 불러오거나 저장하지 못했습니다. 입력 내용을 유지한 채 다시 시도해 주세요.'},503);}
-export function checkOrigin(req:Request){if(Number(req.headers.get('content-length')??0)>6*1024*1024)throw new InputError('업로드 파일이 너무 큽니다.');const origin=req.headers.get('origin');if(origin&&origin!==new URL(req.url).origin)throw new InputError('같은 사이트에서 다시 요청해 주세요.');}
+export function checkOrigin(req:Request){if(Number(req.headers.get('content-length')??0)>6*1024*1024)throw new InputError('업로드 파일이 너무 큽니다.');if(!sameSite(req))throw new InputError('같은 사이트에서 다시 요청해 주세요.');}
+/** 다른 사이트에서 보낸 쓰기 요청을 막습니다. 배포 환경(Netlify)에서는 req.url의 주소가 실제 접속 주소와 다를 수 있어, 브라우저가 보낸 Host와 비교합니다. */
+export function sameSite(req:Request){const origin=req.headers.get('origin');if(req.headers.get('sec-fetch-site')==='cross-site')return false;if(!origin)return true;let o:URL;try{o=new URL(origin);}catch{return false;}
+ const hosts=[req.headers.get('x-forwarded-host'),req.headers.get('host'),new URL(req.url).host].filter(Boolean).flatMap(h=>String(h).split(',').map(x=>x.trim()));return hosts.includes(o.host);}
 export async function getLot(id:string){const c=await client();const lot=checked(await c.from('lots').select('*').eq('id',id).maybeSingle()) as Lot|null;if(!lot)throw new InputError('물량을 찾을 수 없습니다.');return lot;}
 async function payload(req:Request){const text=await req.text();if(text.length>30000)throw new InputError('입력 내용이 너무 깁니다.');try{const parsed=JSON.parse(text);if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw new Error();return parsed;}catch{throw new InputError('입력 형식을 확인해 주세요.');}}
 function short(v:unknown,label:string,optional=false,max=120){if(typeof v!=='string'||(!optional&&!v.trim())||v.length>max)throw new InputError(`${label}를 확인해 주세요.`);return v.trim();}
