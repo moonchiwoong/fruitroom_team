@@ -19,14 +19,18 @@ export default function MyApples({lots, loadError, reload, openTracker, focus}: 
   const [openId, setOpenId] = useState<string | null>(null);
   // 다른 화면에서 특정 사과를 열도록 요청하면(새 사과 저장 직후 등) 그 사과 상세를 엽니다.
   useEffect(() => { if (focus) setOpenId(focus.id); }, [focus?.n]); // eslint-disable-line react-hooks/exhaustive-deps
-  const sorted = useMemo(() => [...lots].sort((a, b) => (storageStart(a) || '').localeCompare(storageStart(b) || '')), [lots]);
+  const [showDone, setShowDone] = useState(false);
+  const all = useMemo(() => [...lots].sort((a, b) => (storageStart(a) || '').localeCompare(storageStart(b) || '')), [lots]);
+  const done = all.filter(l => l.details?.archived_on), viewDone = showDone && done.length > 0, sorted = viewDone ? done : all.filter(l => !l.details?.archived_on);
   const lot = lots.find(l => l.id === openId) ?? null;
   if (lot) return <AppleDetail lot={lot} onBack={() => setOpenId(null)} reload={reload} openTracker={openTracker} />;
   return <div className="ma">
     <div className="ma-head"><h1>내 사과</h1><button type="button" className="ma-primary" onClick={() => openTracker('real', 'new')}><Plus size={18} aria-hidden="true" />새 사과</button></div>
     {loadError && <p className="error-box" role="alert">목록을 불러오지 못했어요. {loadError} <button type="button" className="linkbtn" onClick={() => void reload()}>다시 불러오기</button></p>}
-    {!sorted.length && !loadError && <div className="ma-empty"><p>아직 등록한 사과가 없어요.</p><button type="button" className="ma-primary" onClick={() => openTracker('real', 'new')}><Plus size={18} aria-hidden="true" />첫 사과 등록하기</button></div>}
+    {viewDone && <p className="ma-hint muted">출하 완료로 옮긴 사과예요. 눌러서 다시 목록으로 옮길 수 있어요.</p>}
+    {!sorted.length && !loadError && !viewDone && <div className="ma-empty"><p>아직 등록한 사과가 없어요.</p><button type="button" className="ma-primary" onClick={() => openTracker('real', 'new')}><Plus size={18} aria-hidden="true" />첫 사과 등록하기</button></div>}
     <ul className="ma-list">{sorted.map(l => <li key={l.id}><AppleCard lot={l} onOpen={() => setOpenId(l.id)} /></li>)}</ul>
+    {done.length > 0 && <button type="button" className="ma-ghost" onClick={() => setShowDone(v => !v)}>{viewDone ? '저장 중인 사과 보기' : `출하 완료 ${done.length}개 보기`}</button>}
   </div>;
 }
 
@@ -73,11 +77,26 @@ function AppleDetail({lot, onBack, reload, openTracker}: {lot: Lot; onBack: () =
   }, [pend?.region, pend?.year, waitSept]); // eslint-disable-line react-hooks/exhaustive-deps
   const p = useMemo(() => lotPredictor(lot, obs ?? [], override), [lot, obs, override]);
   const hongro = /홍로/.test(lot.variety || '');
-  const days = [...new Set([...(p.todayDay !== null && p.todayDay >= 0 ? [p.todayDay] : []), 30, 60, 90, 120])].sort((a, b) => a - b);
+  // 홍로 식은 120일까지, 후지는 장기 저장이 많아 150·200일도 보여 줍니다(식 표시 범위 안).
+  const days = [...new Set([...(p.todayDay !== null && p.todayDay >= 0 ? [p.todayDay] : []), 30, 60, 90, 120, ...(hongro ? [] : [150, 200])])].sort((a, b) => a - b);
   const [day, setDay] = useState<number | null>(null);
   const sel = day ?? (p.todayDay !== null && p.todayDay >= 0 ? p.todayDay : 60);
   const ready = lotReadiness(lot);
-  const recent = [...(obs ?? [])].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
+  const [allRec, setAllRec] = useState(false), [editObs, setEditObs] = useState<Observation | null>(null), [busy, setBusy] = useState(false);
+  const sortedObs = [...(obs ?? [])].sort((a, b) => b.date.localeCompare(a.date)), recent = allRec ? sortedObs : sortedObs.slice(0, 3);
+  const post = async (action: string, body: unknown) => requestJson(`/api/lots/${lot.id}/${action}`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  async function delObs(o: Observation) {
+    if (!window.confirm(`${md(o.date)} 측정 기록을 지울까요? 되돌릴 수 없어요.`)) return;
+    setBusy(true); try { await post('observation-delete', {observation_id: o.id}); setMsg('측정 기록을 지웠어요.'); setN(x => x + 1); void reload(); } catch (e) { setMsg(''); window.alert((e as Error).message); } finally { setBusy(false); }
+  }
+  async function archive(on: boolean) {
+    setBusy(true); try { await post('update', {details: {archived_on: on ? todayKST() : null}}); setMsg(on ? '출하 완료로 옮겼어요.' : '다시 저장 중 목록으로 옮겼어요.'); await reload(); if (on) onBack(); } catch (e) { window.alert((e as Error).message); } finally { setBusy(false); }
+  }
+  async function remove() {
+    if (!window.confirm(`‘${lot.name}’을(를) 지울까요? 측정 기록도 모두 지워지고 되돌릴 수 없어요.`)) return;
+    if (!window.confirm('정말 지울까요? 다 판 사과라면 ‘출하 완료’로 옮겨 두는 걸 추천해요.')) return;
+    setBusy(true); try { await post('delete', {}); await reload(); onBack(); } catch (e) { window.alert((e as Error).message); } finally { setBusy(false); }
+  }
   const fromMeasured = EASY_METRICS.some(m => { const r = p.at(m, sel); return r.ok && r.from === 'measured'; });
   useEffect(() => { if (!msg) return; const t = setTimeout(() => setMsg(''), 2400); return () => clearTimeout(t); }, [msg]);
   return <div className="ma ma-detail">
@@ -89,7 +108,7 @@ function AppleDetail({lot, onBack, reload, openTracker}: {lot: Lot; onBack: () =
     <div className="ma-days" role="group" aria-label="저장 일수">{days.map(d => <button key={d} type="button" aria-pressed={sel === d} className={sel === d ? 'active' : ''} onClick={() => setDay(d)}>{d === p.todayDay ? '오늘' : `${d}일`}</button>)}</div>
     <p className="ma-date">{p.start ? `${md(addDays(p.start, sel))} 기준 (저장 ${sel}일째)` : ''}</p>
     <div className="ma-rows">{EASY_METRICS.map(m => { const r = p.at(m, sel);
-      const boxes = m === 'loss' && r.ok && typeof lot.quantity === 'number' && quantityUnit(lot) === '상자' && lot.quantity > 0 ? ` · ${lot.quantity}상자 기준 약 ${fmtNum(lot.quantity * r.value / 100, 1)}상자분` : '';
+      const boxes = m === 'loss' && r.ok && typeof lot.quantity === 'number' && quantityUnit(lot) === '상자' && lot.quantity > 0 ? ` · ${lot.quantity}상자 기준 약 ${fmtNum(lot.quantity * r.value / 100, 1)}상자 무게만큼` : '';
       return <div key={m + ':' + sel} className="ma-row"><span>{SHORT[m]}</span><div>{r.ok ? <><b>{easyChange(m, r.value, r.first, p.weather)}</b><small>{fmtNum(r.value, metricMeta[m].digits)} {unit(m, hongro)}{boxes}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div></div>; })}</div>
     <div className="ma-actions">
       <button type="button" className="ma-primary big" onClick={() => setMeasure(true)}><Plus size={18} aria-hidden="true" />측정 추가</button>
@@ -98,11 +117,15 @@ function AppleDetail({lot, onBack, reload, openTracker}: {lot: Lot; onBack: () =
     {msg && <div key={msg} className="ma-toast" role="status">✓ {msg}</div>}
     <section className="ma-records" aria-label="최근 측정 기록"><h2>최근 측정</h2>
       {obs === null ? <div aria-label="불러오는 중" style={{display: 'grid', gap: 8}}><span className="ma-sk" style={{height: 18}} /><span className="ma-sk" style={{height: 18, width: '70%'}} /></div> : err ? <p className="error-box">{err}</p>
-        : recent.length ? <ul>{recent.map(o => <li key={o.id}><b>{md(o.date)}</b> {[o.brix != null ? `단맛 ${o.brix}` : null, o.firmness != null ? `단단함 ${o.firmness} N` : null, o.acidity != null ? `신맛 ${o.acidity}%` : null].filter(Boolean).join(' · ') || '값 없음'}</li>)}</ul>
+        : recent.length ? <><ul>{recent.map(o => <li key={o.id} className="ma-rec"><span><b>{md(o.date)}</b> {[o.brix != null ? `단맛 ${o.brix}` : null, o.firmness != null ? `단단함 ${o.firmness} N` : null, o.acidity != null ? `신맛 ${o.acidity}%` : null].filter(Boolean).join(' · ') || '값 없음'}</span>
+          <span className="ma-rec-btns"><button type="button" className="linkbtn" disabled={busy} onClick={() => setEditObs(o)}>고치기</button><button type="button" className="linkbtn" disabled={busy} onClick={() => void delObs(o)}>지우기</button></span></li>)}</ul>
+          {sortedObs.length > 3 && <button type="button" className="linkbtn" onClick={() => setAllRec(v => !v)}>{allRec ? '최근 3개만 보기' : `전체 ${sortedObs.length}개 보기`}</button>}</>
         : <p>아직 측정 기록이 없어요.</p>}
     </section>
     <p className="ma-foot">{p.weather ? '처음 품질은 날씨로 추정 · ' : ''}{fromMeasured ? '내가 잰 값부터 이어 계산 · ' : ''}시연용 계산 · 출하·안전 판정 아님 <button type="button" className="linkbtn" onClick={() => setEdit(true)}><Pencil size={13} aria-hidden="true" />사과 정보 수정</button></p>
     {measure && <MeasurementForm open lot={lot} isBaseline={false} hasBaseline={!!baselineObservation(lot, obs ?? [])} onClose={() => setMeasure(false)} onSaved={m => { setMeasure(false); setMsg(m); setN(x => x + 1); void reload(); }} />}
+    {editObs && <MeasurementForm open lot={lot} observation={editObs} isBaseline={baselineObservation(lot, obs ?? [])?.id === editObs.id} hasBaseline={!!baselineObservation(lot, obs ?? [])} onClose={() => setEditObs(null)} onSaved={m => { setEditObs(null); setMsg(m); setN(x => x + 1); void reload(); }} />}
+    <div className="ma-manage"><button type="button" className="ma-ghost" disabled={busy} onClick={() => void archive(!lot.details?.archived_on)}>{lot.details?.archived_on ? '저장 중 목록으로 되돌리기' : '출하 완료로 옮기기'}</button><button type="button" className="linkbtn ma-danger" disabled={busy} onClick={() => void remove()}>이 사과 지우기</button></div>
     {edit && <LotEditor open lot={lot} onClose={() => setEdit(false)} onSaved={() => { setEdit(false); setMsg('사과 정보를 저장했어요.'); void reload(); }} />}
   </div>;
 }
