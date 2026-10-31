@@ -36,7 +36,7 @@ export default function NewApple({onBack, onSaved}: {onBack: () => void; onSaved
   const [storage, setStorage] = useState<'일반 저온' | 'CA'>('일반 저온'), [mcp, setMcp] = useState<'미처리' | '처리' | ''>('');
   const [source, setSource] = useState<'weather' | 'measured'>('weather');
   const [m, setM] = useState({brix: '', firmness: '', acidity: ''}), [unit, setUnit] = useState<'N' | 'kgf'>(() => { try { return window.localStorage.getItem('appletrack:firmunit') === 'kgf' ? 'kgf' : 'N'; } catch { return 'N'; } });
-  const [name, setName] = useState('');
+  const [name, setName] = useState(''), [place, setPlace] = useState(''), [boxes, setBoxes] = useState('');
   const [wx, setWx] = useState<Weather>({state: 'idle'}), [vals, setVals] = useState<Record<string, number | null> | null>(null);
   const [saving, setSaving] = useState(false), [err, setErr] = useState('');
   const startDate = same ? harvest : start, year = isDate(harvest) ? +harvest.slice(0, 4) : null;
@@ -92,7 +92,7 @@ export default function NewApple({onBack, onSaved}: {onBack: () => void; onSaved
     if (e.length) { setErr(e[0]); return; }
     setSaving(true);
     try {
-      const r = await requestJson<{lot: Lot}>('/api/lots', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify((() => { const pl = payloadFromForm(form); return {...pl, details: {...pl.details, region: hongro ? 'geochang' : region || null}}; })())});
+      const r = await requestJson<{lot: Lot}>('/api/lots', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify((() => { const pl = payloadFromForm(form), q = Number(boxes); return {...pl, location: place.trim() || null, ...(boxes.trim() && Number.isFinite(q) && q > 0 ? {quantity: q} : {}), details: {...pl.details, region: hongro ? 'geochang' : region || null, quantity_unit: '상자'}}; })())});
       await onSaved(r.lot);
     } catch (x) { setErr((x as Error).message); } finally { setSaving(false); }
   }
@@ -137,8 +137,11 @@ export default function NewApple({onBack, onSaved}: {onBack: () => void; onSaved
         <p className="ma-sub">잰 것만 넣어도 돼요. 저장을 시작한 날 잰 값으로 계산해요.</p>
       </div>}</section>
 
-    <details className="na-more"><summary>이름 바꾸기 (선택)</summary>
-      <label className="na-field"><span>이름</span><input type="text" maxLength={80} placeholder={suggestName(form)} value={name} onChange={e => setName(e.target.value)} /></label></details>
+    <details className="na-more"><summary>더 넣기 (선택) · 이름·저장고·상자 수</summary>
+      <label className="na-field"><span>이름</span><input type="text" maxLength={80} placeholder={suggestName(form)} value={name} onChange={e => setName(e.target.value)} /></label>
+      <label className="na-field"><span>저장고</span><input type="text" maxLength={80} placeholder="예: 1번 저장고" value={place} onChange={e => setPlace(e.target.value)} /></label>
+      <label className="na-field"><span>상자 수</span><input type="number" inputMode="numeric" min={1} step={1} placeholder="예: 120" value={boxes} onChange={e => setBoxes(e.target.value)} /><em>상자</em></label>
+      <p className="ma-sub">상자 수를 넣으면 무게가 줄어든 만큼을 ‘몇 상자 무게’로도 보여 줘요.</p></details>
 
     {preview && <section className="na-card na-preview" aria-label="미리보기"><h2>저장 {preview.day}일 뒤 (미리보기)</h2>
       <div className="ma-rows">{preview.rows.map(({k, r}) => <div key={k} className="ma-row"><span>{SHORT[k]}</span><div>{r.ok ? <><b>{easyChange(k, r.value, r.first, preview.weather)}</b><small>{fmtNum(r.value, metricMeta[k].digits)} {k === 'firmness' ? 'N' : metricMeta[k].unit}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div></div>)}</div>
