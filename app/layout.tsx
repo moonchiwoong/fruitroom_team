@@ -1,5 +1,5 @@
 import TeamAuth from '@/components/team-auth';
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./refresh.css";
 import "./tracker-refresh.css";
@@ -16,8 +16,16 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
+    apple: "/icons/apple-touch-icon.png",
   },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "애플트랙", statusBarStyle: "default" },
 };
+
+export const viewport: Viewport = { themeColor: "#1f5f35" };
+
+// 글자 크게: 첫 화면이 그려지기 전에 저장된 설정을 적용합니다(저장소를 못 쓰면 기본 크기).
+const bigTextScript = "try{if(localStorage.getItem('appletrack:bigtext')==='1')document.documentElement.classList.add('big-text')}catch(e){}";
 
 export default function RootLayout({
   children,
@@ -25,8 +33,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
+    <html lang="ko" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: bigTextScript }} />
         <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="" />
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
 
