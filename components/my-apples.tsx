@@ -8,7 +8,7 @@ import {requestJson} from '@/components/lot-forms';
 import {LotEditor, MeasurementForm} from '@/components/lot-dialogs';
 import {lotPredictor, easyChange, EASY_LABEL, EASY_METRICS, weatherPending, type WeatherValues} from '@/lib/lot-predict';
 import {lotReadiness, baselineObservation, storageStart, quantityUnit} from '@/lib/lot-readiness';
-import {fmtNum, metricMeta, todayKST, addDays} from '@/lib/tracker';
+import {fmtNum, metricMeta, todayKST, addDays, daysBetween, isDate} from '@/lib/tracker';
 
 const REGION: Record<string, string> = {cheongsong: '청송', jangsu: '장수', yeongju: '영주'};
 const SHORT: Record<string, string> = {firmness: '단단함', loss: '무게', brix: '단맛', acidity: '신맛'};
@@ -42,9 +42,13 @@ function AppleCard({lot, onOpen}: {lot: Lot; onOpen: () => void}) {
   // 목록에서는 측정 기록을 불러오지 않으므로, 측정값에 따라 달라지는 단단함은 상세 화면에서만 보여 줍니다.
   const parts = [loss?.ok ? `무게 ${easyChange('loss', loss.value, 0)}` : null].filter(Boolean);
   const pend = weatherPending(lot), waitSept = !!pend && todayKST() < `${pend.year}-10-01`;
+  // 측정을 3주 넘게 안 했으면 알려 줍니다(마지막 측정, 없으면 처음 측정일·저장 시작일 기준).
+  const lastDate = lot.latest_observation?.date ?? lot.initial_measured_on ?? storageStart(lot) ?? null;
+  const since = lastDate && isDate(lastDate) ? daysBetween(lastDate, todayKST()) : null;
   const hint = ready.status === 'unsupported' || ready.status === 'conditions' ? {tone: 'muted', text: '기록만 · 예측은 준비 중이에요'}
     : waitSept ? {tone: 'warn', text: '10월부터 날씨로 자동 추정 · 당도나 단단함을 재면 바로 예측돼요'}
-    : !firm?.ok && loss?.ok ? {tone: 'warn', text: '당도나 단단함을 한 번 재 주세요'} : null;
+    : !firm?.ok && loss?.ok ? {tone: 'warn', text: '당도나 단단함을 한 번 재 주세요'}
+    : since !== null && since >= 21 && !lot.details?.archived_on ? {tone: 'warn', text: lot.latest_observation || lot.initial_measured_on ? `마지막 측정 ${since}일 전 · 한 번 재 주세요` : `저장 ${since}일째 측정 없음 · 한 번 재 주세요`} : null;
   return <button type="button" className="ma-card" onClick={onOpen}>
     <span className="ma-card-top"><b>{lot.name}</b><span>{d !== null && d >= 0 ? `${d}일째` : ''}</span></span>
     <span className="ma-card-sub">{[lot.variety, REGION[lot.details?.fuji_weather?.region ?? ''] ?? (lot.details?.hongro?.source === 'weather' ? '거창' : null), lot.location, lot.storage].filter(Boolean).join(' · ')}</span>

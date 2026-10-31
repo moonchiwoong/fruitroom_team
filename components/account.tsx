@@ -45,7 +45,7 @@ export default function Account({onOpenPredict}: {onOpenPredict: () => void}) {
     </section>
 
     <div className="account-side">
-      <section className="iq-card">
+      <section className="iq-card" hidden>
         <h3 className="account-h"><MapPin size={17} />내 기본 기상값 <small>기상 기반 계산용</small></h3>
         {d ? <>
           <p className="account-sub">{session.profile.region ? regions[session.profile.region as RegionId].name : '산지 미지정'} 기준</p>
@@ -53,7 +53,7 @@ export default function Account({onOpenPredict}: {onOpenPredict: () => void}) {
           <button className="btn btn-ghost" onClick={clearDefaults}><X size={15} />기본값 지우기</button>
         </> : <p className="account-sub">아직 없어요. 모델 정보 › 기상 기반 계산에서 ‘이 값을 내 기본값으로’를 누르면 저장됩니다.</p>}
       </section>
-      <section className="iq-card">
+      <section className="iq-card" hidden>
         <h3 className="account-h"><Save size={17} />저장한 기상 기반 계산</h3>
         <p className="account-big">{count ?? '–'}<small>건</small></p>
         <button className="btn btn-outline" onClick={onOpenPredict}>모델 정보에서 보기</button>
