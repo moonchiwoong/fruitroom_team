@@ -897,9 +897,20 @@ class Boundary extends Component<{children: ReactNode}, {failed: boolean}> {
 /** 3D 외관은 기본 화면에서 빼고, 펼칠 때만 불러옵니다(모델 파일 약 3MB). */
 function Apple3DFold({day, cultivar, metrics}: {day: number; cultivar: string; metrics: Record<MetricId, ModelResult>}) {
   const [open, setOpen] = useState(false);
-  return <details className="qt2-fold" onToggle={e => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
-    <summary>사과 모양 보기 (3D)<Plus size={16} /></summary>
-    {open && <div className="qt5-apple-fold"><p className="qt-help">무게 감소에 따라 주름을 표현한 설명용 모델이에요. 실제 사진으로 검증하지 않았어요.</p><Boundary><QualityAppleViewer compact day={day} cultivar={cultivar} metrics={metrics} /></Boundary></div>}
+  // 수확 때(무게 감소 0%)와 고른 날을 나란히 놓아 비교합니다. 모양은 계산된 무게 감소율만 반영합니다.
+  const start = {...metrics, loss: {...metrics.loss, ok: true, value: 0}} as Record<MetricId, ModelResult>;
+  const lossV = metrics.loss.ok && metrics.loss.value !== null ? metrics.loss.value : null;
+  const caption = lossV === null ? '무게 감소를 계산할 수 없어 모양을 바꾸지 않았어요.' : lossV < 0.05 ? '아직 무게가 거의 줄지 않아 모양 차이가 없어요.' : `저장 ${day}일째에는 무게가 약 ${fmtNum(lossV, 1)}% 줄어, 그만큼 크기가 작아지고 겉에 잔주름이 생기는 모습으로 그렸어요.${lossV < 2 ? ' 변화가 작아서 눈으로는 미세해요.' : ''}`;
+  return <details className="qt2-fold ag-3d" onToggle={e => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
+    <summary>사과 모양 비교 (3D · 수확 때 ↔ 저장 {day}일째)<Plus size={16} /></summary>
+    {open && <div className="ag-cmp-wrap">
+      <div className="ag-cmp">
+        <figure><figcaption><b>수확 때</b><span>무게 감소 0%</span></figcaption><Boundary><QualityAppleViewer bare day={0} cultivar={cultivar} metrics={start} /></Boundary></figure>
+        <figure><figcaption><b>저장 {day}일째</b><span>{lossV === null ? '계산 없음' : `무게 약 ${fmtNum(lossV, 1)}% 감소`}</span></figcaption><Boundary><QualityAppleViewer bare day={day} cultivar={cultivar} metrics={metrics} /></Boundary></figure>
+      </div>
+      <p className="ag-cmp-cap">{caption}</p>
+      <p className="qt-help">날짜를 바꾸면 오른쪽 사과가 바뀌어요. 무게 감소 계산값으로 그린 설명용 모델이고, 실제 사진으로 검증하지 않았어요.</p>
+    </div>}
   </details>;
 }
 
