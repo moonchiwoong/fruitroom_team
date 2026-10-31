@@ -74,7 +74,7 @@ export function lotPredictor(lot: Lot, observations: Observation[] = [], overrid
     if (m === 'loss') { const r = predictQuality({...base, anchor: {day: 0, value: 0}}); return r.ok && r.value !== null ? {ok: true, value: r.value, first: 0, from: 'model'} : {ok: false, reason: r.reason || '계산할 수 없어요.'}; }
     const obs = latest(m), first = initial[m];
     const anchor = obs ? {day: daysBetween(start, obs.date), value: obs[m] as number} : first !== null && t0 !== null ? {day: t0, value: first} : null;
-    if (!anchor) return {ok: false, reason: '처음 측정값이 있어야 계산돼요.'};
+    if (!anchor) return {ok: false, reason: lot.details?.fuji_weather && m === 'firmness' ? '후지 단단함은 날씨로 추정하지 않아요. 재서 넣으면 계산돼요.' : '처음 측정값이 있어야 계산돼요.'};
     if (day < anchor.day) return {ok: false, reason: '측정일 이전이에요.'};
     const r = predictQuality({...base, anchor});
     return r.ok && r.value !== null ? {ok: true, value: r.value, first: first ?? anchor.value, from: obs ? 'measured' : weather ? 'weather' : 'initial'} : {ok: false, reason: (r.reason || '계산할 수 없어요.').replace(/^적용 모델 없음:\s*/, '')};
