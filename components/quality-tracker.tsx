@@ -203,7 +203,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const observationsFingerprint = useMemo(() => observationFingerprint(pastObs), [pastObs]);
   const measured = useMemo(() => Object.fromEntries(metricIds.map(m => [m, startOk ? measuredPoints(m, pastObs, startDate, kind, trackedInitial, {sampleId: form.tracked.sample_id, date: measuredOn, count: num(form.tracked.count)}) : []])) as Record<MetricId, MeasuredPoint[]>, [pastObs, startDate, startOk, kind, trackedInitial, form.tracked.sample_id, form.tracked.count, measuredOn]);
   const weatherMode = hongro && form.hongro.source === 'weather';
-  // 후지(청송·장수·영주) 날씨 추정: 당도·산도만 저장 예측에 이어 씁니다. 경도는 식 단위(N/mm)가 달라 연결하지 않습니다.
+  // 후지(청송·장수·영주) 날씨 추정: 경도(N, 작성자 확인)·당도·산도를 저장 예측의 처음 값으로 이어 씁니다.
   const fujiWeather = !hongro && form.fuji?.source === 'weather';
   const fujiEst = useMemo(() => hongro ? null : fujiWeatherEstimate(form.fuji ?? emptyFujiForm()), [hongro, form.fuji]);
   const estMode = weatherMode || fujiWeather;
@@ -211,7 +211,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const initialValue = (m: MetricId): number | null => {
     if (m === 'loss') return null;
     if (weatherMode) return hongroResult?.initial[m] ?? null;
-    if (fujiWeather) return m === 'firmness' ? null : fujiEst ? fujiEst[m] : null;
+    if (fujiWeather) return fujiEst ? fujiEst[m] : null;
     if (form.missing[m]) return null;
     const raw = hongro ? form.hongro.initial[m] : form[m];
     return m === 'firmness' ? firmnessToN(raw, form.firmness_unit) : num(raw);
@@ -354,7 +354,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const currentMcp = futureResult ? (future.id === 'mcp' ? '처리' : '미처리') : form.mcp;
   // 최근 측정을 계산 시작점으로 선택해도 ‘처음 대비’ 비교에는 날씨 추정 초기값이 남아 있습니다.
   const usesWeatherInitial = weatherMode && metric !== 'loss' && firstValue !== null;
-  const weatherUnitWarning = usesWeatherInitial && metric === 'firmness';
+  const weatherUnitWarning = false; // 초기 경도 회귀식 단위는 N (작성자 확인, 2026-10-31)
   const changedScenario = futureResult && future.id !== recorded.id && modelResults[metric].ok;
   const priorResult = changedScenario ? predictQuality(modelInput(metric, asOfDay)) : undefined;
   const recordedConditions = `${form.storage} · ${form.temperature ? `${form.temperature}℃` : '온도 미기록'} · 1-MCP ${form.mcp}`;
@@ -579,7 +579,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         <div className="new-quick-grid">{predictable.map(m => { const v = valueAt(series[m], quickDay), a = m === 'loss' ? null : anchors[m];
           return <div key={m} className="new-quick-tile"><span>{EASY_LABEL[m]}</span>{v.status === 'ok' ? <b>{easyChange(m, v.value, a?.value ?? null, estMode)}</b> : <b className="na">계산 없음</b>}
             <small>{v.status !== 'ok' ? v.reason : `${fmtNum(v.value, metricMeta[m].digits)} ${displayUnit(m)}${m === 'loss' ? ' · 저장일수로 계산' : estMode ? ' · 처음 값은 날씨 추정' : ''}`}</small></div>; })}</div>
-        <p className="new-quick-note">{estMode ? '초기 품질은 날씨로 추정한 값이에요(실측 아님). ' : ''}{fujiWeather ? '후지 단단함은 식 단위가 달라 계산하지 않아요. ' : ''}시연용 계산이며 출하·안전 판정이 아니에요. 그래프와 자세한 근거는 ‘자세히 보기’에서 볼 수 있어요.</p>
+        <p className="new-quick-note">{estMode ? '초기 품질은 날씨로 추정한 값이에요(실측 아님). ' : ''}시연용 계산이며 출하·안전 판정이 아니에요. 그래프와 자세한 근거는 ‘자세히 보기’에서 볼 수 있어요.</p>
       </section>}
       <div className="new-actions"><div className="new-status"><b>{statusTitle}</b>{statusDetail && <p>{statusDetail}</p>}{checkShown && uniqueErrors.length > 0 && <div className="new-action-errors" role="alert"><p>다음 항목을 확인해 주세요.</p><ul>{uniqueErrors.map(([id, text]) => <li key={id}><button type="button" onClick={() => focus(id === 'intake_date' && form.sameStart ? 'tf-storage_start_date' : id === 'initial_measured_on' && form.initialSameStart ? 'tf-initialSameStart' : 'tf-' + id.replaceAll('.', '-'))}>{text}</button></li>)}</ul></div>}{inputNotice && noticeSig === signature(form) && <div className="new-condition-note" role="status">{inputNotice}{hongro && form.temperature !== '0' && form.temperature !== '4' && <button type="button" className="linkbtn new-temperature-link" onClick={() => focus('tf-temperature')}>온도 입력하기</button>}</div>}</div><div className="new-actions-right"><button type="button" className="new-primary" onClick={checkNew}>{!missingRequired && predictable.length ? '자세히 보기' : '예측 가능 여부 확인'} <ArrowRight size={18} /></button><p>{guest && '기록 저장에는 로그인이 필요해요'} <button type="button" className="new-save" onClick={saveRecord} disabled={saving || !!loadError}>{saving ? '저장 중…' : '기록만 저장'}</button></p></div></div>
       {saveMsg && <p className={saveMsg.ok?'qt-ok':'auth-error'} role="status">{saveMsg.text}</p>}
@@ -830,7 +830,6 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
               {!hongro && modelResults[metric].modelId && form.temperature.trim() !== '' && <p>후지 자료에 저장 온도가 없어 입력한 온도에서의 적용 타당성은 확인되지 않았습니다.</p>}
               {(modelResults[metric].modelId === 'fuji-mcp-firmness' || priorResult?.modelId === 'fuji-mcp-firmness') && <p>후지 1-MCP 경도 자료의 수식과 설명이 서로 달라 정확성은 확인되지 않았습니다.</p>}
               {hongro && metric === 'brix' && modelResults[metric].modelId && <p>홍로 당도 자료의 수식과 감소 설명이 서로 달라 실제 변화를 확인할 수 없습니다.</p>}
-              {weatherUnitWarning && <p>날씨로 추정한 초기 경도와 저장 모델의 경도 단위가 달라, 변환 없이 연결하거나 비교한 결과의 신뢰도는 확인되지 않았습니다.</p>}
               {basisContext.contextNote && <p>{basisContext.contextNote}</p>}
                             {hongro && <div className="qt-basis-hongro"><p className="qt-help">홍로 · {form.storage} · {form.temperature || '미입력'}℃ · 1-MCP {form.mcp} · 저장 {selectedDayLabel} · 초기품질 출처: {sourceLabel}{exampleMode ? ' · 예시 데이터' : ''}</p><div className="qt-latest-values">{(['weight', 'diameter'] as const).map(m => <div key={m}><dt>{m === 'weight' ? '중량' : '횡경'} · 초기값만 제공</dt><dd>{hongroResult?.initial[m] === undefined ? '미입력' : `${fmtNum(hongroResult.initial[m]!, 1)} ${HONGRO_UNITS[m]}`}</dd></div>)}</div><p className="qt-help">중량·횡경의 저장 중 변화 자료는 없습니다. 홍로 감모율은 일반 저온 0℃·4℃, 1-MCP 미처리 조건에서 계산하며 검증은 미완료입니다. 당도는 제공된 식에 따라 처음 값을 유지합니다.</p></div>}
               <button type="button" className="linkbtn" onClick={() => openModelInfo(basisContext)}>자세한 모델 정보 <ArrowRight size={15} /></button>
@@ -951,7 +950,7 @@ function FujiWeather({form, setForm, estimate}: {form: TrackerForm; setForm: (up
       {st.state === 'loading' ? <p><Loader2 className="spin" size={15} aria-hidden="true" />{year}년 {region?.station} 농업기상 자료를 불러오는 중이에요…</p>
         : st.state === 'error' ? <><p>{st.msg}</p><div className="ld-row"><button type="button" className="qt3-minibtn" onClick={() => setForm(f => ({...f, fuji: {...(f.fuji ?? emptyFujiForm()), source: 'measured'}}))}>측정값 입력으로 바꾸기</button><button type="button" className="qt3-minibtn" onClick={() => setSt({state: 'idle'})}>다시 불러오기</button></div></>
         : estimate ? <><p><b>{year}년 · 농업기상 {region?.station} 관측</b> 자료로 추정했어요 (실측 아님).</p>
-          <ul><li><span>단맛(당도)</span><b>{fmtNum(estimate.brix, 1)} °Brix</b></li><li><span>신맛(산도)</span><b>{fmtNum(estimate.acidity, 2)} %</b></li><li><span>중량</span><b>{fmtNum(estimate.weight, 0)} g</b></li><li><span>횡경</span><b>{fmtNum(estimate.diameter, 1)} mm</b></li><li><span>단단함(참고)</span><b>{fmtNum(estimate.firmness, 1)} N/mm</b><small>단위가 저장식(N)과 달라 저장 중 변화는 계산하지 않아요.</small></li></ul></> : null}
+          <ul><li><span>단맛(당도)</span><b>{fmtNum(estimate.brix, 1)} °Brix</b></li><li><span>신맛(산도)</span><b>{fmtNum(estimate.acidity, 2)} %</b></li><li><span>중량</span><b>{fmtNum(estimate.weight, 0)} g</b></li><li><span>횡경</span><b>{fmtNum(estimate.diameter, 1)} mm</b></li><li><span>단단함</span><b>{fmtNum(estimate.firmness, 1)} N</b></li></ul></> : null}
     </div>}
     {!key && <p className="qt3-help">생산지와 수확일을 고르면 그 해 날씨로 처음 품질을 추정해요.</p>}
   </div>;
@@ -999,7 +998,6 @@ function WeatherChoices({form, setForm, errors, estimate, harvestDate}: {form: T
     {harvest && harvest.m === 9 && <p className="qt3-note warn qt-weather-sept" role="note"><AlertTriangle size={16} aria-hidden="true" /><span>식의 ‘9월 강수량’은 9월 1~30일 전체 합계예요. 수확일(9월 {harvest.d}일) 뒤에 온 비도 들어가며, 9월이 끝나야 자동으로 계산돼요.</span></p>}
     {harvest && harvest.m < 9 && <p className="qt3-note warn qt-weather-sept" role="note"><AlertTriangle size={16} aria-hidden="true" /><span>9월 전에 수확했어요. 식에는 9월 강수량이 들어가지만 이 사과의 재배 기간에는 9월이 없어요. 추정값 해석에 주의해 주세요.</span></p>}
     <div className="qt3-note info"><Info size={16} /><div><span>{fromApi ? '날씨 값은 농촌진흥청 농업기상 관측(거창읍) 일자료로 계산했어요: 4월 일최저기온 평균, 5~6월·7~8월 (일평균기온 − 5℃) 합계, 9월 강수량 합계. 초기 품질은 이 값으로 추정한 값이며 실측이 아니에요.' : '날씨 값은 초기 품질을 추정하기 위한 입력이에요. 직접 입력한 값은 실측 기상자료와 구분해 기록해요.'}</span></div></div>
-    <p className="qt3-help">경도 추정식의 원단위(N/mm)와 저장 모델 단위(N)가 같게 쓰일 수 있는지 확인되지 않았어요. 변환 없이 연결하므로 경도 결과의 신뢰도는 미확인이에요.</p>
     </details>
   </div>;
 }

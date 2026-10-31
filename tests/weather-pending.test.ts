@@ -18,5 +18,5 @@ test('9월이 끝난 뒤 받은 값으로 당도·산도 처음 값을 추정해
   const r = lotPredictor(lot, [], ov).at('brix', 0);
   assert.equal(r.ok, true);
   if (r.ok) assert.ok(Math.abs(r.value - predictAll('jangsu', {rain9: 120, lc56: 850, lc78: 1250, min4: 4.5}).brix) < 1e-9);
-  assert.equal(lotPredictor(lot, [], ov).at('firmness', 30).ok, false); // 후지 경도는 연결하지 않음
+  assert.equal(lotPredictor(lot, [], ov).at('firmness', 30).ok, true); // 경도 단위 N 확인 후 연결
 });

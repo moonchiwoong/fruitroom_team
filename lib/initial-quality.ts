@@ -23,7 +23,7 @@ export const inputInfo: Record<InputKey, {label: string; short: string; unit: st
 export const metricInfo: Record<MetricKey, {label: string; unit: string; digits: number}> = {
   weight: {label: '중량', unit: 'g', digits: 1},
   diameter: {label: '횡경', unit: 'mm', digits: 1},
-  firmness: {label: '경도', unit: 'N/mm', digits: 1},
+  firmness: {label: '경도', unit: 'N', digits: 1}, // 단위 N (작성자 확인, 2026-10-31)
   brix: {label: '당도', unit: '°Brix', digits: 1},
   acidity: {label: '산도', unit: '%', digits: 3},
 };

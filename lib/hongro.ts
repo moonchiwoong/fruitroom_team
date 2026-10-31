@@ -4,7 +4,7 @@ import {predictQuality, HONGRO_FORMULAS, HONGRO_STORAGE_MODEL_VERSION, HONGRO_SO
 /** Separate Hongro model: none of the Fuji coefficients or storage models are used. */
 export const HONGRO_MODEL_VERSION = HONGRO_STORAGE_MODEL_VERSION;
 export const HONGRO_DISCLAIMER = '본 결과는 합성자료 기반 초기품질 회귀식과 문헌을 참고해 구성한 저장 변화식을 연결한 참고용 시뮬레이션입니다. 실제 농가·과실에 대한 독립적인 예측 성능 검증은 완료되지 않았습니다. 실제 품질은 수확 숙도, 과실 개체차, 저장고 환경 등에 따라 달라질 수 있습니다.';
-export const HONGRO_UNITS_CONFLICT = '초기 회귀 계수 이미지에는 경도가 N/mm로, 저장식과 참고 논문에는 N(직경 11 mm 탐침)으로 표기되어 있습니다. 원자료 단위의 동일성은 확인되지 않았습니다. 요청에 따라 회귀 수치를 변환하지 않고 N (Ø11 mm)로 이어 계산하므로 해석에 이 불확실성이 남습니다.';
+export const HONGRO_UNITS_CONFLICT = '초기 경도 회귀식의 단위는 N입니다(회귀식 작성자 확인, 2026-10-31). 제공 이미지의 N/mm 표기는 오기로 확인되어, 저장식의 N (Ø11 mm) 입력으로 그대로 이어 계산합니다.';
 export const HONGRO_SUGAR_EQUATION_CONFLICT = '저장식 파일의 당도 비고에는 감소량이 적혀 있지만 명시 수식은 S(t)=S0입니다. 수식을 우선하여 두 저장 조건 모두 초기 당도를 유지합니다.';
 export const HONGRO_STORAGE_LABELS = {cold0:'0℃ 저온저장',cold4:'4℃ 저온저장'} as const;
 export const HONGRO_STORAGE_EQUATIONS = HONGRO_FORMULAS;
@@ -124,7 +124,7 @@ export function calculateHongro(value:unknown){
   const selected=comparison[input.storage];
   const warnings:string[]=[];
   if(input.source==='weather'){
-    warnings.push(HONGRO_UNITS_CONFLICT,'초기 경도 회귀식의 R²는 0.2495입니다. 합성자료에 대한 적합도이며 독립 검증 성능이나 저장 예측 정확도를 뜻하지 않습니다.');
+    warnings.push('초기 경도 회귀식의 R²는 0.2495입니다. 합성자료에 대한 적합도이며 독립 검증 성능이나 저장 예측 정확도를 뜻하지 않습니다.');
     for(const {key,reference} of HONGRO_WEATHER_FIELDS){
       const v=input.weather[key];
       if(v<reference.min||v>reference.max)warnings.push(`${key} 입력 ${v}는 chang_200.xlsx 합성자료 참고 범위 ${reference.min}~${reference.max} 밖입니다. 이 범위는 검증된 적용 범위가 아니며, 외삽 계산의 불확실성을 확인해 주세요.`);
