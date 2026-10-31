@@ -92,7 +92,9 @@ export default function TeamAuth({children}: {children: ReactNode}) {
 
   // 비회원 체험(/try): 로그인 없이 공개 예시 데이터와 계산만 사용합니다. 개인 데이터 API는 쓰지 않습니다.
   const [guestPath, setGuestPath] = useState<boolean | null>(null);
-  useEffect(() => { setGuestPath(window.location.pathname.replace(/\/+$/, '') === '/try'); }, []);
+  // 개인정보처리방침·이용약관은 로그인과 상관없이 누구나 볼 수 있어야 합니다(가입 화면에서 새 창으로 엽니다).
+  const [publicPath, setPublicPath] = useState(false);
+  useEffect(() => { const path = window.location.pathname.replace(/\/+$/, ''); setGuestPath(path === '/try'); setPublicPath(path === '/privacy' || path === '/terms'); }, []);
   useEffect(() => {
     if (!guestPath || state !== 'in') return;
     // 이미 로그인한 사용자는 같은 화면을 개인 작업 공간에서 이어 갑니다.
@@ -100,6 +102,7 @@ export default function TeamAuth({children}: {children: ReactNode}) {
     window.location.replace('/#track');
   }, [guestPath, state]);
 
+  if (publicPath) return <>{children}</>;
   if (state === 'loading' || guestPath === null) return <Splash />;
   if (guestPath) return state === 'in' ? <Splash /> : <>{children}</>;
   if (state === 'out' || state === 'recovery' || !user) return <Landing recovery={state === 'recovery'} onRecovered={() => setState(user ? 'in' : 'out')} />;
