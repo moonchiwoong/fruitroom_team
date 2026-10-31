@@ -18,6 +18,7 @@ import type {ModelInfoContext} from '@/components/model-info';
 import {measurementCompatibility, observationFingerprint} from '@/lib/ai/context';
 import {isHongroVariety} from '@/lib/cultivar';
 import {calculateHongroForm, emptyHongroForm, exampleHongroForm} from '@/lib/hongro-tracker';
+import {EASY_LABEL, easyChange} from '@/lib/lot-predict';
 import {HONGRO_STORAGE_LABELS, HONGRO_UNITS, HONGRO_WEATHER_FIELDS, HONGRO_UNITS_CONFLICT} from '@/lib/hongro';
 import {buildQualityExportCsv, type QualityExportInput} from '@/lib/quality-export';
 import {predictQuality, getQualitySeries, selectQualityModel, HONGRO_LOSS_RATE} from '@/lib/quality-models';
@@ -796,7 +797,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
               <p className="qt5-guide-title"><Info size={17} aria-hidden="true" />안내</p>
             <p className="qt2-result-when">{whenLabel}{Number.isFinite(selDay) ? ` · 저장 ${selDay}일차` : ''}{isDate(selDate) ? ` · ${fmtDate(selDate)}` : ''}</p>
             <div className="qt2-result-main" aria-live="polite">
-              <p className="qt2-result-label">{metricMeta[metric].label} {modelResults[metric].kind === '실측' ? '실측값' : modelResults[metric].kind === '참고 추정' ? '참고 추정값' : '계산값'}<span>{plainMeaning[metric]}</span></p>
+              <p className="qt2-result-label">{EASY_LABEL[metric]} {modelResults[metric].kind === '실측' ? '실측값' : modelResults[metric].kind === '참고 추정' ? '참고 추정값' : '예상값'}<span>{plainMeaning[metric]}</span></p>
               {selectedValue.status === 'ok' ? <>
                 <p className="qt2-result-value">{fmtNum(selectedValue.value, metricMeta[metric].digits)}<span>{displayUnit(metric)}</span></p>
                 <p className="qt2-result-change" style={hasDisplayedChange ? {background: '#edf6ef', color: '#205e3b', borderLeft: '3px solid #3f8a5e', borderRadius: 8, padding: '10px 12px', fontWeight: 600} : undefined}>{initialComparison}</p>
@@ -1002,17 +1003,6 @@ function WeatherChoices({form, setForm, errors, estimate, harvestDate}: {form: T
   </div>;
 }
 
-/** 농가가 읽기 쉬운 이름과 변화 표현. 계산값은 그대로이며, 처음 값 대비 비율을 반올림해 ‘약’으로 보여 줍니다. */
-const EASY_LABEL: Record<MetricId, string> = {firmness: '단단함', brix: '단맛(당도)', acidity: '신맛(산도)', loss: '무게 감소'};
-function easyChange(m: MetricId, value: number, first: number | null, estimated = false): string {
-  if (m === 'loss') return `약 ${fmtNum(value, 1)}% 줄어듦`;
-  if (first === null || !Number.isFinite(first) || first === 0) return fmtNum(value, metricMeta[m].digits);
-  const rel = (value - first) / first * 100;
-  const base = estimated ? '수확 때(추정)' : '첫 측정';
-  if (Math.abs(rel) < 0.5) return estimated ? '수확 때(추정)와 비슷' : '첫 측정과 비슷';
-  const pct = Math.round(Math.abs(rel));
-  return `${base}보다 약 ${pct < 1 ? 1 : pct}% ${m === 'firmness' ? (rel < 0 ? '물러짐' : '단단해짐') : rel < 0 ? '낮아짐' : '높아짐'}`;
-}
 
 /** Adapter for the existing SVG chart; every point retains the engine result. */
 function predictionSeries(input:ModelInput,asOfDay:number,maxDays:number):Series {

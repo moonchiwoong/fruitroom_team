@@ -891,3 +891,9 @@ p.ma-hint{margin:0;padding:10px 12px;border-radius:12px;background:#fff;font-wei
 .qt5-dash{border:0;border-radius:16px;box-shadow:0 1px 2px rgba(23,36,27,.06)}
 .qt4-tile{border-radius:12px}
 .account-h small{display:none}
+.ma-cmp{display:block;flex-basis:100%;font-size:13px;color:var(--c-sub)}
+.ma-target{background:#fff;border-radius:16px;padding:16px;box-shadow:0 1px 2px rgba(23,36,27,.06);display:flex;flex-direction:column;gap:8px}
+.ma-target h2{margin:0;font-size:15px}.ma-target p{margin:0;font-size:15px;font-weight:700;color:var(--c-main)}.ma-target p.ma-sub{font-size:13px;font-weight:500;color:var(--c-sub)}
+.ma-target-row{display:flex;align-items:center;gap:8px}.ma-target-row label{font-size:15px}
+.ma-target-row input{width:96px;height:44px;border:1px solid #cfd8cc;border-radius:12px;padding:0 10px;font:inherit;font-size:16px}
+.ma-target-row .ma-ghost{min-height:44px;margin-left:auto}

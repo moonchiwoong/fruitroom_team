@@ -88,6 +88,32 @@ function AppleDetail({lot, onBack, reload, openTracker}: {lot: Lot; onBack: () =
   const ready = lotReadiness(lot);
   const [allRec, setAllRec] = useState(false), [editObs, setEditObs] = useState<Observation | null>(null), [busy, setBusy] = useState(false);
   const sortedObs = [...(obs ?? [])].sort((a, b) => b.date.localeCompare(a.date)), recent = allRec ? sortedObs : sortedObs.slice(0, 3);
+  // 측정한 날 그 이전 기록만으로 계산했던 예상값과 실제 측정값을 비교합니다(예측이 얼마나 맞았는지).
+  function compareAt(o: Observation) {
+    if (!p.start) return null;
+    const m = o.firmness != null ? 'firmness' as const : o.brix != null ? 'brix' as const : o.acidity != null ? 'acidity' as const : null;
+    if (!m) return null;
+    const prior = lotPredictor(lot, (obs ?? []).filter(x => x.date < o.date), override).at(m, daysBetween(p.start, o.date));
+    if (!prior.ok) return null;
+    const d = metricMeta[m].digits, actual = o[m] as number, diff = actual - prior.value;
+    return {pred: `${SHORT[m]} ${fmtNum(prior.value, d)}`, actual: fmtNum(actual, d), diff: `${diff >= 0 ? '+' : ''}${fmtNum(diff, d)}`};
+  }
+  // 내 기준: 농가가 정한 단단함(N)에 계산상 언제쯤 닿는지 보여 줍니다(판정이 아니라 계산).
+  const [target, setTarget] = useState(lot.details?.firmness_target != null ? String(lot.details.firmness_target) : '');
+  const maxDay = hongro ? 120 : 300;
+  const reach = (() => {
+    const t = Number(target); if (!target.trim() || !Number.isFinite(t) || t <= 0 || p.todayDay === null) return null;
+    const from = Math.max(0, p.todayDay), now = p.at('firmness', from);
+    if (!now.ok) return {text: '단단함을 계산할 수 있어야 볼 수 있어요. 처음 값이나 측정값을 넣어 주세요.'};
+    if (now.value <= t) return {text: '계산상 이미 기준보다 낮아요.'};
+    for (let d = from + 1; d <= maxDay; d++) { const r = p.at('firmness', d); if (r.ok && r.value <= t) { const dt = addDays(p.start!, d), day = +dt.slice(8, 10); return {text: `계산상 ${+dt.slice(5, 7)}월 ${day <= 10 ? '초순' : day <= 20 ? '중순' : '하순'}쯤 (저장 ${d}일째)`}; } }
+    return {text: `계산 범위(${maxDay}일) 안에서는 기준까지 내려가지 않아요.`};
+  })();
+  async function saveTarget() {
+    const t = target.trim() === '' ? null : Number(target);
+    if (t !== null && (!Number.isFinite(t) || t < 1 || t > 300)) { window.alert('단단함 기준은 1~300 N 사이로 넣어 주세요.'); return; }
+    setBusy(true); try { await post('update', {details: {firmness_target: t}}); setMsg('내 기준을 저장했어요.'); void reload(); } catch (e) { window.alert((e as Error).message); } finally { setBusy(false); }
+  }
   const post = async (action: string, body: unknown) => requestJson(`/api/lots/${lot.id}/${action}`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
   async function delObs(o: Observation) {
     if (!window.confirm(`${md(o.date)} 측정 기록을 지울까요? 되돌릴 수 없어요.`)) return;
@@ -114,6 +140,11 @@ function AppleDetail({lot, onBack, reload, openTracker}: {lot: Lot; onBack: () =
     <div className="ma-rows">{EASY_METRICS.map(m => { const r = p.at(m, sel);
       const boxes = m === 'loss' && r.ok && typeof lot.quantity === 'number' && quantityUnit(lot) === '상자' && lot.quantity > 0 ? ` · ${lot.quantity}상자 기준 약 ${fmtNum(lot.quantity * r.value / 100, 1)}상자 무게만큼` : '';
       return <div key={m + ':' + sel} className="ma-row"><span>{SHORT[m]}</span><div>{r.ok ? <><b>{easyChange(m, r.value, r.first, p.weather)}</b><small>{fmtNum(r.value, metricMeta[m].digits)} {unit(m, hongro)}{boxes}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div></div>; })}</div>
+    <section className="ma-target" aria-label="내 단단함 기준"><h2>내 기준</h2>
+      <div className="ma-target-row"><label htmlFor="ma-target">단단함</label><input id="ma-target" type="number" inputMode="decimal" min={1} max={300} step="any" placeholder="예: 50" value={target} onChange={e => setTarget(e.target.value)} /><span>N</span>
+        <button type="button" className="ma-ghost" disabled={busy || target === (lot.details?.firmness_target != null ? String(lot.details.firmness_target) : '')} onClick={() => void saveTarget()}>저장</button></div>
+      {reach ? <p>{reach.text}</p> : <p className="ma-sub">내가 정한 단단함에 계산상 언제쯤 닿는지 보여 줘요. 출하 판정이 아니라 계산이에요.</p>}
+    </section>
     <div className="ma-actions">
       <button type="button" className="ma-primary big" onClick={() => setMeasure(true)}><Plus size={18} aria-hidden="true" />측정 추가</button>
       <button type="button" className="ma-ghost" onClick={() => openTracker('real', lot.id)}>그래프 · 사과 모양 보기<ArrowRight size={16} aria-hidden="true" /></button>
@@ -122,6 +153,7 @@ function AppleDetail({lot, onBack, reload, openTracker}: {lot: Lot; onBack: () =
     <section className="ma-records" aria-label="최근 측정 기록"><h2>최근 측정</h2>
       {obs === null ? <div aria-label="불러오는 중" style={{display: 'grid', gap: 8}}><span className="ma-sk" style={{height: 18}} /><span className="ma-sk" style={{height: 18, width: '70%'}} /></div> : err ? <p className="error-box">{err}</p>
         : recent.length ? <><ul>{recent.map(o => <li key={o.id} className="ma-rec"><span><b>{md(o.date)}</b> {[o.brix != null ? `단맛 ${o.brix}` : null, o.firmness != null ? `단단함 ${o.firmness} N` : null, o.acidity != null ? `신맛 ${o.acidity}%` : null].filter(Boolean).join(' · ') || '값 없음'}</span>
+          {(() => { const c = compareAt(o); return c ? <small className="ma-cmp">예측 {c.pred} · 실제 {c.actual} ({c.diff})</small> : null; })()}
           <span className="ma-rec-btns"><button type="button" className="linkbtn" disabled={busy} onClick={() => setEditObs(o)}>고치기</button><button type="button" className="linkbtn" disabled={busy} onClick={() => void delObs(o)}>지우기</button></span></li>)}</ul>
           {sortedObs.length > 3 && <button type="button" className="linkbtn" onClick={() => setAllRec(v => !v)}>{allRec ? '최근 3개만 보기' : `전체 ${sortedObs.length}개 보기`}</button>}</>
         : <p>아직 측정 기록이 없어요.</p>}

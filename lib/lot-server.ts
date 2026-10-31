@@ -57,6 +57,7 @@ export function cleanDetails(v:unknown){
  if(Object.hasOwn(s,'loss_reference')){if(typeof s.loss_reference!=='boolean')throw new InputError('후지 기반 참고 추정 선택값을 확인해 주세요.');o.loss_reference=s.loss_reference;}
  if(Object.hasOwn(s,'initial_source')&&s.initial_source!==null){if(!['실측','날씨 기반 추정'].includes(s.initial_source))throw new InputError('초기 품질 출처를 확인해 주세요.');o.initial_source=s.initial_source;}
  if(Object.hasOwn(s,'archived_on'))o.archived_on=date(s.archived_on,'출하 완료일');
+ if(Object.hasOwn(s,'firmness_target'))o.firmness_target=num(s.firmness_target,1,300,'내 단단함 기준 N');
  if(Object.hasOwn(s,'quantity_unit')&&s.quantity_unit!==null){if(!['kg','상자'].includes(s.quantity_unit))throw new InputError('저장 수량 단위는 상자 또는 kg만 저장합니다.');o.quantity_unit=s.quantity_unit;}
  if(Object.hasOwn(s,'initial_observation_id'))o.initial_observation_id=s.initial_observation_id===null||s.initial_observation_id===''?null:short(s.initial_observation_id,'예측 기준 측정 기록',false,80);
  if(Object.hasOwn(s,'initial_history')){if(!Array.isArray(s.initial_history)||s.initial_history.length>20)throw new InputError('이전 초기 측정 이력 형식을 확인해 주세요.');o.initial_history=s.initial_history.map((h:any)=>{if(!h||typeof h!=='object')throw new InputError('이전 초기 측정 이력 형식을 확인해 주세요.');return {date:date(h.date,'이전 초기 측정일'),firmness:num(h.firmness,0,Number.MAX_VALUE,'이전 초기 경도'),brix:num(h.brix,0,Number.MAX_VALUE,'이전 초기 당도'),acidity:num(h.acidity,0,Number.MAX_VALUE,'이전 초기 산도'),sample_count:num(h.sample_count,1,10000,'이전 초기 표본 수'),observation_id:txt(h.observation_id,'이전 기준 기록',80),replaced_at:typeof h.replaced_at==='string'&&h.replaced_at.length<=40?h.replaced_at:null};});}
@@ -174,6 +175,9 @@ export async function addObservation(id:string,req:Request){checkOrigin(req);con
 /** 사과(물량) 삭제: 등록한 사람만. 딸린 측정·온습도·파일 기록도 함께 지웁니다(되돌릴 수 없음). */
 export async function deleteLot(id:string,req:Request){checkOrigin(req);const lot=await getLot(id);const {c,user}=await clientUser();
  if(lot.owner_id&&lot.owner_id!==user.id)throw new InputError('사과는 등록한 사람만 지울 수 있어요.');
+ // 저장소의 사진·CSV 파일도 함께 지웁니다(실패해도 기록 삭제는 계속).
+ const keys=((checked(await c.from('files').select('key').eq('lot_id',id)) as {key:string|null}[]|null)??[]).map(r=>r.key).filter(Boolean) as string[];
+ if(keys.length){try{await (await storage()).remove(keys);}catch{/* 파일 정리는 다음에 다시 시도 */}}
  for(const t of ['observations','environment','files','predictions'])checked(await c.from(t).delete().eq('lot_id',id));
  checked(await c.from('lots').delete().eq('id',id));return json({ok:true});}
 /** 측정 기록 삭제. 예측의 처음 값으로 지정된 기록은 지우지 않고 고치도록 안내합니다. */
