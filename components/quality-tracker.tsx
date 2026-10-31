@@ -403,7 +403,11 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const [storeOpen, setStoreOpen] = useState(false), [storeFrom, setStoreFrom] = useState('');
   // 새 홍로 물량: ‘수확 당일 바로 입고’를 고르면 저장 시작일을 수확일과 같게 둡니다. 체크하지 않으면 날짜를 따로 받습니다.
   const [harvestSame, setHarvestSame] = useState(true);
-  const [quickDay, setQuickDay] = useState(60);
+  // 바로 보기: 저장을 이미 시작했으면 ‘오늘’부터 보여 주고, 아니면 60일을 먼저 보여 줍니다.
+  const [quickPick, setQuickDay] = useState<number | null>(null);
+  const quickToday = startOk && asOfDay > 0 && asOfDay <= (hongro ? 120 : 300) ? asOfDay : null;
+  const quickDays = [...new Set([...(quickToday !== null ? [quickToday] : []), 30, 60, 90, 120, ...(hongro ? [] : [150, 200])])].sort((a, b) => a - b);
+  const quickDay = quickPick !== null && quickDays.includes(quickPick) ? quickPick : quickToday ?? 60;
   useEffect(() => { const r = session?.profile.region; if (firstInput && !hongro && form.fuji && !form.fuji.region && (r === 'cheongsong' || r === 'jangsu' || r === 'yeongju')) setForm(f => ({...f, fuji: {...(f.fuji ?? emptyFujiForm()), region: r}})); }, [firstInput, hongro, form.fuji, session?.profile.region, setForm]);
   useEffect(() => { if (firstInput && fujiWeather && !form.initialSameStart) setForm(f => ({...f, initialSameStart: true})); }, [firstInput, fujiWeather, form.initialSameStart, setForm]);
   // 새 물량 화면은 예측식이 있는 조합만 고르게 합니다. 홍로는 일반 저온·1-MCP 미처리 한 가지라 그 조건으로 둡니다.
@@ -578,7 +582,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
       </div></details>
       {!missingRequired && startOk && predictable.length > 0 && <section className="new-card new-quick" aria-labelledby="new-quick-h">
         <div className="new-card-head"><h2 id="new-quick-h">바로 보기 · 저장 {quickDay}일째 <small>{fmtDate(addDays(startDate, quickDay))}</small></h2>
-          <div className="new-quick-days" role="group" aria-label="저장 일수">{[30, 60, 90, 120].map(d => <button key={d} type="button" aria-pressed={quickDay === d} className={quickDay === d ? 'active' : ''} onClick={() => setQuickDay(d)}>{d}일</button>)}</div></div>
+          <div className="new-quick-days" role="group" aria-label="저장 일수">{quickDays.map(d => <button key={d} type="button" aria-pressed={quickDay === d} className={quickDay === d ? 'active' : ''} onClick={() => setQuickDay(d)}>{d === quickToday ? '오늘' : `${d}일`}</button>)}</div></div>
         <div className="new-quick-grid">{predictable.map(m => { const v = valueAt(series[m], quickDay), a = m === 'loss' ? null : anchors[m];
           return <div key={m} className="new-quick-tile"><span>{EASY_LABEL[m]}</span>{v.status === 'ok' ? <b>{easyChange(m, v.value, a?.value ?? null, estMode)}</b> : <b className="na">계산 없음</b>}
             <small>{v.status !== 'ok' ? v.reason : `${fmtNum(v.value, metricMeta[m].digits)} ${displayUnit(m)}${m === 'loss' ? ' · 저장일수로 계산' : estMode ? ' · 처음 값은 날씨 추정' : ''}`}</small></div>; })}</div>
