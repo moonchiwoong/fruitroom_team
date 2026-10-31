@@ -1,6 +1,7 @@
 'use client';
 import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react';
 import dynamic from 'next/dynamic';
+import BigTextToggle from '@/components/big-text-toggle';
 import {Apple, ArrowRight, ArrowUpRight, BookOpen, ClipboardList, Home as HomeIcon, Info, LineChart, LogOut, Menu, MessageCircle, ShieldCheck, UserRound, X} from 'lucide-react';
 import {applePhoto} from '@/lib/photos';
 import {useTeamSession} from '@/components/team-auth';
@@ -115,13 +116,6 @@ function ProjectGuide() {
         <h3>계산은 아직 ‘시연용’이에요</h3><p>예측식의 정확도는 아직 검증되지 않았어요. 출하·안전 여부를 판정하지 않아요.</p>
         <h3>다 판 사과는</h3><p>사과 상세 아래 ‘출하 완료로 옮기기’로 목록에서 정리할 수 있어요.</p>
       </div></DialogContent></Dialog>;
-}
-
-function BigTextToggle() {
-  const [on, setOn] = useState(false);
-  useEffect(() => { setOn(document.documentElement.classList.contains('big-text')); }, []);
-  const toggle = () => { const next = !on; setOn(next); document.documentElement.classList.toggle('big-text', next); try { localStorage.setItem('appletrack:bigtext', next ? '1' : '0'); } catch { /* 저장 못 해도 이번 화면에는 적용 */ } };
-  return <button className={'nav-util big-text-toggle' + (on ? ' on' : '')} aria-pressed={on} onClick={toggle} title={on ? '글자 보통으로' : '글자 크게'}><span className="btt-ga" aria-hidden>가</span><span>{on ? '글자 보통' : '글자 크게'}</span></button>;
 }
 
 function SiteHeader({tab, setTab, menu, setMenu}: {tab: Page; setTab: (p: Page) => void; menu: boolean; setMenu: (v: boolean) => void}) {

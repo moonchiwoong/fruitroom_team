@@ -1,4 +1,5 @@
 'use client';
+import BigTextToggle from '@/components/big-text-toggle';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import dynamic from 'next/dynamic';
 import {ArrowRight, ClipboardList, Gauge, LineChart, Loader2, MailCheck} from 'lucide-react';
@@ -137,6 +138,7 @@ function Hero({onJoin, animate}: {onJoin: (mode: Mode) => void; animate: boolean
     <header className="shot-header">
       <div className="shot-header-inner">
         <a className="shot-logo" href="/" aria-label="애플트랙 첫 화면"><img src="/assets/appletrack-logo.svg" alt="" width={170} height={42} style={{display:'block', width:'clamp(132px, 16vw, 170px)', height:'auto'}} /></a>
+        <BigTextToggle className="shot-bigtext" />
         <button ref={toggle} className="shot-menu-toggle" type="button" aria-label={open ? '메뉴 닫기' : '메뉴 열기'} aria-expanded={open} aria-controls="shot-nav" onClick={() => setOpen(!open)}><span /><span /><span /></button>
         <nav id="shot-nav" className={'shot-nav' + (open ? ' is-open' : '')} aria-label="주요 메뉴">
           <button type="button" onClick={guide}>이용 가이드</button>

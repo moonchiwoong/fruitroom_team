@@ -64,6 +64,33 @@ export default function Account({onOpenPredict}: {onOpenPredict: () => void}) {
         <p className="account-sub">{session.isTeam ? '팀원 계정입니다. 내 개인 물량과 함께 팀 공유 물량을 볼 수 있고, 새 물량을 팀과 공유할 수 있어요.' : '개인 계정입니다. 내가 등록한 물량·기록·예측은 나만 볼 수 있어요.'}</p>
       </section>
       <button className="btn btn-ghost account-logout" onClick={() => void session.signOut()}><LogOut size={15} />로그아웃</button>
+      <Withdraw onDone={() => void session.signOut()} />
     </div>
   </div>;
+}
+
+/** 회원 탈퇴: 내가 등록한 사과·측정 기록·첨부 파일과 계정을 지웁니다. ‘탈퇴’를 직접 입력해야 진행합니다. */
+function Withdraw({onDone}: {onDone: () => void}) {
+  const [open, setOpen] = useState(false), [text, setText] = useState(''), [busy, setBusy] = useState(false), [err, setErr] = useState('');
+  async function go() {
+    setBusy(true); setErr('');
+    try {
+      const r = await fetch('/api/account/delete', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({confirm: text.trim()})});
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || '탈퇴를 처리하지 못했어요.');
+      window.alert('탈퇴가 끝났어요. 그동안 이용해 주셔서 고마워요.'); onDone(); window.location.href = '/';
+    } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+  }
+  if (!open) return <button type="button" className="linkbtn account-withdraw" onClick={() => setOpen(true)}>회원 탈퇴</button>;
+  return <section className="iq-card account-withdraw-box">
+    <h3 className="account-h">회원 탈퇴</h3>
+    <p className="account-sub">내가 등록한 사과, 측정 기록, 첨부 파일과 계정이 모두 지워지고 되돌릴 수 없어요. 필요한 기록은 먼저 사과 상세의 ‘기록 내려받기’로 저장해 두세요. 다른 팀원이 등록한 기록은 지워지지 않아요.</p>
+    <label className="account-sub" htmlFor="withdraw-confirm">계속하려면 <b>탈퇴</b>라고 입력해 주세요.</label>
+    <input id="withdraw-confirm" className="account-input" value={text} onChange={e => setText(e.target.value)} autoComplete="off" />
+    {err && <p className="auth-error" role="alert">{err}</p>}
+    <div style={{display: 'flex', gap: 8, marginTop: 8}}>
+      <button type="button" className="btn btn-ghost" onClick={() => { setOpen(false); setText(''); setErr(''); }}>취소</button>
+      <button type="button" className="btn account-withdraw-go" disabled={busy || text.trim() !== '탈퇴'} onClick={() => void go()}>{busy && <Loader2 className="spin" size={15} />}탈퇴하기</button>
+    </div>
+  </section>;
 }
