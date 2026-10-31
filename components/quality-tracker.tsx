@@ -532,7 +532,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
       return <MeasureInput key={m} id={id} label={label} value={value} missing={!!form.missing[m]}
         onValue={v => hongro ? setForm(f => ({...f, hongro: {...f.hongro, initial: {...f.hongro.initial, [m]: v}}})) : set(m, v)}
         onMissing={missing => setForm(f => ({...f, missing: {...f.missing, [m]: missing}, ...(missing ? hongro ? {hongro: {...f.hongro, initial: {...f.hongro.initial, [m]: ''}}} : {[m]: ''} : {})}))}
-        unit={m === 'firmness' ? <select aria-label="경도 단위" className="qt3-unit-select" value={form.firmness_unit} onChange={e => set('firmness_unit', e.target.value as TrackerForm['firmness_unit'])}><option value="N">N</option><option value="kgf">kgf</option></select> : <span className="qt3-unit">{m === 'brix' ? '°Brix' : '%'}</span>}
+        unit={m === 'firmness' ? <select aria-label="경도 단위" className="qt3-unit-select" value={form.firmness_unit} onChange={e => set('firmness_unit', e.target.value as TrackerForm['firmness_unit'])}><option value="N">N</option><option value="kgf">kg (kgf)</option></select> : <span className="qt3-unit">{m === 'brix' ? '°Brix' : '%'}</span>}
         err={shownErrors[hongro ? `hongro.initial.${m}` : m]}
         help={m === 'firmness' && form.firmness_unit === 'kgf' && initialValue(m) !== null ? `계산·저장은 N으로 해요 · ${fmtNum(initialValue(m)!, 1)} N (1 kgf = 9.80665 N)` : undefined} />;
     };
@@ -695,7 +695,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
               <MeasureInput id={hongro ? 'tf-hongro-initial-firmness' : 'tf-firmness'} label="처음 측정한 경도" value={hongro ? form.hongro.initial.firmness : form.firmness}
                 onValue={v => hongro ? setForm(f => ({...f, hongro: {...f.hongro, initial: {...f.hongro.initial, firmness: v}}})) : set('firmness', v)}
                 missing={form.missing.firmness} onMissing={m => setForm(f => ({...f, missing: {...f.missing, firmness: m}, ...(m ? hongro ? {hongro: {...f.hongro, initial: {...f.hongro.initial, firmness: ''}}} : {firmness: ''} : {})}))}
-                unit={<select aria-label="경도 단위" className="qt3-unit-select" value={form.firmness_unit} onChange={e => set('firmness_unit', e.target.value as TrackerForm['firmness_unit'])}><option value="N">N</option><option value="kgf">kgf</option></select>}
+                unit={<select aria-label="경도 단위" className="qt3-unit-select" value={form.firmness_unit} onChange={e => set('firmness_unit', e.target.value as TrackerForm['firmness_unit'])}><option value="N">N</option><option value="kgf">kg (kgf)</option></select>}
                 err={errors[hongro ? 'hongro.initial.firmness' : 'firmness'] || saveErrors[hongro ? 'hongro.initial.firmness' : 'firmness']}
                 help={form.firmness_unit === 'kgf' && initialValue('firmness') !== null ? `계산·저장은 N으로 해요 · ${fmtNum(initialValue('firmness')!, 1)} N (1 kgf = 9.80665 N)` : '기기에 표시된 숫자와 단위를 그대로 넣어 주세요. kgf/cm² 같은 압력 단위는 N·kgf와 같지 않아요.'} />
               <MeasureInput id={hongro ? 'tf-hongro-initial-brix' : 'tf-brix'} label="처음 측정한 당도" value={hongro ? form.hongro.initial.brix : form.brix}
@@ -761,7 +761,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
                 <span className="qt4-tile-label">{EASY_LABEL[m]}</span>
                 <span className="qt4-tile-value">{ok ? <>{fmtNum(r.value!, metricMeta[m].digits)}<small>{displayUnit(m)}</small></> : '계산 없음'}</span>
                 {hongro && ok && <span className="qt5-tile-seg">{hongroSegment(m)}</span>}
-                <span className="qt4-tile-note">{!ok ? (r.reason ?? '자료 부족').replace(/^적용 모델 없음:\s*/, '') : m === 'loss' ? (actualLoss ? `실측 ${fmtNum(actualLoss.value, 2)} %` : `${r.kind} · 저장일수로 계산`) : an ? `${an.source === 'latest' ? '최근 측정' : estMode ? '수확 때(추정)' : '첫 측정'}보다 ${describeChange(m, r.value!, an.value).short}` : r.kind}</span>
+                <span className="qt4-tile-note">{!ok ? (r.reason ?? '자료 부족').replace(/^적용 모델 없음:\s*/, '') : m === 'loss' ? (actualLoss ? `실측 ${fmtNum(actualLoss.value, 2)} %` : '저장일수로 계산') : an ? `${an.source === 'latest' ? '최근 측정' : estMode ? '수확 때(추정)' : '첫 측정'}보다 ${describeChange(m, r.value!, an.value).short}` : r.kind}</span>
               </button>; })}
           </div>
           <div className="qt5-main qt5-main-full">

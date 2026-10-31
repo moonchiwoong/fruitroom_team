@@ -886,3 +886,8 @@ p.ma-hint{margin:0;padding:10px 12px;border-radius:12px;background:#fff;font-wei
 .ma-rec-btns{display:flex;gap:4px}.ma-rec-btns .linkbtn,.ma-records>.linkbtn{min-height:40px;padding:0 8px}
 .ma-manage{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:8px}.ma-manage .ma-ghost{width:100%}
 .ma-danger{color:#b42318;min-height:44px}
+/* 자세히 보기: 통일 규칙에 맞춘 정리 */
+.qt5-tile-seg{display:none}
+.qt5-dash{border:0;border-radius:16px;box-shadow:0 1px 2px rgba(23,36,27,.06)}
+.qt4-tile{border-radius:12px}
+.account-h small{display:none}

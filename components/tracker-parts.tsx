@@ -83,7 +83,7 @@ export function TrackerChart({metric, series, baseline, measured, startDate, asO
     {ticks.map(t => <g key={t}><text x={x(t)} y={H - B + 18} textAnchor="middle" className="tk">{t}일</text><text x={x(t)} y={H - B + 33} textAnchor="middle" className="tk dim">{fmtDate(addDays(startDate, t)).slice(5)}</text></g>)}
     <text x={4} y={T - 10} textAnchor="start" className="ax">{meta.unit}</text>
     <text x={(L + W - R) / 2} y={H - 6} textAnchor="middle" className="ax">{compact ? `경과일 / 날짜 (${fmtDate(startDate)} = 0일)` : `저장 경과일 / 날짜 (저장 시작일 ${fmtDate(startDate)} = 0일)`}</text>
-    {asOfDay >= 0 && asOfDay <= H_DAYS && <g><line x1={x(asOfDay)} x2={x(asOfDay)} y1={T} y2={H - B} className="asof" /><text x={x(asOfDay) + 5} y={T + 11} className="asof-t">분석 기준일</text>
+    {asOfDay >= 0 && asOfDay <= H_DAYS && <g><line x1={x(asOfDay)} x2={x(asOfDay)} y1={T} y2={H - B} className="asof" /><text x={x(asOfDay) + 5} y={T + 11} className="asof-t">오늘</text>
       {!compact && <><text x={x(asOfDay) - 5} y={H - B - 6} textAnchor="end" className="zone">과거 관측</text><text x={x(asOfDay) + 5} y={H - B - 6} className="zone">미래 가정 →</text></>}</g>}
     {baseline?.series.ok && <><path d={path(baseline.series, 'past')} className="base-line" /><path d={path(baseline.series, 'future')} className="base-line fut" /></>}
     {series.ok && <><path d={path(series, 'past')} className="calc-line" /><path d={path(series, 'future')} className="calc-line fut" /></>}
@@ -101,6 +101,6 @@ export function ChartLegend({exampleMode, hasBaseline, baselineLabel, initialSou
     <span><svg width="26" height="10"><line x1="0" x2="26" y1="5" y2="5" className="calc-line" /></svg>모델 계산 · 과거 구간(실선)</span>
     <span><svg width="26" height="10"><line x1="0" x2="26" y1="5" y2="5" className="calc-line fut" /></svg>미래 가정(점선)</span>
     {hasBaseline && <span><svg width="26" height="10"><line x1="0" x2="26" y1="5" y2="5" className="base-line fut" /></svg>{baselineLabel}</span>}
-    <span><svg width="10" height="14"><line x1="5" x2="5" y1="0" y2="14" className="asof" /></svg>분석 기준일</span>
+    <span><svg width="10" height="14"><line x1="5" x2="5" y1="0" y2="14" className="asof" /></svg>오늘</span>
   </div>;
 }
