@@ -4,6 +4,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import dynamic from 'next/dynamic';
 import {ArrowRight, ClipboardList, Gauge, LineChart, Loader2, MailCheck} from 'lucide-react';
 import {authMessage, supabaseBrowser} from '@/lib/supabase-browser';
+import {ID_RULE, isEmailLogin, normalizeId, toAuthEmail, validId} from '@/lib/login-id';
 import {regions, type RegionId} from '@/lib/initial-quality';
 import {addDays, computeSeries, describeChange, fmtDate, fmtNum, todayKST, valueAt, type MetricId} from '@/lib/tracker';
 import {HANDOFF_KEY} from '@/lib/tracker-form';
@@ -274,7 +275,10 @@ function AuthCard({mode, setMode, onRecovered}: {mode: Mode; setMode: (m: Mode) 
 
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setError(''); setDone('');
-    const c = supabaseBrowser(), email = form.email.trim();
+    const c = supabaseBrowser(), login = normalizeId(form.email), email = toAuthEmail(login);
+    if (mode === 'signup' && !validId(login)) return setError(`아이디는 ${ID_RULE}로 정해 주세요.`);
+    if (mode === 'login' && !login) return setError('아이디를 입력해 주세요.');
+    if (mode === 'reset' && !isEmailLogin(login)) return setError('아이디로 가입한 계정은 비밀번호 찾기 메일을 보낼 수 없어요. 아래 운영자 메일로 아이디를 알려 주세요.');
     if ((mode === 'signup' || mode === 'recovery') && form.password.length < 8) return setError('비밀번호는 8자 이상으로 정해 주세요.');
     if ((mode === 'signup' || mode === 'recovery') && form.password !== form.confirm) return setError('비밀번호 확인이 일치하지 않습니다.');
     if (mode === 'signup' && !form.name.trim()) return setError('이름을 입력해 주세요.');
@@ -282,10 +286,10 @@ function AuthCard({mode, setMode, onRecovered}: {mode: Mode; setMode: (m: Mode) 
     setBusy(true);
     try {
       if (mode === 'signup') {
-        const r = await c.auth.signUp({email, password: form.password, options: {emailRedirectTo: window.location.origin, data: {name: form.name.trim(), affiliation: form.affiliation.trim(), region: form.region}}});
+        const r = await c.auth.signUp({email, password: form.password, options: {data: {name: form.name.trim(), affiliation: form.affiliation.trim(), region: form.region}}});
         if (r.error) setError(authMessage(r.error));
-        else if (r.data.user && r.data.user.identities?.length === 0) setError('이미 가입된 이메일입니다. 로그인해 주세요.');
-        else if (!r.data.session) setDone(`${email}로 인증 메일을 보냈어요. 메일의 링크를 누르면 가입이 끝나고 바로 시작됩니다.`);
+        else if (r.data.user && r.data.user.identities?.length === 0) setError('이미 쓰고 있는 아이디예요. 다른 아이디를 정하거나 로그인해 주세요.');
+        else if (!r.data.session) setError('가입은 됐지만 바로 로그인되지 않았어요. 운영자에게 문의해 주세요. (Supabase의 이메일 인증이 켜져 있어요)');
       } else if (mode === 'login') {
         const r = await c.auth.signInWithPassword({email, password: form.password});
         if (r.error) setError(authMessage(r.error));
@@ -321,10 +325,12 @@ function AuthCard({mode, setMode, onRecovered}: {mode: Mode; setMode: (m: Mode) 
           </label>
         </div>
       </>}
-      {mode !== 'recovery' && <label>이메일<input type="email" value={form.email} onChange={set('email')} autoComplete="email" placeholder="name@example.com" required /></label>}
+      {mode === 'reset' ? <><p className="auth-legal" style={{fontSize: 14, margin: 0}}>아이디로 가입한 계정은 운영자 메일(<a href="mailto:mooncw@jbnu.ac.kr">mooncw@jbnu.ac.kr</a>)로 아이디를 알려 주시면 비밀번호를 초기화해 드려요. 예전에 이메일로 가입했다면 아래에 이메일을 넣어 주세요.</p>
+        <label>이메일 (예전 계정)<input type="email" value={form.email} onChange={set('email')} autoComplete="email" placeholder="name@example.com" required /></label></>
+        : mode !== 'recovery' && <label><span>아이디{mode === 'signup' && <small>{ID_RULE}</small>}</span><input type="text" value={form.email} onChange={set('email')} autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder={mode === 'signup' ? '예: apple_farm01' : '아이디 (예전 계정은 이메일)'} maxLength={mode === 'signup' ? 20 : 120} required /></label>}
       {mode !== 'reset' && <label><span>{mode === 'recovery' ? '새 비밀번호' : '비밀번호'}{mode !== 'login' && <small>8자 이상</small>}</span><input type="password" value={form.password} onChange={set('password')} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required /></label>}
       {(mode === 'signup' || mode === 'recovery') && <label>비밀번호 확인<input type="password" value={form.confirm} onChange={set('confirm')} autoComplete="new-password" required /></label>}
-      {mode === 'signup' && <label className="l-agree"><input type="checkbox" checked={form.agree} onChange={set('agree')} /><span>서비스 이용을 위한 개인정보(이메일·이름·소속) 수집·이용에 동의합니다.</span></label>}
+      {mode === 'signup' && <label className="l-agree"><input type="checkbox" checked={form.agree} onChange={set('agree')} /><span>서비스 이용을 위한 개인정보(아이디·이름·소속) 수집·이용에 동의합니다.</span></label>}
       {mode === 'signup' && <p className="auth-legal" style={{fontSize: 13, color: 'var(--c-sub)', margin: '4px 0 0'}}>가입하면 <a href="/terms" target="_blank" rel="noreferrer">이용약관</a>과 <a href="/privacy" target="_blank" rel="noreferrer">개인정보처리방침</a>을 확인한 것으로 봐요.</p>}
       <button className="btn btn-primary" disabled={busy} type="submit">{busy && <Loader2 className="spin" size={16} />}{busy ? '처리 중…' : mode === 'signup' ? '가입하고 시작하기' : mode === 'login' ? '로그인' : mode === 'reset' ? '재설정 메일 받기' : '비밀번호 바꾸기'}</button>
       {error && <p role="alert" className="auth-error">{error}</p>}

@@ -4,6 +4,7 @@ import {Check, Loader2, LogOut, Mail, MapPin, Save, ShieldCheck, Users, X} from 
 import {useTeamSession} from '@/components/team-auth';
 import {PROFILE_REGIONS} from '@/lib/profile-regions';
 import {authMessage, supabaseBrowser} from '@/lib/supabase-browser';
+import {ID_RULE, displayLogin, normalizeId, toAuthEmail, validId} from '@/lib/login-id';
 import {countPredictions} from '@/lib/my-predictions';
 import {inputInfo, inputKeys, regionIds, regions, type RegionId} from '@/lib/initial-quality';
 
@@ -29,7 +30,7 @@ export default function Account({onOpenPredict}: {onOpenPredict: () => void}) {
     <section className="iq-card account-main">
       <div className="account-id">
         <span className="account-avatar">{session.displayName.slice(0, 1).toUpperCase()}</span>
-        <div><h2>{session.displayName}</h2><p><Mail size={14} />{session.email}</p></div>
+        <div><h2>{session.displayName}</h2><p><Mail size={14} />{session.loginId}</p></div>
       </div>
       <form onSubmit={save} className="account-form">
         <label>이름<input value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} maxLength={50} required /></label>
@@ -97,7 +98,7 @@ function Withdraw({onDone}: {onDone: () => void}) {
   </section>;
 }
 
-/** 아이디(이메일)·비밀번호 바꾸기. 바꾸기 전에 지금 비밀번호로 본인 확인을 한 번 더 합니다. */
+/** 아이디·비밀번호 바꾸기. 바꾸기 전에 지금 비밀번호로 본인 확인을 한 번 더 합니다. */
 function LoginChange({email}: {email: string}) {
   const [open, setOpen] = useState<'' | 'email' | 'password'>(''), [busy, setBusy] = useState(false), [msg, setMsg] = useState<{ok: boolean; text: string} | null>(null);
   const [cur, setCur] = useState(''), [nextEmail, setNextEmail] = useState(''), [pw, setPw] = useState(''), [pw2, setPw2] = useState('');
@@ -105,7 +106,7 @@ function LoginChange({email}: {email: string}) {
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setMsg(null);
     if (!cur) return setMsg({ok: false, text: '지금 비밀번호를 넣어 주세요.'});
-    if (open === 'email') { const n = nextEmail.trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(n)) return setMsg({ok: false, text: '새 이메일 주소를 확인해 주세요.'}); if (n === email.toLowerCase()) return setMsg({ok: false, text: '지금 쓰는 이메일과 같아요.'}); }
+    if (open === 'email') { const n = normalizeId(nextEmail); if (!validId(n)) return setMsg({ok: false, text: `새 아이디는 ${ID_RULE}로 정해 주세요.`}); if (toAuthEmail(n) === email.toLowerCase()) return setMsg({ok: false, text: '지금 쓰는 아이디와 같아요.'}); }
     if (open === 'password') { if (pw.length < 8) return setMsg({ok: false, text: '새 비밀번호는 8자 이상으로 정해 주세요.'}); if (pw !== pw2) return setMsg({ok: false, text: '새 비밀번호 두 칸이 서로 달라요.'}); if (pw === cur) return setMsg({ok: false, text: '지금 비밀번호와 다르게 정해 주세요.'}); }
     setBusy(true);
     try {
@@ -113,9 +114,10 @@ function LoginChange({email}: {email: string}) {
       const check = await c.auth.signInWithPassword({email, password: cur});
       if (check.error) { setMsg({ok: false, text: '지금 비밀번호가 맞지 않아요.'}); return; }
       if (open === 'email') {
-        const r = await c.auth.updateUser({email: nextEmail.trim()}, {emailRedirectTo: window.location.origin});
+        const n = normalizeId(nextEmail), r = await c.auth.updateUser({email: toAuthEmail(n)});
         if (r.error) { setMsg({ok: false, text: authMessage(r.error)}); return; }
-        reset('email'); setOpen(''); setMsg({ok: true, text: `${nextEmail.trim()}로 확인 메일을 보냈어요. 메일의 링크를 누르면 아이디가 바뀌어요. (설정에 따라 지금 메일함에도 확인 메일이 가요.)`});
+        const changed = r.data.user?.email?.toLowerCase() === toAuthEmail(n);
+        reset(''); setMsg(changed ? {ok: true, text: `아이디를 ${n}(으)로 바꿨어요. 다음 로그인부터 새 아이디를 쓰세요.`} : {ok: false, text: '아이디 변경이 바로 적용되지 않았어요. 운영자에게 문의해 주세요.'});
       } else {
         const r = await c.auth.updateUser({password: pw});
         if (r.error) { setMsg({ok: false, text: authMessage(r.error)}); return; }
@@ -125,14 +127,14 @@ function LoginChange({email}: {email: string}) {
   }
   return <section className="iq-card account-login">
     <h3 className="account-h"><ShieldCheck size={17} />로그인 정보</h3>
-    <p className="account-sub">아이디(이메일) <b>{email}</b></p>
-    {!open && <div className="account-login-btns"><button type="button" className="btn btn-ghost" onClick={() => reset('email')}>아이디(이메일) 바꾸기</button><button type="button" className="btn btn-ghost" onClick={() => reset('password')}>비밀번호 바꾸기</button></div>}
+    <p className="account-sub">아이디 <b>{displayLogin(email)}</b></p>
+    {!open && <div className="account-login-btns"><button type="button" className="btn btn-ghost" onClick={() => reset('email')}>아이디 바꾸기</button><button type="button" className="btn btn-ghost" onClick={() => reset('password')}>비밀번호 바꾸기</button></div>}
     {open && <form className="account-form" onSubmit={submit}>
-      {open === 'email' ? <label>새 이메일<input type="email" autoComplete="email" value={nextEmail} onChange={e => setNextEmail(e.target.value)} required /></label>
+      {open === 'email' ? <label>새 아이디 <small>{ID_RULE}</small><input type="text" autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={20} autoComplete="username" value={nextEmail} onChange={e => setNextEmail(e.target.value)} required /></label>
         : <><label>새 비밀번호 (8자 이상)<input type="password" autoComplete="new-password" value={pw} onChange={e => setPw(e.target.value)} required /></label>
           <label>새 비밀번호 한 번 더<input type="password" autoComplete="new-password" value={pw2} onChange={e => setPw2(e.target.value)} required /></label></>}
       <label>지금 비밀번호 (본인 확인)<input type="password" autoComplete="current-password" value={cur} onChange={e => setCur(e.target.value)} required /></label>
-      <div className="account-login-btns"><button type="button" className="btn btn-ghost" onClick={() => reset('')}>취소</button><button className="btn btn-primary" disabled={busy}>{busy && <Loader2 className="spin" size={15} />}{open === 'email' ? '확인 메일 보내기' : '비밀번호 바꾸기'}</button></div>
+      <div className="account-login-btns"><button type="button" className="btn btn-ghost" onClick={() => reset('')}>취소</button><button className="btn btn-primary" disabled={busy}>{busy && <Loader2 className="spin" size={15} />}{open === 'email' ? '아이디 바꾸기' : '비밀번호 바꾸기'}</button></div>
     </form>}
     {msg && <p className={msg.ok ? 'account-ok' : 'auth-error'} role="status">{msg.ok && <Check size={15} />}{msg.text}</p>}
   </section>;
