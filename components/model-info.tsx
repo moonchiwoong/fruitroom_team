@@ -141,7 +141,7 @@ export default function ModelInfo({modelId, metric, context}: {modelId?: Storage
     <section className="mi-card" id="mi-units">
       <h2>단위와 측정법</h2>
       <dl className="mi-dl">
-        <div><dt>경도 N</dt><dd>저장 모델의 경도는 힘(N)입니다. 산지별 참고 기상 회귀식의 N/mm(강성), N/mm²(압력)은 기본 예측에 연결하지 않습니다. 다만 홍로 날씨 기반 초기 경도는 N/mm 수치를 변환 없이 저장 모델의 N 입력으로 연결하며 단위의 동일성은 확인되지 않았습니다.</dd></div>
+        <div><dt>경도 N</dt><dd>저장 모델과 날씨 기반 초기 경도 회귀식(거창 홍로, 청송·장수·영주 후지)의 경도는 모두 힘(N)입니다(회귀식 작성자 확인, 2026-10-31). N/mm²(압력)·kgf/cm²는 다른 단위라 그대로 쓰지 않습니다.</dd></div>
         <div><dt>N ↔ kgf</dt><dd>1 kgf = 9.80665 N. 입력한 원측정값·단위와 화면의 환산값을 구분합니다.</dd></div>
         <div><dt>압력 환산</dt><dd>탐침의 유효 접촉 면적과 해당 측정법의 환산 타당성이 모두 확인되어야 합니다. 탐침 직경만 입력한 경우에는 kgf/cm² 등의 환산 수치를 제공하지 않습니다.</dd></div>
         <div><dt>비교 전 확인</dt><dd>기기, 탐침, 껍질 제거 여부, 측정 위치·과실 온도 등이 다르면 단순 비교에 제한이 있습니다. 기록되지 않은 조건은 미확인으로 남깁니다.</dd></div>
@@ -182,7 +182,7 @@ export default function ModelInfo({modelId, metric, context}: {modelId?: Storage
       <dl className="mi-dl">
         <div><dt>출처</dt><dd><code>data/initial-quality-regression.hwpx</code>(회귀계수·R²), 학습 자료 <code>data/initial-quality/*.csv</code></dd></div>
         <div><dt>입력</dt><dd>{inputKeys.map(k => `${inputInfo[k].label}(${inputInfo[k].code}, ${inputInfo[k].unit})`).join(' · ')} — 변수 이름은 자료의 약어로부터 붙인 것으로, 정의 확인이 필요합니다.</dd></div>
-        <div><dt>출력</dt><dd>{metricKeys.map(m => `${metricInfo[m].label}(${metricInfo[m].unit})`).join(' · ')} — 경도는 <b>N/mm(강성)</b>으로, 실측 입력·저장 모델의 N(힘)과 다른 지표입니다.</dd></div>
+        <div><dt>출력</dt><dd>{metricKeys.map(m => `${metricInfo[m].label}(${metricInfo[m].unit})`).join(' · ')} — 경도 단위는 N(작성자 확인)이에요.</dd></div>
         <div><dt>별도 평가 성능</dt><dd><b>평가 자료 없음 — 표시하지 않음.</b> 아래 수치는 모두 학습 자료에서 잰 적합도입니다.</dd></div>
       </dl>
       <div className="qt-table-wrap mi-table-wrap"><table className="qt-table mi-regression-table">

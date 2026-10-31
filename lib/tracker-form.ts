@@ -19,7 +19,7 @@ export type TrackerForm = {
   ca: {from: string; to: string; o2: string; co2: string};
   tracked: {sample_id: string; count: string; initial_weight: string};
   hongro: HongroTrackerForm;
-  /** 후지(청송·장수·영주): 수확한 해 농업기상으로 초기 당도·산도를 추정할 때의 입력. 경도는 단위(N/mm)가 달라 저장 예측에 연결하지 않습니다. */
+  /** 후지(청송·장수·영주): 수확한 해 농업기상으로 초기 당도·산도를 추정할 때의 입력. 경도 단위는 N(작성자 확인)이라 경도·당도·산도를 모두 저장 예측의 처음 값으로 씁니다. */
   fuji: FujiWeatherForm;
   /** 이전 홍로 기록에 전용 모델 출처가 없을 때 상위 실측값을 보존합니다. */
   legacyHongro: boolean;
@@ -146,7 +146,7 @@ export function payloadFromForm(f: TrackerForm, mode: 'real' | 'example' = 'real
     name: effectiveName(f).trim(), variety: f.variety.trim(), intake_date: f.intake_date, harvest_date: f.harvest_date || null,
     storage_start_date: f.sameStart ? (f.intake_date || null) : (f.storage_start_date || null),
     initial_measured_on: effectiveInitialMeasuredOn(f) || null, initial_sample_count: num(f.initial_sample_count),
-    firmness: firmN, brix: fujiEst ? Math.round(fujiEst.brix * 100) / 100 : measuredInput && !f.missing.brix ? num(quality.brix) : null, acidity: fujiEst ? Math.round(fujiEst.acidity * 1000) / 1000 : measuredInput && !f.missing.acidity ? num(quality.acidity) : null, weight: num(quality.weight),
+    firmness: fujiEst ? Math.round(fujiEst.firmness * 10) / 10 : firmN, brix: fujiEst ? Math.round(fujiEst.brix * 100) / 100 : measuredInput && !f.missing.brix ? num(quality.brix) : null, acidity: fujiEst ? Math.round(fujiEst.acidity * 1000) / 1000 : measuredInput && !f.missing.acidity ? num(quality.acidity) : null, weight: num(quality.weight),
     packaging: txt(f.packaging), location: txt(f.location), sensor_id: txt(f.sensor_id),
     storage: f.storage, mcp: f.mcp, team_shared: f.team_shared,
     details: {

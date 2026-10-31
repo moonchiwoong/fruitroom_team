@@ -124,7 +124,7 @@ export default function HongroPredictor({userId}: {userId: string}) {
           </div><p className="qt-help">중량·횡경은 초기값만 표시합니다. 저장 중 변화 모델은 없습니다.</p></> : <><p className="qt-help">4개 기상변수를 모두 입력하세요. 초기 품질은 회귀 추정값이며 실측값이 아닙니다.</p><div className="hongro-fields">
             {HONGRO_WEATHER_FIELDS.map(field => <NumberField key={field.key} id={`hongro-weather-${field.key}`} label={`${field.label} (${field.unit})`} value={form.weather[field.key]} onChange={value => update({...form, weather: {...form.weather, [field.key]: value}})} error={fieldError(`weather.${field.key}`, form.weather[field.key])} hint={`변수 ${field.key} · 합성 참고자료 ${field.reference.min}~${field.reference.max} (검증 적용범위 아님)`} />)}
           </div><p className="qt-help">위 변수 정의와 단위에 맞는 기상값을 입력하세요. 참고자료 범위만으로 적용 가능성을 판단하지 않습니다.</p></>}
-          <div className="hongro-unit-note"><AlertTriangle size={15} /><p>경도 단위 확인 필요: 제공 이미지의 N/mm 표기와 사용자 지정·PDF의 N(직경 11mm 탐침)이 다릅니다. 초기 회귀자료와 저장식의 측정 기준이 같은지 확인이 필요합니다.</p></div>
+          
         </section>
         <section className="hongro-panel" aria-labelledby="hongro-storage-heading"><h3 id="hongro-storage-heading">저장 조건</h3>
           <div className="seg hongro-storage" role="radiogroup" aria-label="홍로 저장 조건">{(['cold0', 'cold4'] as Storage[]).map(storage => <button type="button" id={`hongro-storage-${storage}`} key={storage} role="radio" aria-checked={form.storage === storage} className={form.storage === storage ? 'active' : ''} onClick={() => update({...form, storage})}>{HONGRO_STORAGE_LABELS[storage]}</button>)}</div>
@@ -184,7 +184,7 @@ function HongroSources({result}: {result: HongroResult | null}) {
   return <details className="qt-basis hongro-sources"><summary><BookOpen size={16} />계수·출처·적용 범위<ChevronDown size={15} /></summary><div>
     <p><strong>홍로·거창 전용 모델</strong> · 저장 방식은 0℃ 또는 4℃ 저온저장만 선택할 수 있으며, 계산 범위는 0~120일입니다. 품종·산지·저장 조건이 다르면 이 식을 적용하지 않습니다.</p>
     <p>{HONGRO_UNITS_CONFLICT}</p>
-    <p>PDF의 측정법은 직경 11mm 탐침으로 적도 부위의 과피를 제거한 뒤 과실당 3회 측정한 평균을 Newton(N)으로 표시합니다. 이미지의 N/mm를 N으로 환산한 것이 아니라, 사용자 명세·PDF의 N 표기를 따릅니다.</p>
+    <p>PDF의 측정법은 직경 11mm 탐침으로 적도 부위의 과피를 제거한 뒤 과실당 3회 측정한 평균을 Newton(N)으로 표시합니다. 초기 경도 회귀식의 단위도 N이며(작성자 확인, 2026-10-31) 이미지의 N/mm 표기는 오기예요.</p>
     <p>결정계수 R²는 초기 품질 회귀식의 자료 내 설명력입니다. 예측 정확도나 저장 모델 검증 성능으로 해석하지 않습니다.</p>
     <div className="qt-table-wrap hongro-coefficients"><table className="qt-table"><caption>제공 이미지의 초기 품질 회귀 계수 · 재학습하지 않은 원래 계수</caption><thead><tr><th>지표·단위</th><th>절편</th><th>chang_LC56</th><th>chang_LC78</th><th>chang_9rain</th><th>chang_min4</th><th>결정계수 R²</th></tr></thead><tbody>{(['diameter', 'weight', 'firmness', 'brix', 'acidity'] as const).map(metric => <tr key={metric}><th>{metricLabels[metric]}<br /><small>{HONGRO_UNITS[metric]}</small></th>{(['intercept', 'chang_LC56', 'chang_LC78', 'chang_9rain', 'chang_min4'] as const).map(key => <td key={key}>{HONGRO_REGRESSION[metric][key].toFixed(6)}</td>)}<td>{HONGRO_REGRESSION[metric].r2.toFixed(4)}</td></tr>)}</tbody></table></div>
     <p>초기값 = 절편 + Σ(변수별 계수 × 기상값). 특히 경도 회귀식의 R²는 0.2495입니다. chang_200.xlsx의 200건은 합성 참고자료이며 실제 농가에 대한 검증 자료가 아닙니다.</p>
@@ -203,7 +203,7 @@ function exportHongro(result: HongroResult) {
     ['애플트랙 홍로·거창 품질 예측'], ['내보낸 시각', new Date().toISOString()], ['모델 ID·버전', meta.modelVersion], ['저장 모델 설명', meta.storageModel],
     ['품종', 'hongro', '홍로'], ['산지', 'geochang', '거창'], ['초기값 source', result.input.source, meta.initialKind], ['저장 방식', result.input.storage, HONGRO_STORAGE_LABELS[result.input.storage]], ['선택 저장일', result.input.days, '일'],
     ['계산 적용 범위', 0, 120, '일'], ['외삽', '범위 밖 결과 제공 안 함'], ['검증 상태', meta.validation], ['출처 파일', ...meta.sourceFiles], ['정식 기록 저장', '없음 · 이 기기의 사용자별 초안'],
-    ['면책 안내', HONGRO_DISCLAIMER], ['단위 충돌·확인 필요', HONGRO_UNITS_CONFLICT], ['당도식 적용', meta.sugarEquationConflict], ['초기 회귀 R²', '결정계수이며 예측 정확도나 저장모델 검증 성능이 아님'],
+    ['면책 안내', HONGRO_DISCLAIMER], ['경도 단위', HONGRO_UNITS_CONFLICT], ['당도식 적용', meta.sugarEquationConflict], ['초기 회귀 R²', '결정계수이며 예측 정확도나 저장모델 검증 성능이 아님'],
     ['합성 참고자료', meta.referenceData.file, meta.referenceData.rows, '검증 적용범위 아님'], [], ['[초기 품질]', '값', '단위', '출처'],
   ];
   for (const key of initialKeys) rows.push([metricLabels[key], result.initial[key] ?? '미입력', HONGRO_UNITS[key], meta.initialKind]);
