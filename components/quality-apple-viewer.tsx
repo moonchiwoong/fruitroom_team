@@ -30,6 +30,8 @@ export type QualityAppleViewerProps = {
   modelUrl?: string;
   /** 결과 화면 메인용: 수치 표는 숨기고(결과 화면이 따로 보여 줌) 설명·한계는 접어 둡니다. */
   compact?: boolean;
+  /** 캔버스만 그립니다(나란히 비교용). 설명·수치·버튼은 바깥에서 보여 줍니다. */
+  bare?: boolean;
 };
 
 const bytesCache = new Map<string, Promise<ArrayBuffer>>();
@@ -68,7 +70,7 @@ type MutableBody = {geometry: THREE.BufferGeometry; original: Float32Array; cent
 type ViewerApi = {controls: OrbitControls; camera: THREE.PerspectiveCamera; group: THREE.Group; bodies: MutableBody[]; update: (appearance: AppleAppearance) => void};
 
 /** The downloaded GLB is immutable; this viewer owns its parsed GPU resources. */
-export default function QualityAppleViewer({day, cultivar, metrics, modelUrl, compact = false}: QualityAppleViewerProps) {
+export default function QualityAppleViewer({day, cultivar, metrics, modelUrl, compact = false, bare = false}: QualityAppleViewerProps) {
   const mount = useRef<HTMLDivElement>(null), api = useRef<ViewerApi | null>(null);
   const loss = metrics.loss.ok && metrics.loss.value !== null ? metrics.loss.value : null;
   const appearance = appleAppearance(loss), appearanceRef = useRef(appearance);
@@ -206,8 +208,8 @@ export default function QualityAppleViewer({day, cultivar, metrics, modelUrl, co
   const metricInfo = {firmness: ['경도', 1], brix: ['당도', 1], acidity: ['산도', 3], loss: ['감모율', 3]} as const;
   const modelNote = <>{isHongro ? '홍로 사진을 참고해 재구성한 설명용 3D 모델' : '설명용 후지 3D 모델'}입니다. 정밀 스캔이나 실제 사과의 측정 결과가 아닙니다.</>;
   return <section className={styles.viewer + (compact ? ' ' + styles.compact : '')} data-testid="quality-apple-viewer" data-day={day} data-load-state={loadState}>
-    <div className={styles.heading}><span>{compact ? '설명용 3D · 실측 외형 아님' : '설명용 외관 시각화'}</span><b>저장 {Number.isFinite(day) ? day : '—'}일차</b></div>
-    {!compact && <p className={styles.modelNote}>{modelNote}</p>}
+    {!bare && <div className={styles.heading}><span>{compact ? '설명용 3D · 실측 외형 아님' : '설명용 외관 시각화'}</span><b>저장 {Number.isFinite(day) ? day : '—'}일차</b></div>}
+    {!compact && !bare && <p className={styles.modelNote}>{modelNote}</p>}
     <div className={styles.stage}>
       <div className={styles.canvas} ref={mount} role="img" aria-label="품질 계산과 연결된 사과 3D 모델. 드래그로 회전, 확대·축소 버튼으로 크기를 조절합니다." tabIndex={0}
         onKeyDown={event => {
@@ -227,11 +229,11 @@ export default function QualityAppleViewer({day, cultivar, metrics, modelUrl, co
       {loadState === 'loading' && <p className={styles.overlay} role="status">사과 3D 모델을 불러오는 중입니다…</p>}
       {loadState === 'error' && <div className={styles.overlay} role="alert"><AlertTriangle size={22}/><p>{errorText}</p><button type="button" onClick={() => {bytesCache.delete(resolvedModelUrl); setRetry(value => value + 1);}}>3D 모델 다시 불러오기</button><small>아래 품질 계산값은 계속 확인할 수 있습니다.</small></div>}
     </div>
-    <div className={styles.tools}>
+    {!bare && <><div className={styles.tools}>
       <small><Rotate3D size={15}/> 드래그로 회전 · 두 손가락으로 확대</small>
       <div><button type="button" disabled={loadState !== 'ready'} onClick={() => zoom(1.15)} aria-label="3D 사과 축소"><Minus size={17}/></button><button type="button" disabled={loadState !== 'ready'} onClick={() => zoom(0.85)} aria-label="3D 사과 확대"><Plus size={17}/></button><button type="button" disabled={loadState !== 'ready'} onClick={reset}><RotateCcw size={16}/>시점 초기화</button></div>
-    </div>
-    {compact ? <p className={styles.compactLine} data-testid={appearance.available ? undefined : 'appearance-unavailable'}>{appearance.available ? `감모율 ${loss!.toFixed(2)}%를 크기·주름에 반영했어요${isReference ? ' (후지 기반 참고 추정)' : ''}.` : '감모율 자료가 없어 모양을 바꾸지 않았어요. 수축·주름이 없다는 뜻은 아니에요.'}</p> : <>
+    </div></>}
+    {bare ? null : compact ? <p className={styles.compactLine} data-testid={appearance.available ? undefined : 'appearance-unavailable'}>{appearance.available ? `감모율 ${loss!.toFixed(2)}%를 크기·주름에 반영했어요${isReference ? ' (후지 기반 참고 추정)' : ''}.` : '감모율 자료가 없어 모양을 바꾸지 않았어요. 수축·주름이 없다는 뜻은 아니에요.'}</p> : <>
     <dl className={styles.metrics}>{(Object.keys(metricInfo) as Array<keyof typeof metricInfo>).map(key => {
       const metric = metrics[key], [label, digits] = metricInfo[key];
       return <div key={key}><dt>{label}</dt><dd>{metric.ok && metric.value !== null ? <>{metric.value.toLocaleString('ko-KR', {minimumFractionDigits: digits, maximumFractionDigits: digits})}<small> {metric.unit}</small></> : '계산 없음'}</dd><small>{metric.ok ? metric.kind ?? '모델 계산' : metric.reason ?? '자료 부족'}</small></div>;
@@ -240,6 +242,6 @@ export default function QualityAppleViewer({day, cultivar, metrics, modelUrl, co
     {metrics.loss.source && metrics.loss.source.length > 0 && <p className={styles.source}>감모율 출처: {metrics.loss.source.join(' · ')}{metrics.loss.modelVersion && ` · ${metrics.loss.modelVersion}`}<br/>{metrics.loss.validation}</p>}
     {metrics.loss.warnings?.map(warning => <p key={warning} className={styles.source}>{warning}</p>)}
     </>}
-    <details className={styles.explanation}><summary>외관 연결 방식과 한계</summary>{compact && <p>{modelNote}</p>}{isHongro && <p>홍로 모델의 사진 출처: <a href="https://doi.org/10.3390/agriculture14050761" target="_blank" rel="noreferrer">Do 외 (2024), Agriculture 14(5), 761, 그림 3(b)</a>. 사진을 바탕으로 형태와 질감을 재구성·수정했습니다. <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>.</p>}{compact && metrics.loss.source && metrics.loss.source.length > 0 && <p>감모율 출처: {metrics.loss.source.join(' · ')}{metrics.loss.modelVersion && ` · ${metrics.loss.modelVersion}`} · {metrics.loss.validation}</p>}<p>감모율을 길이 감소율로 그대로 적용하지 않습니다. 일정 밀도·등방 수축을 가정해 길이 배율 = (1 − 감모율/100 × 수축 강도)의 세제곱근으로 나타내고, 표면 메시 좌표에 연속적인 주름 변형을 더합니다. 이 가정과 주름 강도는 실제 외관 자료로 보정되지 않은 설명용 설정입니다.</p><p>경도·당도·산도는 위 수치로 표시하며 형태 변형·껍질 색·부패를 결정하지 않습니다. 실측 사진이나 상품성·안전 보관 기간을 예측하는 모델이 아닙니다.</p><p>설정: 수축 강도 {APPLE_APPEARANCE_CONFIG.volumeLossStrength}, 주름 강도 {APPLE_APPEARANCE_CONFIG.wrinkleStrength}. 원본 GLB에는 품질 변화용 morph target이 없어 웹에서 본체 메시를 직접 변형합니다.</p></details>
+    {!bare && <details className={styles.explanation}><summary>외관 연결 방식과 한계</summary>{compact && <p>{modelNote}</p>}{isHongro && <p>홍로 모델의 사진 출처: <a href="https://doi.org/10.3390/agriculture14050761" target="_blank" rel="noreferrer">Do 외 (2024), Agriculture 14(5), 761, 그림 3(b)</a>. 사진을 바탕으로 형태와 질감을 재구성·수정했습니다. <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>.</p>}{compact && metrics.loss.source && metrics.loss.source.length > 0 && <p>감모율 출처: {metrics.loss.source.join(' · ')}{metrics.loss.modelVersion && ` · ${metrics.loss.modelVersion}`} · {metrics.loss.validation}</p>}<p>감모율을 길이 감소율로 그대로 적용하지 않습니다. 일정 밀도·등방 수축을 가정해 길이 배율 = (1 − 감모율/100 × 수축 강도)의 세제곱근으로 나타내고, 표면 메시 좌표에 연속적인 주름 변형을 더합니다. 이 가정과 주름 강도는 실제 외관 자료로 보정되지 않은 설명용 설정입니다.</p><p>경도·당도·산도는 위 수치로 표시하며 형태 변형·껍질 색·부패를 결정하지 않습니다. 실측 사진이나 상품성·안전 보관 기간을 예측하는 모델이 아닙니다.</p><p>설정: 수축 강도 {APPLE_APPEARANCE_CONFIG.volumeLossStrength}, 주름 강도 {APPLE_APPEARANCE_CONFIG.wrinkleStrength}. 원본 GLB에는 품질 변화용 morph target이 없어 웹에서 본체 메시를 직접 변형합니다.</p></details>}
   </section>;
 }

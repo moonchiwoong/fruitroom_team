@@ -51,11 +51,28 @@ export function AppleGraph({p, obs, sel, maxDay}: {p: P; obs: Observation[]; sel
   </section>;
 }
 
+type M = {ok: boolean; value: number | null; unit: string; kind?: string; reason?: string};
+const metricsAt = (p: P, day: number) => Object.fromEntries((['firmness', 'brix', 'acidity', 'loss'] as const).map(k => { const r = p.at(k, day); return [k, r.ok ? {ok: true, value: r.value, unit: UNIT(k), kind: '모델 계산'} : {ok: false, value: null, unit: UNIT(k), reason: r.reason}]; })) as Record<'firmness' | 'brix' | 'acidity' | 'loss', M>;
+
+/** 수확 때(0일)와 고른 날을 나란히 놓아 무게 감소에 따른 모양 차이를 비교합니다. 모양은 계산된 무게 감소율로만 바뀝니다(과장하지 않음). */
 export function Apple3D({p, sel, cultivar}: {p: P; sel: number; cultivar: string}) {
   const [open, setOpen] = useState(false);
-  const metrics = useMemo(() => Object.fromEntries((['firmness', 'brix', 'acidity', 'loss'] as const).map(k => { const r = p.at(k, sel); return [k, r.ok ? {ok: true, value: r.value, unit: UNIT(k), kind: '모델 계산'} : {ok: false, value: null, unit: UNIT(k), reason: r.reason}]; })) as Record<'firmness' | 'brix' | 'acidity' | 'loss', {ok: boolean; value: number | null; unit: string; kind?: string; reason?: string}>, [p, sel]);
+  const day = Math.max(0, sel);
+  const now = useMemo(() => metricsAt(p, day), [p, day]);
+  const start = useMemo(() => ({...metricsAt(p, 0), loss: {ok: true, value: 0, unit: '%', kind: '수확 때'}}), [p]);
+  const loss = now.loss.ok && now.loss.value !== null ? now.loss.value : null;
+  const caption = loss === null ? '무게 감소를 계산할 수 없어 모양을 바꾸지 않았어요.'
+    : loss < 0.05 ? '아직 무게가 거의 줄지 않아 모양 차이가 없어요.'
+    : `저장 ${day}일째에는 무게가 약 ${fmtNum(loss, 1)}% 줄어, 그만큼 크기가 작아지고 겉에 잔주름이 생기는 모습으로 그렸어요.${loss < 2 ? ' 변화가 작아서 눈으로는 미세해요.' : ''}`;
   return <details className="qt2-fold ag-3d" onToggle={e => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
-    <summary>사과 모양 보기 (3D · 저장 {sel}일째)<Plus size={16} aria-hidden="true" /></summary>
-    {open && <div className="qt5-apple-fold"><p className="qt-help">무게 감소에 따라 주름을 표현한 설명용 모델이에요. 실제 사진으로 검증하지 않았어요.</p><Boundary><QualityAppleViewer compact day={sel} cultivar={cultivar} metrics={metrics} /></Boundary></div>}
+    <summary>사과 모양 비교 (3D · 수확 때 ↔ 저장 {day}일째)<Plus size={16} aria-hidden="true" /></summary>
+    {open && <div className="ag-cmp-wrap">
+      <div className="ag-cmp">
+        <figure><figcaption><b>수확 때</b><span>무게 감소 0%</span></figcaption><Boundary><QualityAppleViewer bare day={0} cultivar={cultivar} metrics={start} /></Boundary></figure>
+        <figure><figcaption><b>저장 {day}일째</b><span>{loss === null ? '계산 없음' : `무게 약 ${fmtNum(loss, 1)}% 감소`}</span></figcaption><Boundary><QualityAppleViewer bare day={day} cultivar={cultivar} metrics={now} /></Boundary></figure>
+      </div>
+      <p className="ag-cmp-cap">{caption}</p>
+      <p className="qt-help">위쪽 날짜 버튼을 바꾸면 오른쪽 사과가 바뀌어요. 손가락으로 돌려 볼 수 있어요. 무게 감소 계산값으로 그린 설명용 모델이고, 실제 사진으로 검증하지 않았어요. 단단함·단맛·신맛은 모양에 반영하지 않아요.</p>
+    </div>}
   </details>;
 }
