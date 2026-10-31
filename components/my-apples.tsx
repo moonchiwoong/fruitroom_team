@@ -28,7 +28,7 @@ export default function MyApples({lots, loadError, reload, openTracker, focus}: 
     <div className="ma-head"><h1>내 사과</h1><button type="button" className="ma-primary" onClick={() => openTracker('real', 'new')}><Plus size={18} aria-hidden="true" />새 사과</button></div>
     {loadError && <p className="error-box" role="alert">목록을 불러오지 못했어요. {loadError} <button type="button" className="linkbtn" onClick={() => void reload()}>다시 불러오기</button></p>}
     {viewDone && <p className="ma-hint muted">출하 완료로 옮긴 사과예요. 눌러서 다시 목록으로 옮길 수 있어요.</p>}
-    {!sorted.length && !loadError && !viewDone && <div className="ma-empty"><p>아직 등록한 사과가 없어요.</p><button type="button" className="ma-primary" onClick={() => openTracker('real', 'new')}><Plus size={18} aria-hidden="true" />첫 사과 등록하기</button></div>}
+    {!sorted.length && !loadError && !viewDone && <div className="ma-empty"><p><b>아직 등록한 사과가 없어요.</b></p><ol className="ma-howto"><li>새 사과: 품종·생산지·수확일·저장고 온도만 넣어요</li><li>사과를 누르면 저장 중 변화를 보여줘요</li><li>당도·단단함을 재면 ‘측정 추가’로 넣어요</li></ol><button type="button" className="ma-primary" onClick={() => openTracker('real', 'new')}><Plus size={18} aria-hidden="true" />첫 사과 등록하기</button></div>}
     <ul className="ma-list">{sorted.map(l => <li key={l.id}><AppleCard lot={l} onOpen={() => setOpenId(l.id)} /></li>)}</ul>
     {done.length > 0 && <button type="button" className="ma-ghost" onClick={() => setShowDone(v => !v)}>{viewDone ? '저장 중인 사과 보기' : `출하 완료 ${done.length}개 보기`}</button>}
   </div>;

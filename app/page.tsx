@@ -107,12 +107,13 @@ function Brand({onClick}: {onClick: () => void}) {
 
 function ProjectGuide() {
   return <Dialog><DialogTrigger asChild><button className="nav-util"><Info size={16} /><span>안내</span></button></DialogTrigger>
-    <DialogContent className="record-dialog guide-dialog"><DialogHeader><DialogTitle>애플트랙 사용 안내</DialogTitle><DialogDescription>초기 품질부터 저장 중 변화까지 — 사과 품질 예측·저장 관리</DialogDescription></DialogHeader>
+    <DialogContent className="record-dialog guide-dialog"><DialogHeader><DialogTitle>애플트랙 사용 안내</DialogTitle><DialogDescription>수확일만 넣으면 저장 중 변화까지 — 사과 품질 예측·저장 관리</DialogDescription></DialogHeader>
       <div className="guide-body">
-        <h3>이렇게 씁니다</h3><p>① 초기 품질(경도·당도·산도)을 입력하고 → ② 저장 조건을 고른 뒤 → ③ 날짜별 변화를 확인하고 실제 측정값과 비교합니다. 처음이라면 ‘예시로 체험’으로 같은 흐름을 둘러보세요.</p>
-        <h3>값의 종류를 구분합니다</h3><p><b>실측</b>(직접 측정), <b>모델 계산</b>(수식 결과), <b>예시</b>(가상 값), <b>미측정</b>을 따로 표시합니다. 측정하지 않은 값은 0이나 예시값으로 바꾸지 않습니다.</p>
-        <h3>계산은 아직 ‘시연용’입니다</h3><p>저장 중 변화식은 출처 자료에 검증 기간·성능이 없어 검증 미확인 상태입니다. 오차 범위를 표시하지 않으며, 출하일·보관 가능일·안전성을 판정하지 않습니다. 자세한 내용은 ‘모델 정보’에서 확인하세요.</p>
-        <h3>입력 내용은 자동으로 임시 저장됩니다</h3><p>새로고침해도 작성 중인 내용을 복구합니다. 초안은 이 브라우저에만 있고, ‘저장’을 눌러야 정식 기록이 됩니다.</p>
+        <h3>이렇게 써요</h3><p>① ‘내 사과’에서 <b>새 사과</b>를 눌러 품종·생산지·수확일·저장고 온도를 넣어요. 처음 품질은 그 해 농업기상 자료로 자동 추정해요. → ② 사과를 누르면 오늘·30·60·90·120일 뒤 단단함·무게·단맛·신맛을 쉬운 말로 보여줘요. → ③ 당도나 단단함을 재면 <b>측정 추가</b>로 넣어요. 그 값에서 다시 이어 계산하고, 예측과 실제의 차이도 보여줘요.</p>
+        <h3>내 기준</h3><p>사과 상세에서 단단함 기준을 넣으면 계산상 언제쯤 닿는지 ‘○월 중순쯤’으로 보여줘요. 출하 판정이 아니라 계산이에요.</p>
+        <h3>값의 출처를 구분해요</h3><p>직접 잰 값(실측), 날씨로 추정한 값, 계산값을 섞지 않고 표시해요.</p>
+        <h3>계산은 아직 ‘시연용’이에요</h3><p>예측식의 정확도는 아직 검증되지 않았어요. 출하·안전 여부를 판정하지 않아요.</p>
+        <h3>다 판 사과는</h3><p>사과 상세 아래 ‘출하 완료로 옮기기’로 목록에서 정리할 수 있어요.</p>
       </div></DialogContent></Dialog>;
 }
 
@@ -189,7 +190,7 @@ function HomePage({lots, loaded, error, retry, openTracker, setTab, onAskAI, ope
 
 function SiteFooter({setTab}: {setTab: (p: Page) => void}) {
   return <footer className="site-footer"><div className="site-footer-inner">
-    <div className="footer-brand"><div><img src="/assets/appletrack-logo.svg" alt="애플트랙" width={170} height={42} style={{display:'block', width:'clamp(132px, 16vw, 170px)', height:'auto'}} /><p>초기 품질부터 저장 중 변화까지. 실측·모델 계산·예시·미측정을 구분해 표시하며, 계산값은 출하·안전 판정을 대신하지 않습니다.</p></div></div>
+    <div className="footer-brand"><div><img src="/assets/appletrack-logo.svg" alt="애플트랙" width={170} height={42} style={{display:'block', width:'clamp(132px, 16vw, 170px)', height:'auto'}} /><p>수확일만 넣으면 저장 중 사과 품질 변화를 보여줘요. 직접 잰 값과 계산값을 구분해 표시하며, 출하·안전 판정은 하지 않아요.</p></div></div>
     <nav aria-label="하단 메뉴">{pages.filter(p => !p.hidden).map(p => <button key={p.id} onClick={() => setTab(p.id)}>{p.label}</button>)}</nav>
   </div><div className="site-footer-bottom"><ShieldCheck size={14} />사과 품질 예측·저장 관리 · FarmBridge</div></footer>;
 }

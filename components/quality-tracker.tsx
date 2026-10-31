@@ -402,6 +402,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   // 새 홍로 물량: ‘수확 당일 바로 입고’를 고르면 저장 시작일을 수확일과 같게 둡니다. 체크하지 않으면 날짜를 따로 받습니다.
   const [harvestSame, setHarvestSame] = useState(true);
   const [quickDay, setQuickDay] = useState(60);
+  useEffect(() => { const r = session?.profile.region; if (firstInput && !hongro && form.fuji && !form.fuji.region && (r === 'cheongsong' || r === 'jangsu' || r === 'yeongju')) setForm(f => ({...f, fuji: {...(f.fuji ?? emptyFujiForm()), region: r}})); }, [firstInput, hongro, form.fuji, session?.profile.region, setForm]);
   useEffect(() => { if (firstInput && fujiWeather && !form.initialSameStart) setForm(f => ({...f, initialSameStart: true})); }, [firstInput, fujiWeather, form.initialSameStart, setForm]);
   // 새 물량 화면은 예측식이 있는 조합만 고르게 합니다. 홍로는 일반 저온·1-MCP 미처리 한 가지라 그 조건으로 둡니다.
   useEffect(() => {
@@ -549,9 +550,9 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           {hongro ? <div className="qt3-q"><div className="qt3-q-head"><span>보관 조건</span></div><p className="new-fixed-cond">일반 저온 · 1-MCP 미처리</p><p className="qt3-help">홍로는 거창 자료로 만든 식으로 계산해요. 다른 조건은 준비 중이에요.</p></div>
           : <><Seg id="tf-storage" legend="보관 방식" value={form.storage} options={[{value:'일반 저온',label:'일반 저온'},{value:'CA',label:'CA'},...(form.storage === '기타' ? [{value:'기타' as const,label:'기타',disabled:true,tag:'준비 중'}] : [])]} onChange={v => setForm(f => ({...f, storage: v, ...(v === 'CA' && f.mcp === '처리' ? {mcp: '미확인', mcpSelected: false} : {})}))} />
           <div><Seg id="tf-mcp" legend="1-MCP 처리 여부" value={mcpChosen ? form.mcp : ''} options={[{value:'처리',label:'처리함',disabled:form.storage === 'CA',tag:form.storage === 'CA' ? '준비 중' : undefined},{value:'미처리',label:'미처리'}]} onChange={v => setForm(f => ({...f,mcp:v,mcpSelected:true}))} err={shownErrors.mcp} />{form.storage === 'CA' && <p className="qt3-help">CA + 1-MCP 처리 예측은 준비 중이에요. 기록은 물량 관리에서 남길 수 있어요.</p>}</div></>}
-          {hongro && <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-harvest_date">수확일</label></div><input id="tf-harvest_date" className="qt3-input" type="date" max={today} value={form.harvest_date} onChange={e => { const v = e.target.value; setForm(f => ({...f, harvest_date: v, ...(harvestSame ? {storage_start_date: v, ...(f.sameStart ? {intake_date: v} : {})} : {})})); }} aria-invalid={!!shownErrors.harvest_date} />{shownErrors.harvest_date && <span className="qf-err">{shownErrors.harvest_date}</span>}
+          {<div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-harvest_date">수확일</label></div><input id="tf-harvest_date" className="qt3-input" type="date" max={today} value={form.harvest_date} onChange={e => { const v = e.target.value; setForm(f => ({...f, harvest_date: v, ...(harvestSame ? {storage_start_date: v, ...(f.sameStart ? {intake_date: v} : {})} : {})})); }} aria-invalid={!!shownErrors.harvest_date} />{shownErrors.harvest_date && <span className="qf-err">{shownErrors.harvest_date}</span>}
             <label className="new-date-check"><input id="tf-harvestSame" type="checkbox" checked={harvestSame} onChange={e => { const c = e.target.checked; setHarvestSame(c); if (c && form.harvest_date) setStart(form.harvest_date); }} /><span>수확 당일 바로 저장고에 넣었어요</span></label></div>}
-          <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-storage_start_date">저장 시작일</label></div><input id="tf-storage_start_date" className="qt3-input" type="date" max={today} value={startDate} disabled={hongro && harvestSame} onChange={e => setStart(e.target.value)} aria-invalid={!!shownErrors.storage_start_date} />{shownErrors.storage_start_date ? <span className="qf-err">{shownErrors.storage_start_date}</span> : (hongro && harvestSame ? <p className="qt3-help">수확일과 같아요.</p> : null)}</div>
+          <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-storage_start_date">저장 시작일</label></div><input id="tf-storage_start_date" className="qt3-input" type="date" max={today} value={startDate} disabled={harvestSame} onChange={e => setStart(e.target.value)} aria-invalid={!!shownErrors.storage_start_date} />{shownErrors.storage_start_date ? <span className="qf-err">{shownErrors.storage_start_date}</span> : (harvestSame ? <p className="qt3-help">수확일과 같아요.</p> : null)}</div>
           {hongro && <Seg id="tf-temperature" legend="저장고 온도" value={form.temperature === '0' || form.temperature === '4' ? form.temperature as '0' | '4' : ''} options={[{value:'0',label:'0℃'},{value:'4',label:'4℃'}]} onChange={v => setForm(f => ({...f, temperature: v, hongro: {...f.hongro, storage: v === '0' ? 'cold0' : 'cold4'}}))} err={shownErrors.temperature} />}
         </div>
         {form.mcpSelected && form.mcp === '미확인' && <p className="new-condition-note">처리 여부가 미확인이면 예측식은 적용하지 않으며 기록은 저장할 수 있어요.</p>}
@@ -567,10 +568,9 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
       </section>
       <details className="new-card new-extra" ref={optionalRef}><summary><strong>추가 기록</strong><span>선택 &nbsp; {hongro ? '이름 · 저장고' : '이름 · 저장고 · 온도'}</span><Plus size={20} /></summary><div className="new-extra-body">
         <div className="new-grid2">
-          <F id="name" label="물량 이름" err={shownErrors.name}><input id="tf-name" value={form.name_auto && !form.name.trim() ? suggestName(form) : form.name} onChange={e=>setForm(f=>({...f,name:e.target.value,name_auto:false}))} maxLength={120} /><p className="qt3-help">품종과 저장 시작일로 자동 생성되며 직접 수정할 수 있어요.</p></F>
+          <F id="name" label="이름" err={shownErrors.name}><input id="tf-name" value={form.name_auto && !form.name.trim() ? suggestName(form) : form.name} onChange={e=>setForm(f=>({...f,name:e.target.value,name_auto:false}))} maxLength={120} /><p className="qt3-help">품종과 저장 시작일로 자동 생성되며 직접 수정할 수 있어요.</p></F>
           {!hongro && temperatureField}
           <F id="location" label="저장고 이름·위치"><input id="tf-location" value={form.location} onChange={e=>set('location',e.target.value)} maxLength={120} /></F>
-          {!hongro && !fujiWeather && <F id="harvest_date" label="수확일" err={shownErrors.harvest_date}><input id="tf-harvest_date" type="date" max={today} value={form.harvest_date} onChange={e=>set('harvest_date',e.target.value)} /></F>}
         </div>
         {session?.isTeam && <label className="qt-check"><input type="checkbox" checked={form.team_shared} onChange={e=>set('team_shared',e.target.checked)} />팀과 공유</label>}
       </div></details>
@@ -820,7 +820,8 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           {!exampleMode && activeLot && !guest ? <ObservationForm lot={activeLot} label="오늘 측정값 기록" className="btn btn-primary" onSaved={() => { setReload(r => r + 1); void onLotsChanged(); }} disabled={false} />
             : guest && !exampleMode ? <button className="btn btn-primary" onClick={handoffToLogin}><Save size={16} />로그인하고 저장하기</button>
             : exampleMode ? <button className="btn btn-primary" onClick={() => changeMode('real')}>내 측정값 입력하기</button>
-            : <button className="btn btn-primary" onClick={() => { setEditing(true); requestAnimationFrame(() => document.getElementById('qt-input-editor')?.scrollIntoView({behavior: 'smooth', block: 'start'})); }}>입력 정보 수정</button>}
+            : activeLot && !guest ? <button className="btn btn-primary" onClick={() => openLot(activeLot.id)}>사과 정보 수정</button>
+            : <button className="btn btn-primary" onClick={() => { setEditing(true); requestAnimationFrame(() => document.getElementById('qt-input-editor')?.scrollIntoView({behavior: 'smooth', block: 'start'})); }}>입력 고치기</button>}
 
             </div>
             </div>
@@ -946,9 +947,9 @@ function FujiWeather({form, setForm, estimate}: {form: TrackerForm; setForm: (up
   const region = FUJI_REGIONS.find(r => r.id === fj.region);
   return <div className="qt-weather qt3-weather">
     <fieldset className="qt3-q"><legend className="qt3-q-head">생산지</legend><div className="qt3-seg">{FUJI_REGIONS.map(r => <label key={r.id} className={fj.region === r.id ? 'active' : ''}><input type="radio" name="tf-fuji-region" checked={fj.region === r.id} onChange={() => setForm(f => ({...f, fuji: {...(f.fuji ?? emptyFujiForm()), region: r.id, weather: {rain9: '', lc56: '', lc78: '', min4: ''}}}))} /><span>{r.label}</span></label>)}</div></fieldset>
-    <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-harvest_date">수확일</label></div><input id="tf-harvest_date" className="qt3-input" type="date" max={todayKST()} value={form.harvest_date} onChange={e => { const v = e.target.value; setForm(f => ({...f, harvest_date: v})); }} /></div>
+
     {key && <div className={'qt-weather-auto' + (st.state === 'error' ? ' err' : '')} role="status" aria-live="polite">
-      {st.state === 'loading' ? <p><Loader2 className="spin" size={15} aria-hidden="true" />{year}년 {region?.station} 농업기상 자료를 불러오는 중이에요…</p>
+      {st.state === 'loading' ? <p><Loader2 className="spin" size={15} aria-hidden="true" />{year}년 4~9월 {region?.station} 날씨를 모으는 중이에요(몇 초 걸려요)…</p>
         : st.state === 'error' ? <><p>{st.msg}</p><div className="ld-row"><button type="button" className="qt3-minibtn" onClick={() => setForm(f => ({...f, fuji: {...(f.fuji ?? emptyFujiForm()), source: 'measured'}}))}>측정값 입력으로 바꾸기</button><button type="button" className="qt3-minibtn" onClick={() => setSt({state: 'idle'})}>다시 불러오기</button></div></>
         : estimate ? <><p><b>{year}년 · 농업기상 {region?.station} 관측</b> 자료로 추정했어요 (실측 아님).</p>
           <ul><li><span>단맛(당도)</span><b>{fmtNum(estimate.brix, 1)} °Brix</b></li><li><span>신맛(산도)</span><b>{fmtNum(estimate.acidity, 2)} %</b></li><li><span>중량</span><b>{fmtNum(estimate.weight, 0)} g</b></li><li><span>횡경</span><b>{fmtNum(estimate.diameter, 1)} mm</b></li><li><span>단단함</span><b>{fmtNum(estimate.firmness, 1)} N</b></li></ul></> : null}
@@ -984,7 +985,7 @@ function WeatherChoices({form, setForm, errors, estimate, harvestDate}: {form: T
   return <div className="qt-weather qt3-weather">
     <div className="qt3-q-head"><p className="qt-weather-lead">{harvest ? `${harvest.y}년(수확한 해) 거창 재배기 날씨로 초기 품질을 추정해요.` : '수확일을 넣으면 그 해 거창 농업기상 자료로 날씨 값을 채워요.'}</p><span className="qt3-count" aria-live="polite">입력 {picked} / {HONGRO_WEATHER_FIELDS.length}</span></div>
     {harvest && <div className={'qt-weather-auto' + (auto.state === 'error' ? ' err' : '')} role="status" aria-live="polite">
-      {auto.state === 'loading' ? <p><Loader2 className="spin" size={15} aria-hidden="true" />{harvest.y}년 거창읍 농업기상 자료를 불러오는 중이에요…</p>
+      {auto.state === 'loading' ? <p><Loader2 className="spin" size={15} aria-hidden="true" />{harvest.y}년 4~9월 거창읍 날씨를 모으는 중이에요(몇 초 걸려요)…</p>
         : auto.state === 'error' ? <p>{auto.error}</p>
         : auto.state === 'ok' && auto.data ? <>
           <p><b>{auto.data.year}년 · 농업기상 {auto.data.station.name} 관측</b>{fromApi ? ' 자료로 계산해 채웠어요.' : ' 자료와 다른 값이 들어 있어요(직접 고친 값).'}</p>

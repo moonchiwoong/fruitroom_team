@@ -6,6 +6,7 @@ import {authMessage, supabaseBrowser} from '@/lib/supabase-browser';
 import {regions, type RegionId} from '@/lib/initial-quality';
 import {addDays, computeSeries, describeChange, fmtDate, fmtNum, todayKST, valueAt, type MetricId} from '@/lib/tracker';
 import {HANDOFF_KEY} from '@/lib/tracker-form';
+import {PROFILE_REGIONS} from '@/lib/profile-regions';
 
 type Mode = 'signup' | 'login' | 'reset' | 'recovery';
 
@@ -71,9 +72,9 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
       <section id="service-guide" className="lv-section" aria-labelledby="lv-how">
         <h2 id="lv-how" {...d(0)}>세 단계면 충분해요</h2>
         <ol className="lv-steps">
-          <li {...d(1)}><span>1</span><div><b>초기 품질 입력</b><p>측정일, 표본 수와 경도(N)·당도(°Brix)·산도(%)를 넣어요. 한 항목만 있어도 됩니다.</p></div></li>
-          <li {...d(2)}><span>2</span><div><b>저장 조건 선택</b><p>저장 시작일을 0일로 두고, 저온·1-MCP·CA 등 저장 조건을 고릅니다.</p></div></li>
-          <li {...d(3)}><span>3</span><div><b>변화 확인</b><p>날짜를 고르면 변화를 한 문장으로 요약하고, 후속 측정값과 그래프로 비교해요.</p></div></li>
+          <li {...d(1)}><span>1</span><div><b>새 사과 등록</b><p>품종·생산지·수확일과 저장고 온도만 넣어요. 처음 품질은 그 해 농업기상 자료로 자동 추정해요(직접 잰 값이 있으면 그 값을 써요).</p></div></li>
+          <li {...d(2)}><span>2</span><div><b>저장 중 변화 보기</b><p>오늘, 30·60·90·120일 뒤 단단함·무게·단맛·신맛을 ‘처음보다 약 몇 %’로 쉽게 보여줘요.</p></div></li>
+          <li {...d(3)}><span>3</span><div><b>재면 더 정확하게</b><p>당도나 단단함을 재서 넣으면 그 값에서 다시 이어 계산하고, 예측과 실제의 차이도 보여줘요.</p></div></li>
         </ol>
       </section>
 
@@ -263,7 +264,7 @@ export function ServicePreview({animate}: {animate: boolean}) {
 }
 
 function AuthCard({mode, setMode, onRecovered}: {mode: Mode; setMode: (m: Mode) => void; onRecovered?: () => void}) {
-  const [form, setForm] = useState({name: '', affiliation: '', region: '' as RegionId | '', email: '', password: '', confirm: '', agree: false});
+  const [form, setForm] = useState({name: '', affiliation: '', region: '' as import('@/lib/profile-regions').ProfileRegion | '', email: '', password: '', confirm: '', agree: false});
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [done, setDone] = useState('');
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm(f => ({...f, [k]: e.target.type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value}));
@@ -313,7 +314,7 @@ function AuthCard({mode, setMode, onRecovered}: {mode: Mode; setMode: (m: Mode) 
           <label><span>주 산지 <small>선택</small></span>
             <select value={form.region} onChange={set('region')}>
               <option value="">선택 안 함</option>
-              {(Object.keys(regions) as RegionId[]).map(r => <option key={r} value={r}>{regions[r].name}</option>)}
+              {PROFILE_REGIONS.map(r => <option key={r.id} value={r.id}>{r.name} ({r.area})</option>)}
             </select>
           </label>
         </div>

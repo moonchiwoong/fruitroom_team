@@ -2,12 +2,13 @@
 import {useEffect, useState} from 'react';
 import {Check, Loader2, LogOut, Mail, MapPin, Save, ShieldCheck, Users, X} from 'lucide-react';
 import {useTeamSession} from '@/components/team-auth';
+import {PROFILE_REGIONS} from '@/lib/profile-regions';
 import {countPredictions} from '@/lib/my-predictions';
 import {inputInfo, inputKeys, regionIds, regions, type RegionId} from '@/lib/initial-quality';
 
 export default function Account({onOpenPredict}: {onOpenPredict: () => void}) {
   const session = useTeamSession();
-  const [form, setForm] = useState({name: '', affiliation: '', region: '' as RegionId | ''});
+  const [form, setForm] = useState({name: '', affiliation: '', region: '' as import('@/lib/profile-regions').ProfileRegion | ''});
   const [busy, setBusy] = useState(false), [msg, setMsg] = useState<{ok: boolean; text: string} | null>(null), [count, setCount] = useState<number | null>(null);
 
   useEffect(() => { if (session) setForm({name: session.profile.name, affiliation: session.profile.affiliation, region: session.profile.region}); }, [session?.profile.name, session?.profile.affiliation, session?.profile.region]);
@@ -35,7 +36,7 @@ export default function Account({onOpenPredict}: {onOpenPredict: () => void}) {
         <label>주 산지
           <select value={form.region} onChange={e => setForm(f => ({...f, region: e.target.value as RegionId | ''}))}>
             <option value="">선택 안 함</option>
-            {regionIds.map(r => <option key={r} value={r}>{regions[r].name} ({regions[r].area})</option>)}
+            {PROFILE_REGIONS.map(r => <option key={r.id} value={r.id}>{r.name} ({r.area})</option>)}
           </select>
           <small>모델 정보의 기상 기반 계산(상세 기능)이 이 산지로 시작합니다.</small>
         </label>
@@ -48,7 +49,7 @@ export default function Account({onOpenPredict}: {onOpenPredict: () => void}) {
       <section className="iq-card" hidden>
         <h3 className="account-h"><MapPin size={17} />내 기본 기상값 <small>기상 기반 계산용</small></h3>
         {d ? <>
-          <p className="account-sub">{session.profile.region ? regions[session.profile.region as RegionId].name : '산지 미지정'} 기준</p>
+          <p className="account-sub">{session.profile.region ? (PROFILE_REGIONS.find(r => r.id === session.profile.region)?.name ?? '산지 미지정') : '산지 미지정'} 기준</p>
           <dl className="account-dl">{inputKeys.map(k => <div key={k}><dt>{inputInfo[k].label}</dt><dd>{d[k]} {inputInfo[k].unit}</dd></div>)}</dl>
           <button className="btn btn-ghost" onClick={clearDefaults}><X size={15} />기본값 지우기</button>
         </> : <p className="account-sub">아직 없어요. 모델 정보 › 기상 기반 계산에서 ‘이 값을 내 기본값으로’를 누르면 저장됩니다.</p>}

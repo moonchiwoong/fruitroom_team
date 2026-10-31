@@ -7,7 +7,8 @@ import type {Inputs, RegionId} from '@/lib/initial-quality';
 
 const Landing = dynamic(() => import('@/components/landing'), {ssr: false, loading: () => <Splash />});
 
-export type Profile = {name: string; affiliation: string; region: RegionId | ''; default_inputs: Inputs | null};
+import {type ProfileRegion} from '@/lib/profile-regions';
+export type Profile = {name: string; affiliation: string; region: ProfileRegion | ''; default_inputs: Inputs | null};
 export type Session = {
   userId: string; email: string; profile: Profile; isTeam: boolean;
   displayName: string;
@@ -48,7 +49,7 @@ export default function TeamAuth({children}: {children: ReactNode}) {
     const meta = u.meta;
     setProfile(!p.error && p.data ? {...emptyProfile, ...p.data} : {
       name: String(meta.name ?? ''), affiliation: String(meta.affiliation ?? ''),
-      region: (['cheongsong', 'jangsu', 'yeongju'].includes(String(meta.region)) ? meta.region : '') as Profile['region'], default_inputs: null,
+      region: (['geochang', 'cheongsong', 'jangsu', 'yeongju'].includes(String(meta.region)) ? meta.region : '') as Profile['region'], default_inputs: null,
     });
     setIsTeam(!t.error && !!t.data);
     setUser(u); setState(s => s === 'recovery' ? s : 'in');

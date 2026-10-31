@@ -14,7 +14,7 @@ const inputIcon: Record<InputKey, typeof CloudRain> = {rain9: CloudRain, lc56: S
 
 export default function InitialQuality() {
   const session = useTeamSession();
-  const home = session?.profile.region || 'cheongsong';
+  const home = (session?.profile.region && session.profile.region !== 'geochang' ? session.profile.region : 'cheongsong') as RegionId;
   // 내 기본값(산지·기상값)이 있으면 그 값으로 시작합니다.
   const startInputs = (r: RegionId) => r === session?.profile.region && session?.profile.default_inputs ? session.profile.default_inputs : defaultInputs(r);
   const [region, setRegion] = useState<RegionId>(home);
