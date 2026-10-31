@@ -103,7 +103,7 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
       <section id="join" className="lv-join" aria-labelledby="lv-join-title">
         <div className="lv-join-copy" {...d(0)}>
           <h2 id="lv-join-title">{mode === 'login' ? '다시 오셨네요' : '내 기록을 저장하려면'}</h2>
-          <p>{handoff ? '로그인하면 체험 화면에서 입력하던 내용으로 돌아가 이어서 저장할 수 있어요.' : '가입하면 물량별 측정 기록, 온습도 이력, 사진을 내 계정에 저장합니다. 내 기록은 나만 볼 수 있어요.'}</p>
+          <p>{handoff ? '로그인하면 체험 화면에서 입력하던 내용으로 돌아가 이어서 저장할 수 있어요.' : '가입하면 사과별 측정 기록, 온습도 이력, 사진을 내 계정에 저장합니다. 내 기록은 나만 볼 수 있어요.'}</p>
         </div>
         <div className="lv-join-card" {...d(1)}><AuthCard mode={mode} setMode={setMode} onRecovered={onRecovered} /></div>
       </section>

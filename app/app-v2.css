@@ -959,3 +959,4 @@ html.big-text .as-intro .lv-hero-copy, html.big-text .as-cap > *, html.big-text 
 .shot-bigtext{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 12px;margin-left:auto;border:1px solid #cfd8cc;border-radius:999px;background:#fff;color:#17241b;font:inherit;font-size:14px;cursor:pointer}
 .shot-bigtext.on{border-color:var(--c-main);color:var(--c-main);background:#e8f1ea}
 .account-login-btns{display:flex;gap:8px;flex-wrap:wrap}.account-login-btns .btn{flex:1;min-height:44px}
+.na-card{grid-template-columns:minmax(0,1fr)}.na-field input{width:0}.na-field select{flex:none;width:auto}.na-field em{flex:none;min-width:34px}

@@ -84,7 +84,7 @@ export default function NewApple({onBack, onSaved}: {onBack: () => void; onSaved
     try { const p = lotPredictor(fake), day = 60; return {day, rows: EASY_METRICS.map(k => ({k, r: p.at(k, day)})), weather: p.weather}; } catch { return null; }
   }, [form, startDate]);
 
-  const missing = [!harvest && '수확일', !same && !start && '저장 시작일', hongro && !temp && '저장고 온도', !hongro && !mcp && '1-MCP 처리 여부', !hongro && source === 'weather' && !region && '생산지'].filter(Boolean) as string[];
+  const missing = [!harvest && '수확일', !same && !start && '저장 시작일', hongro && !temp && '저장고 온도', !hongro && !mcp && '1-MCP 처리 여부', !hongro && source === 'weather' && !region && '생산지', source === 'measured' && !m.brix.trim() && !m.firmness.trim() && !m.acidity.trim() && '잰 값(하나 이상)'].filter(Boolean) as string[];
   async function save() {
     setErr('');
     if (missing.length) { setErr(`${missing.join(', ')}을(를) 골라 주세요.`); return; }
@@ -92,7 +92,7 @@ export default function NewApple({onBack, onSaved}: {onBack: () => void; onSaved
     if (e.length) { setErr(e[0]); return; }
     setSaving(true);
     try {
-      const r = await requestJson<{lot: Lot}>('/api/lots', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payloadFromForm(form))});
+      const r = await requestJson<{lot: Lot}>('/api/lots', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify((() => { const pl = payloadFromForm(form); return {...pl, details: {...pl.details, region: hongro ? 'geochang' : region || null}}; })())});
       await onSaved(r.lot);
     } catch (x) { setErr((x as Error).message); } finally { setSaving(false); }
   }
