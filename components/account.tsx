@@ -62,7 +62,7 @@ export default function Account({onOpenPredict}: {onOpenPredict: () => void}) {
       </section>
       <section className="iq-card">
         <h3 className="account-h">{session.isTeam ? <Users size={17} /> : <ShieldCheck size={17} />}데이터 공유 범위</h3>
-        <p className="account-sub">{session.isTeam ? '팀원 계정입니다. 내 개인 물량과 함께 팀 공유 물량을 볼 수 있고, 새 물량을 팀과 공유할 수 있어요.' : '개인 계정입니다. 내가 등록한 물량·기록·예측은 나만 볼 수 있어요.'}</p>
+        <p className="account-sub">{session.isTeam ? '팀원 계정입니다. 내 사과와 함께 팀이 공유한 사과을 볼 수 있고, 새 사과를 팀과 공유할 수 있어요.' : '개인 계정입니다. 내가 등록한 사과·기록·예측은 나만 볼 수 있어요.'}</p>
       </section>
       <button className="btn btn-ghost account-logout" onClick={() => void session.signOut()}><LogOut size={15} />로그아웃</button>
       <LoginChange email={session.email} />

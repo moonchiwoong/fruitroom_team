@@ -91,7 +91,7 @@ export function LotEditor({open, lot, onClose, onSaved}: {open: boolean; lot?: L
         ? <Field id="le-temp" label="저장고 온도"><select id="le-temp" value={f.temperature} onChange={e => set('temperature', e.target.value)}><option value="">선택</option><option value="0">0℃</option><option value="4">4℃</option></select></Field>
         : <Field id="le-temp" label={<>실제 저장고 온도 <small>℃ · 선택</small></>} hint="기록한 온도를 지원 온도로 바꾸지 않아요."><input id="le-temp" type="number" inputMode="decimal" step="any" value={f.temperature} placeholder="예: 0" onChange={e => set('temperature', e.target.value)} /></Field>}
       {lot && (lot.details?.fuji_weather || lot.details?.hongro?.source === 'weather') && <p className="ld-hint ld-wide">생산지: {({cheongsong: '청송', jangsu: '장수', yeongju: '영주'} as Record<string, string>)[lot.details?.fuji_weather?.region ?? ''] ?? '거창'} · 처음 품질은 수확한 해 날씨로 추정했어요. 생산지나 추정 방식을 바꾸려면 새 사과로 등록해 주세요.</p>}
-      {session?.isTeam && <Field id="le-share" label="공유 범위" hint={!session?.isTeam ? '팀 계정에서만 팀과 공유할 수 있어요.' : !owner ? '공유 범위는 물량을 등록한 사람만 바꿀 수 있어요.' : '팀과 공유하면 팀원이 기록을 보고 추가·수정할 수 있어요.'}>
+      {session?.isTeam && <Field id="le-share" label="공유 범위" hint={!session?.isTeam ? '팀 계정에서만 팀과 공유할 수 있어요.' : !owner ? '공유 범위는 사과를 등록한 사람만 바꿀 수 있어요.' : '팀과 공유하면 팀원이 기록을 보고 추가·수정할 수 있어요.'}>
         <select id="le-share" value={f.team ? 'team' : 'me'} disabled={!canShare} onChange={e => set('team', e.target.value === 'team')}><option value="me">나만 보기</option><option value="team">팀과 공유</option></select></Field>}
     </div>
     <div className={'ld-ready ' + preview.status} role="status"><Info size={16} aria-hidden="true" /><div><b>{preview.status === 'unsupported' ? preview.title : preview.status === 'conditions' ? '기록 가능 · ' + preview.title : '기록 가능 · ' + (preview.status === 'ready' ? '예측 가능' : '이 조건의 예측식 있음')}</b><span>{preview.status === 'ready' || preview.status === 'unsupported' || preview.status === 'conditions' ? preview.detail : '예측하려면 등록 후 예측 기준 초기 측정과 측정일을 기록해 주세요.'}</span></div></div>
@@ -158,7 +158,7 @@ export function MeasurementForm({open, lot, observation, prefill, isBaseline, ha
   return <Shell open={open} onClose={onClose} busy={busy} title={observation ? '측정 기록 수정' : '측정 기록 추가'} desc={<>{lot.name}{lot.location ? ` · ${lot.location}` : ''}</>}
     footer={<><p className="ld-foot-note">{observation ? '이 기록만 고쳐요. 새 기록을 만들지 않아요.' : '저장하면 목록·그래프·예측에 바로 반영돼요.'}</p><button type="button" className="btn btn-outline" onClick={onClose} disabled={busy}>취소</button><button type="button" className="btn btn-primary" onClick={() => void save()} disabled={busy}>{busy ? <Loader2 size={16} className="spin" /> : <Save size={16} />}기록 저장</button></>}>
     {restored && <div className="ld-restored" role="status"><span>작성하던 내용을 불러왔어요.</span><button type="button" className="linkbtn" onClick={() => { store.del(key); setF(obsDraft(lot, observation)); setRestored(false); }}><Undo2 size={13} />처음 값으로</button></div>}
-    {fromInitial ? <p className="ld-baseline on"><b>물량 등록 때 입력한 초기 측정을 고쳐요.</b> 저장하면 이 값이 측정 기록으로 남고 예측 기준 초기 측정으로 지정돼요. 고치기 전 값은 ‘이전 예측 기준값 이력’에 남아요.</p>
+    {fromInitial ? <p className="ld-baseline on"><b>사과 등록 때 입력한 초기 측정을 고쳐요.</b> 저장하면 이 값이 측정 기록으로 남고 예측 기준 초기 측정으로 지정돼요. 고치기 전 값은 ‘이전 예측 기준값 이력’에 남아요.</p>
       : isBaseline ? <p className="ld-baseline on"><b>현재 예측 기준 초기 측정이에요.</b> 고치면 예측에 쓰는 초기값도 함께 바뀌어요.</p>
       : null}
     <div className="ld-guide"><p>측정한 항목만 입력하세요. 빈칸은 미측정으로 남겨둘게요.</p><p>측정한 사과들의 평균값을 입력해 주세요.</p></div>

@@ -92,7 +92,7 @@ export default function Home() {
       {tab === 'model' && <PageHead title="계산 근거" />}
       <div className="page-body">
         {trackerVisited && <div hidden={tab !== 'track'}><QualityTracker lots={lots} onLotsChanged={reload} request={trackReq} onAskAI={setAIContext} openModelInfo={context => {setModelContext(context); setTab('model', true);}} openLot={id => { setLotFocus(id); setTab('lots'); }} /></div>}
-        {lotsVisited && <div hidden={tab !== 'lots'}>{lotsLoaded ? <MyApples lots={lots} loadError={lotsError} reload={reload} openTracker={openTracker} focus={lotFocus} openModel={() => setTab('model')} /> : <div className="loading-strip">물량을 불러오는 중…</div>}</div>}
+        {lotsVisited && <div hidden={tab !== 'lots'}>{lotsLoaded ? <MyApples lots={lots} loadError={lotsError} reload={reload} openTracker={openTracker} focus={lotFocus} openModel={() => setTab('model')} /> : <div className="loading-strip">사과 목록을 불러오는 중…</div>}</div>}
         {tab === 'model' && <ModelInfo context={modelContext} />}
         {tab === 'account' && <Account onOpenPredict={() => { setTab('model'); }} />}
       </div>
@@ -153,7 +153,7 @@ function HomePage({lots, loaded, error, retry, openTracker, setTab, onAskAI, ope
         <h1 className="app-title">저장한 사과,<br />변화를 살피세요.</h1>
         <p className="app-lead">측정한 값을 기록하고, 저장 중 품질 변화를 확인하세요.</p>
         <div className="ah-actions">
-          <button className="btn btn-primary btn-lg" onClick={newLot}>새 물량 등록하기<ArrowUpRight size={18} /></button>
+          <button className="btn btn-primary btn-lg" onClick={newLot}>새 사과 등록하기<ArrowUpRight size={18} /></button>
           <button className="ah-textlink" onClick={() => openTracker('example')}>처음이라면 예시로 체험하기<ArrowRight size={17} /></button>
         </div>
       </div>
@@ -177,7 +177,7 @@ function HomePage({lots, loaded, error, retry, openTracker, setTab, onAskAI, ope
               <button className="btn btn-outline" onClick={() => openLot(l.id)}>기록 보기</button></div>
           </li>; })}</ul>
         : <div className="ah-empty"><img src={applePhoto('empty')} alt="" /><div><b>아직 등록한 사과가 없어요.</b><p>저장을 시작한 사과를 등록하고, 측정한 값을 기록해 보세요.</p></div>
-          <button className="btn btn-primary" onClick={newLot}>새 물량 등록하기</button></div>}
+          <button className="btn btn-primary" onClick={newLot}>새 사과 등록하기</button></div>}
     </section>
 
     <section className="ah-section ah-steps" aria-labelledby="ah-how">
