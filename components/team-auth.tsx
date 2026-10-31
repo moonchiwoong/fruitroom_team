@@ -3,6 +3,7 @@ import {createContext, useCallback, useContext, useEffect, useRef, useState, typ
 import dynamic from 'next/dynamic';
 import {Loader2} from 'lucide-react';
 import {supabaseBrowser} from '@/lib/supabase-browser';
+import {displayLogin} from '@/lib/login-id';
 import type {Inputs, RegionId} from '@/lib/initial-quality';
 
 const Landing = dynamic(() => import('@/components/landing'), {ssr: false, loading: () => <Splash />});
@@ -10,7 +11,7 @@ const Landing = dynamic(() => import('@/components/landing'), {ssr: false, loadi
 import {type ProfileRegion} from '@/lib/profile-regions';
 export type Profile = {name: string; affiliation: string; region: ProfileRegion | ''; default_inputs: Inputs | null};
 export type Session = {
-  userId: string; email: string; profile: Profile; isTeam: boolean;
+  userId: string; email: string; loginId: string; profile: Profile; isTeam: boolean;
   displayName: string;
   saveProfile: (patch: Partial<Profile>) => Promise<string | null>;
   signOut: () => Promise<void>;
@@ -105,7 +106,7 @@ export default function TeamAuth({children}: {children: ReactNode}) {
 
   const session: Session = {
     userId: user.id, email: user.email, profile, isTeam,
-    displayName: profile.name || user.email.split('@')[0],
+    displayName: profile.name || user.email.split('@')[0], loginId: displayLogin(user.email),
     saveProfile,
     signOut: async () => {
       const scope = accountScope.current;
