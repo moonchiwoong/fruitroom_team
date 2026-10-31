@@ -514,7 +514,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
       : lossOnlyNew ? '감모율만 계산할 수 있어요'
       : `계산 가능: ${predictable.map(m => metricMeta[m].label).join(' · ')}`;
     const statusDetail = missingRequired ? (valueNames.length ? `${valueNames.join(' · ')} 입력됨` : '측정한 항목을 입력할 수 있어요.')
-      : !predictable.length ? (condition.ok ? '처음 측정한 경도·당도·산도 중 하나 이상을 넣으면 계산할 수 있어요. 기록은 저장할 수 있어요.' : [condition.title, condition.detail].filter(Boolean).join(' '))
+      : !predictable.length ? (condition.ok ? (weatherMode ? (supportRows.find(r => !r.ok && r.key !== 'save' && r.key !== 'measured-loss')?.text ?? '날씨 값과 수확일을 확인해 주세요.') : '처음 측정한 경도·당도·산도 중 하나 이상을 넣으면 계산할 수 있어요. 기록은 저장할 수 있어요.') : [condition.title, condition.detail].filter(Boolean).join(' '))
       : lossOnlyNew ? (anyInitial ? (supportRows.find(r => r.key !== 'loss' && r.key !== 'weather' && visibleMetrics.includes(r.key as MetricId) && !r.ok)?.text ?? '경도·당도·산도는 계산하지 않아요.') : '경도·당도·산도는 처음 측정한 값이 있어야 계산돼요. 감모율은 저장일수로 계산해요.')
       : estMode ? '초기 품질은 날씨로 추정한 값이에요(실측 아님).' : valueNames.length ? `${valueNames.join(' · ')} 입력됨` : '';
     const temperatureField = <F id="temperature" label={hongro ? '저장고 온도' : '실제 저장고 온도'} unit="℃" err={shownErrors.temperature} hint={hongro?'홍로 예측식은 0℃ 또는 4℃에만 있어요. 다른 온도는 기록만 하고 계산하지 않아요.':'후지의 온도는 기록용이며 예측식을 보정하지 않아요.'}><input id="tf-temperature" type="number" step="any" value={form.temperature} onChange={e=>setForm(f=>({...f,temperature:e.target.value,hongro:{...f.hongro,storage:e.target.value==='0'?'cold0':e.target.value==='4'?'cold4':f.hongro.storage}}))} /></F>;
@@ -566,7 +566,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
         <div className="new-grid2">
           {!(estMode && form.initialSameStart) && <div className="qt3-q"><div className="qt3-q-head"><label htmlFor="tf-initial_measured_on">{estMode ? '추정 기준일' : '측정일'}</label></div><label className="new-date-check"><input id="tf-initialSameStart" type="checkbox" checked={!!form.initialSameStart} onChange={e => setInitialSame(e.target.checked)} /><span>저장 시작일과 같음</span><span>{form.initialSameStart && startOk ? fmtDate(startDate) : ''}</span></label>{!form.initialSameStart && <input id="tf-initial_measured_on" className="qt3-input" type="date" max={today} value={form.initial_measured_on} onChange={e => set('initial_measured_on',e.target.value)} aria-invalid={!!shownErrors.initial_measured_on} />}{shownErrors.initial_measured_on && <span className="qf-err">{shownErrors.initial_measured_on}</span>}</div>}
         </div>
-        {weatherMode ? <WeatherChoices form={form} setForm={setForm} errors={errors} estimate={hongroResult ? hongroResult.initial : null} harvestDate={form.harvest_date} /> : fujiWeather ? <FujiWeather form={form} setForm={setForm} estimate={fujiEst} /> : <div className="new-grid3">{(['firmness','brix','acidity'] as const).map(metricInput)}</div>}
+        {weatherMode ? <WeatherChoices form={form} setForm={setForm} errors={errors} estimate={hongroResult ? hongroResult.initial : null} harvestDate={form.harvest_date} onHarvest={v => setForm(f => ({...f, harvest_date: v, ...(harvestSame ? {storage_start_date: v, ...(f.sameStart ? {intake_date: v} : {})} : {})}))} /> : fujiWeather ? <FujiWeather form={form} setForm={setForm} estimate={fujiEst} /> : <div className="new-grid3">{(['firmness','brix','acidity'] as const).map(metricInput)}</div>}
       </section>
       <details className="new-card new-extra" ref={optionalRef}><summary><strong>추가 기록</strong><span>선택 &nbsp; {hongro ? '이름 · 저장고' : '이름 · 저장고 · 온도'}</span><Plus size={20} /></summary><div className="new-extra-body">
         <div className="new-grid2">
@@ -954,6 +954,7 @@ function FujiWeather({form, setForm, estimate}: {form: TrackerForm; setForm: (up
       const j = await r.json().catch(() => ({}));
       if (!live) return;
       if (!r.ok) { setSt({state: 'error', key, msg: `${j.error || '날씨 자료를 불러오지 못했어요.'} 지금은 예측할 수 없어요. 잠시 뒤 다시 시도해 주세요.`}); return; }
+      if (!Array.isArray(j.variables)) { setSt({state: 'error', key, msg: '날씨 자료를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.'}); return; }
       const v = Object.fromEntries((j.variables as {key: string; value: number | null}[]).map(x => [x.key, x.value]));
       const reasons = (j.variables as {reason: string | null}[]).map(x => x.reason).filter(Boolean);
       setForm(f => ({...f, fuji: {...(f.fuji ?? emptyFujiForm()), year: String(year), weather: {rain9: v.chang_9rain == null ? '' : String(v.chang_9rain), lc56: v.chang_LC56 == null ? '' : String(v.chang_LC56), lc78: v.chang_LC78 == null ? '' : String(v.chang_LC78), min4: v.chang_min4 == null ? '' : String(v.chang_min4)}}}));
@@ -976,7 +977,7 @@ function FujiWeather({form, setForm, estimate}: {form: TrackerForm; setForm: (up
 }
 
 /** 홍로 날씨 값: 수확한 해의 농업기상(거창읍) 일자료로 자동 계산해 채우고, 확인·직접 입력할 수 있습니다. */
-function WeatherChoices({form, setForm, errors, estimate, harvestDate}: {form: TrackerForm; setForm: (update: (f: TrackerForm) => TrackerForm) => void; errors: Partial<Record<string, string>>; estimate: Record<'firmness' | 'brix' | 'acidity', number> | null; harvestDate?: string}) {
+function WeatherChoices({form, setForm, errors, estimate, harvestDate, onHarvest}: {form: TrackerForm; setForm: (update: (f: TrackerForm) => TrackerForm) => void; errors: Partial<Record<string, string>>; estimate: Record<'firmness' | 'brix' | 'acidity', number> | null; harvestDate?: string; onHarvest?: (v: string) => void}) {
   const harvest = harvestDate && isDate(harvestDate) ? {y: +harvestDate.slice(0, 4), m: +harvestDate.slice(5, 7), d: +harvestDate.slice(8, 10)} : null;
   // 수확한 해의 거창읍 농업기상 일자료로 네 값을 계산해 채웁니다(서버 경로 /api/weather/hongro). 비어 있는 값은 채우지 않습니다.
   type Fetched = {year: number; station: {code: string; name: string}; source: string; variables: {key: string; value: number | null; period: [string, string]; reason: string | null}[]};
@@ -989,6 +990,7 @@ function WeatherChoices({form, setForm, errors, estimate, harvestDate}: {form: T
       const j = await r.json().catch(() => ({}));
       if (!r.ok) { setAuto({state: 'error', year, error: `${j.error || '날씨 자료를 불러오지 못했어요.'} 지금은 예측할 수 없어요. 잠시 뒤 다시 시도해 주세요.`}); return; }
       const data = j as Fetched;
+      if (!Array.isArray(data?.variables)) { setAuto({state: 'error', year, error: '날씨 자료를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.'}); return; }
       setAuto({state: 'ok', year, data});
       setForm(f => ({...f, hongro: {...f.hongro, weather: {...f.hongro.weather, ...Object.fromEntries(data.variables.filter(v => v.value !== null).map(v => [v.key, String(v.value)]))}}}));
     } catch { setAuto({state: 'error', year, error: '날씨 자료를 불러오지 못해 지금은 예측할 수 없어요. 잠시 뒤 다시 시도해 주세요.'}); }
@@ -1001,6 +1003,12 @@ function WeatherChoices({form, setForm, errors, estimate, harvestDate}: {form: T
   const picked = HONGRO_WEATHER_FIELDS.filter(f => String(h.weather[f.key] ?? '').trim() !== '').length;
   return <div className="qt-weather qt3-weather">
     <div className="qt3-q-head"><p className="qt-weather-lead">{harvest ? `${harvest.y}년(수확한 해) 거창 재배기 날씨로 초기 품질을 추정해요.` : '수확일을 넣으면 그 해 거창 농업기상 자료로 날씨 값을 채워요.'}</p><span className="qt3-count" aria-live="polite">입력 {picked} / {HONGRO_WEATHER_FIELDS.length}</span></div>
+    {!harvest && <div className="qt3-q qt-weather-harvest">
+      <div className="qt3-q-head"><label htmlFor="tf-weather-harvest">수확일</label></div>
+      <input id="tf-weather-harvest" className="qt3-input" type="date" max={todayKST()} value={form.harvest_date} onChange={e => { const v = e.target.value; if (onHarvest) onHarvest(v); else setForm(f => ({...f, harvest_date: v})); }} />
+      {!onHarvest && isDate(form.sameStart ? form.intake_date : form.storage_start_date) && <button type="button" className="qt3-minibtn" onClick={() => { const d = form.sameStart ? form.intake_date : form.storage_start_date; setForm(f => ({...f, harvest_date: d})); }}>저장 시작일과 같은 날 수확했어요</button>}
+      <p className="qt3-help">날씨로 추정하려면 수확한 해를 알아야 해요. 수확일을 넣으면 바로 그 해 날씨를 불러와요.</p>
+    </div>}
     {harvest && <div className={'qt-weather-auto' + (auto.state === 'error' ? ' err' : '')} role="status" aria-live="polite">
       {auto.state === 'loading' ? <p><Loader2 className="spin" size={15} aria-hidden="true" />{harvest.y}년 4~9월 거창읍 날씨를 모으는 중이에요(몇 초 걸려요)…</p>
         : auto.state === 'error' ? <p>{auto.error}</p>

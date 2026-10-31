@@ -51,6 +51,7 @@ export default function NewApple({onBack, onSaved}: {onBack: () => void; onSaved
       const j = await r.json().catch(() => ({}));
       if (!live) return;
       if (!r.ok) { setWx({state: 'error', key: wKey, msg: j.error || '날씨 자료를 불러오지 못했어요.'}); return; }
+      if (!Array.isArray(j.variables)) { setWx({state: 'error', key: wKey, msg: '날씨 자료를 불러오지 못했어요.'}); return; }
       const v = Object.fromEntries((j.variables as {key: string; value: number | null}[]).map(x => [x.key, x.value]));
       setVals(v);
       const missing = Object.values(v).some(x => x === null);

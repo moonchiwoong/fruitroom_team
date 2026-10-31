@@ -84,7 +84,7 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
     if (!pend || waitSept) return;
     let live = true;
     fetch(`/api/weather/hongro?year=${pend.year}&region=${pend.region}`).then(r => r.ok ? r.json() : null).then(j => {
-      if (!live || !j) return;
+      if (!live || !j || !Array.isArray(j.variables)) return;
       const v = Object.fromEntries((j.variables as {key: string; value: number | null}[]).map(x => [x.key, x.value])) as WeatherValues;
       if (Object.values(v).every(x => x !== null)) setOverride(v);
     }).catch(() => {});
