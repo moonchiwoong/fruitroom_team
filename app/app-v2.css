@@ -899,3 +899,11 @@ p.ma-hint{margin:0;padding:10px 12px;border-radius:12px;background:#fff;font-wei
 .ma-target-row .ma-ghost{min-height:44px;margin-left:auto}
 .ma-howto{margin:8px auto 16px;padding-left:20px;text-align:left;max-width:360px;font-size:14px;color:var(--c-sub);line-height:1.7}
 .ld-wide{grid-column:1/-1;margin:0}
+/* 모바일 메뉴가 안 열리던 문제: 헤더의 backdrop-filter가 고정 위치 메뉴의 기준이 되어 메뉴 높이가 0으로 잘렸음.
+   접힌 메뉴를 쓰는 폭에서는 헤더 흐림 효과를 끄고, 메뉴 높이를 화면 기준으로 고정합니다. */
+@media(max-width:1000px){
+  .site-header2,.app-header{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:#fff}
+  .site-nav.open{bottom:auto;height:calc(100dvh - 60px);z-index:60;box-shadow:0 8px 24px rgba(23,36,27,.08)}
+}
+.mi-simple ul{margin:0;padding-left:20px;line-height:1.7}.mi-simple h3{margin-top:0}
+.mi-more>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:700;color:var(--c-main,#1f5f35);padding:8px 0}

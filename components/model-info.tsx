@@ -59,6 +59,15 @@ export default function ModelInfo({modelId, metric, context}: {modelId?: Storage
         {currentResult.weatherUnitWarning && <p><b>단위 확인 필요:</b> 날씨로 추정한 초기 경도와 저장 모델의 경도는 단위가 다릅니다. 현재 변환 없이 연결하지만 서로 같은 값으로 쓸 수 있는지 확인되지 않아 결과 해석에 주의가 필요합니다.</p>}
       </div> : (modelId || metric) ? <p className="mi-current-model">선택한 결과: {modelId ? modelLabel[modelId] : '저장 조건 확인 필요'}{metric ? ` · ${metricMeta[metric].label}` : ''}. 품종과 상세 조건은 결과 화면에서 확인해 주세요.</p> : <p>결과 화면의 ‘이 결과의 계산 근거’를 누르면 선택한 결과의 조건을 함께 확인할 수 있습니다.</p>}
     </section>
+    <section className="mi-card mi-simple" aria-label="한눈에 보기">
+      <h3>한눈에 보기</h3>
+      <ul>
+        <li><b>처음 품질</b>: 직접 잰 값, 또는 수확한 해 농업기상(거창·청송·장수·영주 관측소) 자료로 산지별 회귀식이 추정한 값이에요.</li>
+        <li><b>저장 중 변화</b>: 품종·보관 방식·1-MCP·온도별 저장식으로 저장 일수에 따라 계산해요. 직접 잰 값이 있으면 그 값에서 이어 계산해요.</li>
+        <li><b>정확도</b>: 아직 검증되지 않은 시연용 계산이에요. 출하·안전 여부는 판정하지 않아요.</li>
+      </ul>
+    </section>
+    <details className="mi-more"><summary>자세한 연구 정보 보기 (수식·자료·단위)</summary>
     <nav className="mi-toc" aria-label="계산 근거 목차">
       <button type="button" onClick={() => jumpTo('mi-storage')}>반영 정보·적용 조건</button><button type="button" onClick={() => jumpTo('mi-formulas')}>수식과 연구 자료</button><button type="button" onClick={() => jumpTo('mi-regression')}>연구 중인 모델·참고 자료</button>
     </nav>
@@ -202,5 +211,6 @@ export default function ModelInfo({modelId, metric, context}: {modelId?: Storage
       </details>
     </section>
     <p className="qt-help"><BookOpen size={13} /> 근거 자료가 추가되면(관측·검증 기간, 평가 자료) 이 페이지와 계산 범위를 함께 갱신합니다.</p>
+    </details>
   </div>;
 }
