@@ -1,6 +1,7 @@
 'use client';
 import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react';
 import dynamic from 'next/dynamic';
+import BigTextToggle from '@/components/big-text-toggle';
 import {Apple, ArrowRight, ArrowUpRight, BookOpen, ClipboardList, Home as HomeIcon, Info, LineChart, LogOut, Menu, MessageCircle, ShieldCheck, UserRound, X} from 'lucide-react';
 import {applePhoto} from '@/lib/photos';
 import {useTeamSession} from '@/components/team-auth';
@@ -117,13 +118,6 @@ function ProjectGuide() {
       </div></DialogContent></Dialog>;
 }
 
-function BigTextToggle() {
-  const [on, setOn] = useState(false);
-  useEffect(() => { setOn(document.documentElement.classList.contains('big-text')); }, []);
-  const toggle = () => { const next = !on; setOn(next); document.documentElement.classList.toggle('big-text', next); try { localStorage.setItem('appletrack:bigtext', next ? '1' : '0'); } catch { /* 저장 못 해도 이번 화면에는 적용 */ } };
-  return <button className={'nav-util big-text-toggle' + (on ? ' on' : '')} aria-pressed={on} onClick={toggle} title={on ? '글자 보통으로' : '글자 크게'}><span className="btt-ga" aria-hidden>가</span><span>{on ? '글자 보통' : '글자 크게'}</span></button>;
-}
-
 function SiteHeader({tab, setTab, menu, setMenu}: {tab: Page; setTab: (p: Page) => void; menu: boolean; setMenu: (v: boolean) => void}) {
   const session = useTeamSession(), signedIn = !!session?.userId;
   return <header className="site-header2 app-header"><div className="site-header-inner">
@@ -199,5 +193,5 @@ function SiteFooter({setTab}: {setTab: (p: Page) => void}) {
   return <footer className="site-footer"><div className="site-footer-inner">
     <div className="footer-brand"><div><img src="/assets/appletrack-logo.svg" alt="애플트랙" width={170} height={42} style={{display:'block', width:'clamp(132px, 16vw, 170px)', height:'auto'}} /><p>수확일만 넣으면 저장 중 사과 품질 변화를 보여줘요. 직접 잰 값과 계산값을 구분해 표시하며, 출하·안전 판정은 하지 않아요.</p></div></div>
     <nav aria-label="하단 메뉴">{pages.filter(p => !p.hidden).map(p => <button key={p.id} onClick={() => setTab(p.id)}>{p.label}</button>)}</nav>
-  </div><div className="site-footer-bottom"><ShieldCheck size={14} />사과 품질 예측·저장 관리 · FarmBridge</div></footer>;
+  </div><div className="site-footer-bottom"><ShieldCheck size={14} />사과 품질 예측·저장 관리 · FarmBridge</div><div className="site-footer-legal"><a href="/privacy"><b>개인정보처리방침</b></a><a href="/terms">이용약관</a><a href="mailto:mooncw@jbnu.ac.kr">문의</a></div></footer>;
 }

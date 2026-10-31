@@ -180,6 +180,15 @@ export async function deleteLot(id:string,req:Request){checkOrigin(req);const lo
  if(keys.length){try{await (await storage()).remove(keys);}catch{/* 파일 정리는 다음에 다시 시도 */}}
  for(const t of ['observations','environment','files','predictions'])checked(await c.from(t).delete().eq('lot_id',id));
  checked(await c.from('lots').delete().eq('id',id));return json({ok:true});}
+/** 회원 탈퇴: 본인이 등록한 사과(측정·파일 포함)를 모두 지운 뒤, 본인 계정만 지우는 DB 함수(delete_my_account)를 부릅니다. 다른 사람의 기록은 건드리지 않습니다. */
+export async function deleteMyAccount(req:Request){checkOrigin(req);const p=await payload(req);if(p.confirm!=='탈퇴')throw new InputError('확인 문구를 입력해 주세요.');const {c,user}=await clientUser();
+ const lots=(checked(await c.from('lots').select('id').eq('owner_id',user.id)) as {id:string}[]|null)??[];
+ for(const {id} of lots){const keys=((checked(await c.from('files').select('key').eq('lot_id',id)) as {key:string|null}[]|null)??[]).map(r=>r.key).filter(Boolean) as string[];
+  if(keys.length){try{await (await storage()).remove(keys);}catch{/* 파일 정리 실패는 계속 진행 */}}
+  for(const t of ['observations','environment','files','predictions'])checked(await c.from(t).delete().eq('lot_id',id));
+  checked(await c.from('lots').delete().eq('id',id));}
+ const r=await c.rpc('delete_my_account');if(r.error)throw new InputError(/function|does not exist|schema cache/i.test(r.error.message)?'탈퇴 기능 준비가 아직 끝나지 않았어요. 운영자에게 문의해 주세요.':'탈퇴를 처리하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+ await c.auth.signOut().catch(()=>{});return json({ok:true,deleted_lots:lots.length});}
 /** 측정 기록 삭제. 예측의 처음 값으로 지정된 기록은 지우지 않고 고치도록 안내합니다. */
 export async function deleteObservation(id:string,req:Request){checkOrigin(req);const lot=await getLot(id);const p=await payload(req);const oid=short(p.observation_id,'측정 기록',false,80);
  if(lot.details?.initial_observation_id===oid)throw new InputError('예측의 처음 값으로 쓰는 기록이라 지울 수 없어요. 값을 고쳐 주세요.');

@@ -1,4 +1,5 @@
 'use client';
+import BigTextToggle from '@/components/big-text-toggle';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import dynamic from 'next/dynamic';
 import type {TrackerRequest} from '@/components/quality-tracker';
@@ -53,7 +54,7 @@ export default function GuestTry() {
         <button className={'nav-link' + (view === 'track' ? ' active' : '')} aria-current={view === 'track' ? 'page' : undefined} onClick={() => go({view: 'track'})}>품질 예측 체험</button>
         <button className={'nav-link' + (view === 'basis' ? ' active' : '')} aria-current={view === 'basis' ? 'page' : undefined} onClick={() => {setModelContext(undefined); go({view: 'basis'});}}>계산 근거</button>
       </nav>
-      <div className="guest-utils"><button className="btn btn-ghost" onClick={() => toLogin()}>로그인</button><button className="btn btn-primary" onClick={() => toLogin(true)}>가입하기</button></div>
+      <div className="guest-utils"><BigTextToggle className="btn btn-ghost" /><button className="btn btn-ghost" onClick={() => toLogin()}>로그인</button><button className="btn btn-primary" onClick={() => toLogin(true)}>가입하기</button></div>
     </div></header>
     <main className="site-main">
       <div className="page-hero"><div className="page-hero-inner">

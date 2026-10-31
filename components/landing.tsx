@@ -1,4 +1,5 @@
 'use client';
+import BigTextToggle from '@/components/big-text-toggle';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import dynamic from 'next/dynamic';
 import {ArrowRight, ClipboardList, Gauge, LineChart, Loader2, MailCheck} from 'lucide-react';
@@ -137,6 +138,7 @@ function Hero({onJoin, animate}: {onJoin: (mode: Mode) => void; animate: boolean
     <header className="shot-header">
       <div className="shot-header-inner">
         <a className="shot-logo" href="/" aria-label="애플트랙 첫 화면"><img src="/assets/appletrack-logo.svg" alt="" width={170} height={42} style={{display:'block', width:'clamp(132px, 16vw, 170px)', height:'auto'}} /></a>
+        <BigTextToggle className="shot-bigtext" />
         <button ref={toggle} className="shot-menu-toggle" type="button" aria-label={open ? '메뉴 닫기' : '메뉴 열기'} aria-expanded={open} aria-controls="shot-nav" onClick={() => setOpen(!open)}><span /><span /><span /></button>
         <nav id="shot-nav" className={'shot-nav' + (open ? ' is-open' : '')} aria-label="주요 메뉴">
           <button type="button" onClick={guide}>이용 가이드</button>
@@ -323,6 +325,7 @@ function AuthCard({mode, setMode, onRecovered}: {mode: Mode; setMode: (m: Mode) 
       {mode !== 'reset' && <label><span>{mode === 'recovery' ? '새 비밀번호' : '비밀번호'}{mode !== 'login' && <small>8자 이상</small>}</span><input type="password" value={form.password} onChange={set('password')} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required /></label>}
       {(mode === 'signup' || mode === 'recovery') && <label>비밀번호 확인<input type="password" value={form.confirm} onChange={set('confirm')} autoComplete="new-password" required /></label>}
       {mode === 'signup' && <label className="l-agree"><input type="checkbox" checked={form.agree} onChange={set('agree')} /><span>서비스 이용을 위한 개인정보(이메일·이름·소속) 수집·이용에 동의합니다.</span></label>}
+      {mode === 'signup' && <p className="auth-legal" style={{fontSize: 13, color: 'var(--c-sub)', margin: '4px 0 0'}}>가입하면 <a href="/terms" target="_blank" rel="noreferrer">이용약관</a>과 <a href="/privacy" target="_blank" rel="noreferrer">개인정보처리방침</a>을 확인한 것으로 봐요.</p>}
       <button className="btn btn-primary" disabled={busy} type="submit">{busy && <Loader2 className="spin" size={16} />}{busy ? '처리 중…' : mode === 'signup' ? '가입하고 시작하기' : mode === 'login' ? '로그인' : mode === 'reset' ? '재설정 메일 받기' : '비밀번호 바꾸기'}</button>
       {error && <p role="alert" className="auth-error">{error}</p>}
       {mode === 'login' && <button type="button" className="l-textlink" onClick={() => switchTo('reset')}>비밀번호를 잊으셨나요?</button>}
