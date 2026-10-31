@@ -20,7 +20,7 @@ const md = (d: string) => { const [, m, day] = d.split('-').map(Number); return 
 const unit = (m: string, hongro: boolean) => m === 'firmness' ? (hongro ? 'N (Ø11 mm)' : 'N') : metricMeta[m as 'brix'].unit;
 
 export default function MyApples({lots, loadError, reload, openTracker, focus, openModel}: {lots: Lot[]; loadError: string; reload: () => Promise<Lot[]>; openTracker: (mode: 'real' | 'example', lotId?: string) => void; focus?: {id: string | null; n: number; create?: boolean} | null; openModel?: () => void}) {
-  const [openId, setOpenId] = useState<string | null>(null), [creating, setCreating] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null), [creating, setCreating] = useState(false), [created, setCreated] = useState('');
   // 다른 화면에서 특정 사과(또는 새 사과 등록)를 열도록 요청하면 그 화면을 엽니다.
   useEffect(() => { if (focus) { setOpenId(focus.id); setCreating(!!focus.create && !focus.id); } }, [focus?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showDone, setShowDone] = useState(false);
@@ -33,8 +33,8 @@ export default function MyApples({lots, loadError, reload, openTracker, focus, o
   const all = useMemo(() => [...lots].sort((a, b) => (storageStart(a) || '').localeCompare(storageStart(b) || '')), [lots]);
   const done = all.filter(l => l.details?.archived_on), viewDone = showDone && done.length > 0, sorted = viewDone ? done : all.filter(l => !l.details?.archived_on);
   const lot = lots.find(l => l.id === openId) ?? null;
-  if (creating) return <NewApple onBack={() => setCreating(false)} onSaved={async l => { await reload(); setCreating(false); setOpenId(l.id); }} />;
-  if (lot) return <AppleDetail lot={lot} onBack={() => setOpenId(null)} reload={reload} openTracker={openTracker} openModel={openModel} />;
+  if (creating) return <NewApple onBack={() => setCreating(false)} onSaved={async l => { await reload(); setCreating(false); setCreated(l.id); setOpenId(l.id); }} />;
+  if (lot) return <AppleDetail key={lot.id} lot={lot} firstMsg={created === lot.id ? `‘${lot.name}’을(를) 등록했어요.` : ''} onBack={() => { setOpenId(null); setCreated(''); }} reload={reload} openTracker={openTracker} openModel={openModel} />;
   return <div className="ma">
     <div className="ma-head"><h1>내 사과</h1><button type="button" className="ma-primary" onClick={() => setCreating(true)}><Plus size={18} aria-hidden="true" />새 사과</button></div>
     {loadError && <p className="error-box" role="alert">목록을 불러오지 못했어요. {loadError} <button type="button" className="linkbtn" onClick={() => void reload()}>다시 불러오기</button></p>}
@@ -68,9 +68,9 @@ function AppleCard({lot, onOpen}: {lot: Lot; onOpen: () => void}) {
   </button>;
 }
 
-function AppleDetail({lot, onBack, reload, openTracker, openModel}: {lot: Lot; onBack: () => void; reload: () => Promise<Lot[]>; openTracker: (mode: 'real' | 'example', lotId?: string) => void; openModel?: () => void}) {
+function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel}: {lot: Lot; firstMsg?: string; onBack: () => void; reload: () => Promise<Lot[]>; openTracker: (mode: 'real' | 'example', lotId?: string) => void; openModel?: () => void}) {
   const [obs, setObs] = useState<Observation[] | null>(null), [err, setErr] = useState(''), [n, setN] = useState(0);
-  const [measure, setMeasure] = useState(false), [edit, setEdit] = useState(false), [msg, setMsg] = useState('');
+  const [measure, setMeasure] = useState(false), [edit, setEdit] = useState(false), [msg, setMsg] = useState(firstMsg);
   useEffect(() => {
     let live = true; setErr('');
     requestJson<{observations: Observation[]}>(`/api/lots/${lot.id}/analysis?asOf=${todayKST()}`).then(r => { if (live) setObs(r.observations ?? []); }).catch(e => { if (live) { setObs([]); setErr((e as Error).message); } });
@@ -110,6 +110,10 @@ function AppleDetail({lot, onBack, reload, openTracker, openModel}: {lot: Lot; o
     return {pred: `${SHORT[m]} ${fmtNum(prior.value, d)}`, actual: fmtNum(actual, d), diff: `${diff >= 0 ? '+' : ''}${fmtNum(diff, d)}`};
   }
   // 내 기준: 농가가 정한 단단함(N)에 계산상 언제쯤 닿는지 보여 줍니다(판정이 아니라 계산).
+  // 단단함을 kg(kgf) 기계로 재는 농가: 측정 입력에서 고른 단위를 기억해 두었다가 kg 환산을 함께 보여 줍니다(계산은 N 그대로).
+  const [kgUser, setKgUser] = useState(false);
+  useEffect(() => { try { setKgUser(window.localStorage.getItem('appletrack:firmunit') === 'kgf'); } catch { /* 무시 */ } }, []);
+  const asKg = (n: number) => `약 ${fmtNum(n / 9.80665, 1)} kg`;
   const [target, setTarget] = useState(lot.details?.firmness_target != null ? String(lot.details.firmness_target) : '');
   const maxDay = hongro ? 120 : 300;
   const reach = (() => {
@@ -160,10 +164,11 @@ function AppleDetail({lot, onBack, reload, openTracker, openModel}: {lot: Lot; o
     <p className="ma-date">{p.start ? `${md(addDays(p.start, sel))} 기준 (저장 ${sel}일째)` : ''}</p>
     <div className="ma-rows">{EASY_METRICS.map(m => { const r = p.at(m, sel);
       const boxes = m === 'loss' && r.ok && typeof lot.quantity === 'number' && quantityUnit(lot) === '상자' && lot.quantity > 0 ? ` · ${lot.quantity}상자 기준 약 ${fmtNum(lot.quantity * r.value / 100, 1)}상자 무게만큼` : '';
-      return <div key={m + ':' + sel} className="ma-row"><span>{SHORT[m]}</span><div>{r.ok ? <><b>{easyChange(m, r.value, r.first, p.weather)}</b><small>{fmtNum(r.value, metricMeta[m].digits)} {unit(m, hongro)}{boxes}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div></div>; })}</div>
+      return <div key={m + ':' + sel} className="ma-row"><span>{SHORT[m]}</span><div>{r.ok ? <><b>{easyChange(m, r.value, r.first, p.weather)}</b><small>{fmtNum(r.value, metricMeta[m].digits)} {unit(m, hongro)}{m === 'firmness' && kgUser ? ` (${asKg(r.value)})` : ''}{boxes}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div></div>; })}</div>
     <section className="ma-target" aria-label="내 단단함 기준"><h2>내 기준</h2>
       <div className="ma-target-row"><label htmlFor="ma-target">단단함</label><input id="ma-target" type="number" inputMode="decimal" min={1} max={300} step="any" placeholder="예: 50" value={target} onChange={e => setTarget(e.target.value)} /><span>N</span>
         <button type="button" className="ma-ghost" disabled={busy || target === (lot.details?.firmness_target != null ? String(lot.details.firmness_target) : '')} onClick={() => void saveTarget()}>저장</button></div>
+      {Number(target) > 0 && <p className="ma-sub">{target} N은 {asKg(Number(target))}이에요. (kg 기계 숫자 × 9.8 = N)</p>}
       {reach ? <p>{reach.text}</p> : <p className="ma-sub">내가 정한 단단함에 계산상 언제쯤 닿는지 보여 줘요. 출하 판정이 아니라 계산이에요.</p>}
     </section>
     <div className="ma-actions">
@@ -183,7 +188,7 @@ function AppleDetail({lot, onBack, reload, openTracker, openModel}: {lot: Lot; o
     <p className="ma-foot">{p.weather ? '처음 품질은 날씨로 추정 · ' : ''}{fromMeasured ? '내가 잰 값부터 이어 계산 · ' : ''}시연용 계산 · 출하·안전 판정 아님 {openModel && <button type="button" className="linkbtn" onClick={openModel}>계산 근거</button>} <button type="button" className="linkbtn" onClick={() => setEdit(true)}><Pencil size={13} aria-hidden="true" />사과 정보 수정</button></p>
     {measure && <MeasurementForm open lot={lot} isBaseline={false} hasBaseline={!!baselineObservation(lot, obs ?? [])} onClose={() => setMeasure(false)} onSaved={m => { setMeasure(false); setMsg(m); setN(x => x + 1); void reload(); }} />}
     {editObs && <MeasurementForm open lot={lot} observation={editObs} isBaseline={baselineObservation(lot, obs ?? [])?.id === editObs.id} hasBaseline={!!baselineObservation(lot, obs ?? [])} onClose={() => setEditObs(null)} onSaved={m => { setEditObs(null); setMsg(m); setN(x => x + 1); void reload(); }} />}
-    <div className="ma-manage"><button type="button" className="ma-ghost" disabled={busy} onClick={() => void archive(!lot.details?.archived_on)}>{lot.details?.archived_on ? '저장 중 목록으로 되돌리기' : '출하 완료로 옮기기'}</button><button type="button" className="ma-ghost" onClick={exportCsv}>기록 내려받기 (엑셀)</button><button type="button" className="linkbtn" onClick={() => openTracker('real', lot.id)}>예전 상세 화면으로 보기<ArrowRight size={14} aria-hidden="true" /></button><button type="button" className="linkbtn ma-danger" disabled={busy} onClick={() => void remove()}>이 사과 지우기</button></div>
+    <div className="ma-manage"><button type="button" className="ma-ghost" disabled={busy} onClick={() => void archive(!lot.details?.archived_on)}>{lot.details?.archived_on ? '저장 중 목록으로 되돌리기' : '출하 완료로 옮기기'}</button><button type="button" className="ma-ghost" onClick={exportCsv}>기록 내려받기 (엑셀)</button><button type="button" className="linkbtn ma-danger" disabled={busy} onClick={() => void remove()}>이 사과 지우기</button></div>
     {edit && <LotEditor open lot={lot} onClose={() => setEdit(false)} onSaved={() => { setEdit(false); setMsg('사과 정보를 저장했어요.'); void reload(); }} />}
   </div>;
 }
