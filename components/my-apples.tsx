@@ -1,7 +1,8 @@
 'use client';
 // ‘내 사과’: 농가용 단순 화면. 목록 → 사과 상세 → 측정 추가만 있습니다.
-// 계산은 lib/lot-predict.ts(기존 예측식 그대로)를 쓰고, 그래프·근거는 기존 ‘자세히 보기’(품질 예측 화면)로 보냅니다.
+// 계산은 lib/lot-predict.ts(기존 예측식 그대로)를 씁니다. 새 사과 등록·그래프·3D도 이 화면 안에서 엽니다.
 import {useEffect, useMemo, useState} from 'react';
+import dynamic from 'next/dynamic';
 import {ArrowLeft, ArrowRight, Loader2, Pencil, Plus} from 'lucide-react';
 import type {Lot, Observation} from '@/lib/lot-types';
 import {requestJson} from '@/components/lot-forms';
@@ -9,32 +10,36 @@ import {LotEditor, MeasurementForm} from '@/components/lot-dialogs';
 import {lotPredictor, easyChange, EASY_LABEL, EASY_METRICS, weatherPending, type WeatherValues} from '@/lib/lot-predict';
 import {lotReadiness, baselineObservation, storageStart, quantityUnit} from '@/lib/lot-readiness';
 import {fmtNum, metricMeta, todayKST, addDays, daysBetween, isDate} from '@/lib/tracker';
+import {AppleGraph, Apple3D} from '@/components/apple-graph';
+
+const NewApple = dynamic(() => import('@/components/new-apple'), {ssr: false, loading: () => <div className="loading-strip">여는 중…</div>});
 
 const REGION: Record<string, string> = {cheongsong: '청송', jangsu: '장수', yeongju: '영주'};
 const SHORT: Record<string, string> = {firmness: '단단함', loss: '무게', brix: '단맛', acidity: '신맛'};
 const md = (d: string) => { const [, m, day] = d.split('-').map(Number); return `${m}/${day}`; };
 const unit = (m: string, hongro: boolean) => m === 'firmness' ? (hongro ? 'N (Ø11 mm)' : 'N') : metricMeta[m as 'brix'].unit;
 
-export default function MyApples({lots, loadError, reload, openTracker, focus}: {lots: Lot[]; loadError: string; reload: () => Promise<Lot[]>; openTracker: (mode: 'real' | 'example', lotId?: string) => void; focus?: {id: string | null; n: number} | null}) {
-  const [openId, setOpenId] = useState<string | null>(null);
-  // 다른 화면에서 특정 사과를 열도록 요청하면(새 사과 저장 직후 등) 그 사과 상세를 엽니다.
-  useEffect(() => { if (focus) setOpenId(focus.id); }, [focus?.n]); // eslint-disable-line react-hooks/exhaustive-deps
+export default function MyApples({lots, loadError, reload, openTracker, focus, openModel}: {lots: Lot[]; loadError: string; reload: () => Promise<Lot[]>; openTracker: (mode: 'real' | 'example', lotId?: string) => void; focus?: {id: string | null; n: number; create?: boolean} | null; openModel?: () => void}) {
+  const [openId, setOpenId] = useState<string | null>(null), [creating, setCreating] = useState(false);
+  // 다른 화면에서 특정 사과(또는 새 사과 등록)를 열도록 요청하면 그 화면을 엽니다.
+  useEffect(() => { if (focus) { setOpenId(focus.id); setCreating(!!focus.create && !focus.id); } }, [focus?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showDone, setShowDone] = useState(false);
-  // 휴대폰 속도: 목록을 보는 동안 ‘새 사과’·‘그래프’ 화면 코드를 미리 받아 두어, 눌렀을 때 바로 열리게 합니다.
+  // 휴대폰 속도: 목록을 보는 동안 ‘새 사과’ 화면 코드를 미리 받아 두어, 눌렀을 때 바로 열리게 합니다.
   useEffect(() => {
-    const load = () => { void import('@/components/quality-tracker'); };
+    const load = () => { void import('@/components/new-apple'); };
     const w = window as Window & {requestIdleCallback?: (cb: () => void) => number};
     if (w.requestIdleCallback) w.requestIdleCallback(load); else setTimeout(load, 1500);
   }, []);
   const all = useMemo(() => [...lots].sort((a, b) => (storageStart(a) || '').localeCompare(storageStart(b) || '')), [lots]);
   const done = all.filter(l => l.details?.archived_on), viewDone = showDone && done.length > 0, sorted = viewDone ? done : all.filter(l => !l.details?.archived_on);
   const lot = lots.find(l => l.id === openId) ?? null;
-  if (lot) return <AppleDetail lot={lot} onBack={() => setOpenId(null)} reload={reload} openTracker={openTracker} />;
+  if (creating) return <NewApple onBack={() => setCreating(false)} onSaved={async l => { await reload(); setCreating(false); setOpenId(l.id); }} />;
+  if (lot) return <AppleDetail lot={lot} onBack={() => setOpenId(null)} reload={reload} openTracker={openTracker} openModel={openModel} />;
   return <div className="ma">
-    <div className="ma-head"><h1>내 사과</h1><button type="button" className="ma-primary" onClick={() => openTracker('real', 'new')}><Plus size={18} aria-hidden="true" />새 사과</button></div>
+    <div className="ma-head"><h1>내 사과</h1><button type="button" className="ma-primary" onClick={() => setCreating(true)}><Plus size={18} aria-hidden="true" />새 사과</button></div>
     {loadError && <p className="error-box" role="alert">목록을 불러오지 못했어요. {loadError} <button type="button" className="linkbtn" onClick={() => void reload()}>다시 불러오기</button></p>}
     {viewDone && <p className="ma-hint muted">출하 완료로 옮긴 사과예요. 눌러서 다시 목록으로 옮길 수 있어요.</p>}
-    {!sorted.length && !loadError && !viewDone && <div className="ma-empty"><p><b>아직 등록한 사과가 없어요.</b></p><ol className="ma-howto"><li>새 사과: 품종·생산지·수확일·저장고 온도만 넣어요</li><li>사과를 누르면 저장 중 변화를 보여줘요</li><li>당도·단단함을 재면 ‘측정 추가’로 넣어요</li></ol><button type="button" className="ma-primary" onClick={() => openTracker('real', 'new')}><Plus size={18} aria-hidden="true" />첫 사과 등록하기</button></div>}
+    {!sorted.length && !loadError && !viewDone && <div className="ma-empty"><p><b>아직 등록한 사과가 없어요.</b></p><ol className="ma-howto"><li>새 사과: 품종·생산지·수확일·저장고 온도만 넣어요</li><li>사과를 누르면 저장 중 변화를 보여줘요</li><li>당도·단단함을 재면 ‘측정 추가’로 넣어요</li></ol><button type="button" className="ma-primary" onClick={() => setCreating(true)}><Plus size={18} aria-hidden="true" />첫 사과 등록하기</button></div>}
     <ul className="ma-list">{sorted.map(l => <li key={l.id}><AppleCard lot={l} onOpen={() => setOpenId(l.id)} /></li>)}</ul>
     {done.length > 0 && <button type="button" className="ma-ghost" onClick={() => setShowDone(v => !v)}>{viewDone ? '저장 중인 사과 보기' : `출하 완료 ${done.length}개 보기`}</button>}
   </div>;
@@ -63,7 +68,7 @@ function AppleCard({lot, onOpen}: {lot: Lot; onOpen: () => void}) {
   </button>;
 }
 
-function AppleDetail({lot, onBack, reload, openTracker}: {lot: Lot; onBack: () => void; reload: () => Promise<Lot[]>; openTracker: (mode: 'real' | 'example', lotId?: string) => void}) {
+function AppleDetail({lot, onBack, reload, openTracker, openModel}: {lot: Lot; onBack: () => void; reload: () => Promise<Lot[]>; openTracker: (mode: 'real' | 'example', lotId?: string) => void; openModel?: () => void}) {
   const [obs, setObs] = useState<Observation[] | null>(null), [err, setErr] = useState(''), [n, setN] = useState(0);
   const [measure, setMeasure] = useState(false), [edit, setEdit] = useState(false), [msg, setMsg] = useState('');
   useEffect(() => {
@@ -163,8 +168,9 @@ function AppleDetail({lot, onBack, reload, openTracker}: {lot: Lot; onBack: () =
     </section>
     <div className="ma-actions">
       <button type="button" className="ma-primary big" onClick={() => setMeasure(true)}><Plus size={18} aria-hidden="true" />측정 추가</button>
-      <button type="button" className="ma-ghost" onClick={() => openTracker('real', lot.id)}>그래프 · 사과 모양 보기<ArrowRight size={16} aria-hidden="true" /></button>
     </div>
+    <AppleGraph p={p} obs={obs ?? []} sel={sel} maxDay={hongro ? 120 : 200} />
+    <Apple3D p={p} sel={sel} cultivar={lot.variety || ''} />
     {msg && <div key={msg} className="ma-toast" role="status">✓ {msg}</div>}
     <section className="ma-records" aria-label="최근 측정 기록"><h2>최근 측정</h2>
       {obs === null ? <div aria-label="불러오는 중" style={{display: 'grid', gap: 8}}><span className="ma-sk" style={{height: 18}} /><span className="ma-sk" style={{height: 18, width: '70%'}} /></div> : err ? <p className="error-box">{err}</p>
@@ -174,10 +180,10 @@ function AppleDetail({lot, onBack, reload, openTracker}: {lot: Lot; onBack: () =
           {sortedObs.length > 3 && <button type="button" className="linkbtn" onClick={() => setAllRec(v => !v)}>{allRec ? '최근 3개만 보기' : `전체 ${sortedObs.length}개 보기`}</button>}</>
         : <p>아직 측정 기록이 없어요.</p>}
     </section>
-    <p className="ma-foot">{p.weather ? '처음 품질은 날씨로 추정 · ' : ''}{fromMeasured ? '내가 잰 값부터 이어 계산 · ' : ''}시연용 계산 · 출하·안전 판정 아님 <button type="button" className="linkbtn" onClick={() => setEdit(true)}><Pencil size={13} aria-hidden="true" />사과 정보 수정</button></p>
+    <p className="ma-foot">{p.weather ? '처음 품질은 날씨로 추정 · ' : ''}{fromMeasured ? '내가 잰 값부터 이어 계산 · ' : ''}시연용 계산 · 출하·안전 판정 아님 {openModel && <button type="button" className="linkbtn" onClick={openModel}>계산 근거</button>} <button type="button" className="linkbtn" onClick={() => setEdit(true)}><Pencil size={13} aria-hidden="true" />사과 정보 수정</button></p>
     {measure && <MeasurementForm open lot={lot} isBaseline={false} hasBaseline={!!baselineObservation(lot, obs ?? [])} onClose={() => setMeasure(false)} onSaved={m => { setMeasure(false); setMsg(m); setN(x => x + 1); void reload(); }} />}
     {editObs && <MeasurementForm open lot={lot} observation={editObs} isBaseline={baselineObservation(lot, obs ?? [])?.id === editObs.id} hasBaseline={!!baselineObservation(lot, obs ?? [])} onClose={() => setEditObs(null)} onSaved={m => { setEditObs(null); setMsg(m); setN(x => x + 1); void reload(); }} />}
-    <div className="ma-manage"><button type="button" className="ma-ghost" disabled={busy} onClick={() => void archive(!lot.details?.archived_on)}>{lot.details?.archived_on ? '저장 중 목록으로 되돌리기' : '출하 완료로 옮기기'}</button><button type="button" className="ma-ghost" onClick={exportCsv}>기록 내려받기 (엑셀)</button><button type="button" className="linkbtn ma-danger" disabled={busy} onClick={() => void remove()}>이 사과 지우기</button></div>
+    <div className="ma-manage"><button type="button" className="ma-ghost" disabled={busy} onClick={() => void archive(!lot.details?.archived_on)}>{lot.details?.archived_on ? '저장 중 목록으로 되돌리기' : '출하 완료로 옮기기'}</button><button type="button" className="ma-ghost" onClick={exportCsv}>기록 내려받기 (엑셀)</button><button type="button" className="linkbtn" onClick={() => openTracker('real', lot.id)}>예전 상세 화면으로 보기<ArrowRight size={14} aria-hidden="true" /></button><button type="button" className="linkbtn ma-danger" disabled={busy} onClick={() => void remove()}>이 사과 지우기</button></div>
     {edit && <LotEditor open lot={lot} onClose={() => setEdit(false)} onSaved={() => { setEdit(false); setMsg('사과 정보를 저장했어요.'); void reload(); }} />}
   </div>;
 }

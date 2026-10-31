@@ -91,7 +91,7 @@ export default function Home() {
       {tab === 'model' && <PageHead title="계산 근거" />}
       <div className="page-body">
         {trackerVisited && <div hidden={tab !== 'track'}><QualityTracker lots={lots} onLotsChanged={reload} request={trackReq} onAskAI={setAIContext} openModelInfo={context => {setModelContext(context); setTab('model', true);}} openLot={id => { setLotFocus(id); setTab('lots'); }} /></div>}
-        {lotsVisited && <div hidden={tab !== 'lots'}>{lotsLoaded ? <MyApples lots={lots} loadError={lotsError} reload={reload} openTracker={openTracker} focus={lotFocus} /> : <div className="loading-strip">물량을 불러오는 중…</div>}</div>}
+        {lotsVisited && <div hidden={tab !== 'lots'}>{lotsLoaded ? <MyApples lots={lots} loadError={lotsError} reload={reload} openTracker={openTracker} focus={lotFocus} openModel={() => setTab('model')} /> : <div className="loading-strip">물량을 불러오는 중…</div>}</div>}
         {tab === 'model' && <ModelInfo context={modelContext} />}
         {tab === 'account' && <Account onOpenPredict={() => { setTab('model'); }} />}
       </div>
@@ -117,6 +117,13 @@ function ProjectGuide() {
       </div></DialogContent></Dialog>;
 }
 
+function BigTextToggle() {
+  const [on, setOn] = useState(false);
+  useEffect(() => { setOn(document.documentElement.classList.contains('big-text')); }, []);
+  const toggle = () => { const next = !on; setOn(next); document.documentElement.classList.toggle('big-text', next); try { localStorage.setItem('appletrack:bigtext', next ? '1' : '0'); } catch { /* 저장 못 해도 이번 화면에는 적용 */ } };
+  return <button className={'nav-util big-text-toggle' + (on ? ' on' : '')} aria-pressed={on} onClick={toggle} title={on ? '글자 보통으로' : '글자 크게'}><span className="btt-ga" aria-hidden>가</span><span>{on ? '글자 보통' : '글자 크게'}</span></button>;
+}
+
 function SiteHeader({tab, setTab, menu, setMenu}: {tab: Page; setTab: (p: Page) => void; menu: boolean; setMenu: (v: boolean) => void}) {
   const session = useTeamSession(), signedIn = !!session?.userId;
   return <header className="site-header2 app-header"><div className="site-header-inner">
@@ -125,7 +132,7 @@ function SiteHeader({tab, setTab, menu, setMenu}: {tab: Page; setTab: (p: Page) 
       {pages.filter(p => !p.hidden && !(p.id === 'home' && signedIn)).map(p => <button key={p.id} className={'nav-link' + (tab === p.id ? ' active' : '')} aria-current={tab === p.id ? 'page' : undefined} onClick={() => setTab(p.id)}>{p.label}</button>)}
       <div className="nav-mobile-foot">{session && <button onClick={() => void session.signOut()}><LogOut size={15} />로그아웃</button>}</div>
     </nav>
-    <div className="site-utils"><ProjectGuide />
+    <div className="site-utils"><BigTextToggle /><ProjectGuide />
       {session && <button className="nav-util app-logout" onClick={() => void session.signOut()} title="로그아웃"><LogOut size={16} /><span>로그아웃</span></button>}
       <button className="menu-toggle" aria-label={menu ? '메뉴 닫기' : '메뉴 열기'} aria-expanded={menu} onClick={() => setMenu(!menu)}>{menu ? <X size={22} /> : <Menu size={22} />}</button>
     </div>
