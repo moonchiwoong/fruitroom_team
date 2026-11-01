@@ -23,8 +23,8 @@ export function AppleGraph({p, obs, sel, maxDay}: {p: P; obs: Observation[]; sel
   const [m, setM] = useState<MetricId>('firmness');
   const W = 340, H = 180, L = 40, R = 10, T = 12, B = 26;
   const data = useMemo(() => {
-    const pts: {d: number; v: number | null}[] = [];
-    for (let d = 0; d <= maxDay; d += 2) { const r = p.at(m, d); pts.push({d, v: r.ok ? r.value : null}); }
+    const pts: {d: number; v: number | null; seg: string}[] = [];
+    for (let d = 0; d <= maxDay; d += 2) { const r = p.at(m, d); pts.push({d, v: r.ok ? r.value : null, seg: r.ok ? r.from : ''}); }
     const meas = m === 'loss' || !p.start ? [] : obs.filter(o => o[m] != null && isDate(o.date)).map(o => ({d: daysBetween(p.start!, o.date), v: o[m] as number})).filter(x => x.d >= 0 && x.d <= maxDay);
     const vals = [...pts.map(x => x.v).filter((v): v is number => v !== null), ...meas.map(x => x.v)];
     if (!vals.length) return null;
@@ -32,7 +32,8 @@ export function AppleGraph({p, obs, sel, maxDay}: {p: P; obs: Observation[]; sel
     return {pts, meas, lo, hi};
   }, [p, m, obs, maxDay]);
   const x = (d: number) => L + (W - L - R) * d / maxDay, y = (v: number) => data ? T + (H - T - B) * (1 - (v - data.lo) / (data.hi - data.lo)) : 0;
-  const path = data ? data.pts.reduce((s, pt, i) => pt.v === null ? s : s + `${i && data.pts[i - 1].v !== null ? 'L' : 'M'}${x(pt.d).toFixed(1)},${y(pt.v).toFixed(1)}`, '') : '';
+  // 계산 출발점(처음 값 → 최근 측정값)이 바뀌는 곳은 선을 잇지 않습니다(이어 그리면 없는 급변처럼 보임).
+  const path = data ? data.pts.reduce((s, pt, i) => pt.v === null ? s : s + `${i && data.pts[i - 1].v !== null && data.pts[i - 1].seg === pt.seg ? 'L' : 'M'}${x(pt.d).toFixed(1)},${y(pt.v).toFixed(1)}`, '') : '';
   const selR = p.at(m, sel), today = p.todayDay;
   const ticks = [0, Math.round(maxDay / 4), Math.round(maxDay / 2), Math.round(maxDay * 3 / 4), maxDay];
   return <section className="ag" aria-label="저장 중 변화 그래프"><h2>그래프</h2>

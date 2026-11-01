@@ -72,7 +72,9 @@ export function lotPredictor(lot: Lot, observations: Observation[] = [], overrid
       temperature: num(form.temperature), mcp: (form.mcp === '처리' ? 'treated' : form.mcp === '미처리' ? 'untreated' : 'unknown') as 'treated' | 'untreated' | 'unknown',
       metric: m, day, allowFujiReference: false};
     if (m === 'loss') { const r = predictQuality({...base, anchor: {day: 0, value: 0}}); return r.ok && r.value !== null ? {ok: true, value: r.value, first: 0, from: 'model'} : {ok: false, reason: r.reason || '계산할 수 없어요.'}; }
-    const obs = latest(m), first = initial[m];
+    const obs0 = latest(m), first = initial[m];
+    // 최근 측정일보다 앞선 날은 처음 값에서 같은 식으로 계산합니다(식·계수는 그대로).
+    const obs = obs0 && first !== null && t0 !== null && day >= t0 && day < daysBetween(start, obs0.date) ? null : obs0;
     const anchor = obs ? {day: daysBetween(start, obs.date), value: obs[m] as number} : first !== null && t0 !== null ? {day: t0, value: first} : null;
     if (!anchor) return {ok: false, reason: '처음 측정값이 있어야 계산돼요.'};
     if (day < anchor.day) return {ok: false, reason: '측정일 이전이에요.'};
