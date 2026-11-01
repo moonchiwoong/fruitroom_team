@@ -10,6 +10,7 @@ import {useTeamSession} from '@/components/team-auth';
 import {emptyForm, payloadFromForm, validateForm, suggestName, type TrackerForm, type FujiRegion} from '@/lib/tracker-form';
 import {lotPredictor, easyChange, EASY_METRICS} from '@/lib/lot-predict';
 import {fmtNum, metricMeta, todayKST, isDate} from '@/lib/tracker';
+import LotPreview from '@/components/lot-preview';
 
 const FUJI_REGIONS: {id: FujiRegion; label: string; station: string}[] = [{id: 'cheongsong', label: '청송', station: '청송군 청송읍'}, {id: 'jangsu', label: '장수', station: '장수군 장수읍'}, {id: 'yeongju', label: '영주', station: '영주시 봉현면'}];
 const SHORT: Record<string, string> = {firmness: '단단함', loss: '무게', brix: '단맛', acidity: '신맛'};
@@ -24,7 +25,8 @@ function Seg<T extends string>({name, legend, value, options, onChange}: {name: 
 
 type Weather = {state: 'idle' | 'loading' | 'ok' | 'pending' | 'error'; msg?: string; key?: string};
 
-export default function NewApple({onBack, onSaved}: {onBack: () => void; onSaved: (lot: Lot) => void | Promise<void>}) {
+/** guest: 비회원 체험. 저장하지 않고 결과를 바로 보여 주며, 저장 버튼은 가입·로그인으로 보냅니다. */
+export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onBack?: () => void; onSaved?: (lot: Lot) => void | Promise<void>; guest?: boolean; onLogin?: () => void}) {
   const session = useTeamSession(), today = todayKST();
   const [cultivar, setCultivar] = useState<'후지' | '홍로'>('후지');
   const hongro = cultivar === '홍로';
@@ -82,7 +84,7 @@ export default function NewApple({onBack, onSaved}: {onBack: () => void; onSaved
     if (!isDate(startDate)) return null;
     let payload; try { payload = payloadFromForm(form); } catch { return null; }
     const fake = {id: 'preview', ...payload, latest_observation: null} as unknown as Lot;
-    try { const p = lotPredictor(fake), day = 60; return {day, rows: EASY_METRICS.map(k => ({k, r: p.at(k, day)})), weather: p.weather}; } catch { return null; }
+    try { const p = lotPredictor(fake), day = 60; return {day, rows: EASY_METRICS.map(k => ({k, r: p.at(k, day)})), weather: p.weather, lot: fake}; } catch { return null; }
   }, [form, startDate]);
 
   const missing = [!harvest && '수확일', !same && !start && '저장 시작일', hongro && !temp && '저장고 온도', !hongro && !mcp && '1-MCP 처리 여부', !hongro && source === 'weather' && !region && '생산지', source === 'measured' && !m.brix.trim() && !m.firmness.trim() && !m.acidity.trim() && '잰 값(하나 이상)'].filter(Boolean) as string[];
@@ -94,15 +96,15 @@ export default function NewApple({onBack, onSaved}: {onBack: () => void; onSaved
     setSaving(true);
     try {
       const r = await requestJson<{lot: Lot}>('/api/lots', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify((() => { const pl = payloadFromForm(form), q = Number(boxes); return {...pl, location: place.trim() || null, ...(boxes.trim() && Number.isFinite(q) && q > 0 ? {quantity: q} : {}), details: {...pl.details, region: hongro ? 'geochang' : region || null, quantity_unit: '상자'}}; })())});
-      await onSaved(r.lot);
+      await onSaved?.(r.lot);
     } catch (x) { setErr((x as Error).message); } finally { setSaving(false); }
   }
   const setUnitSaved = (u: 'N' | 'kgf') => { setUnit(u); try { window.localStorage.setItem('appletrack:firmunit', u); } catch { /* 무시 */ } };
   const station = hongro ? '거창군 거창읍' : FUJI_REGIONS.find(r => r.id === region)?.station;
 
   return <div className="ma ma-detail na">
-    <button type="button" className="ma-back" onClick={onBack}><ArrowLeft size={18} aria-hidden="true" />내 사과</button>
-    <div className="ma-title"><h1>새 사과</h1><p>다섯 가지만 고르면 저장 중 변화를 계산해요.</p></div>
+    {!guest && onBack && <button type="button" className="ma-back" onClick={onBack}><ArrowLeft size={18} aria-hidden="true" />내 사과</button>}
+    <div className="ma-title"><h1>{guest ? '내 사과로 해 보기' : '새 사과'}</h1><p>다섯 가지만 고르면 저장 중 변화를 계산해요.{guest ? ' 가입하지 않아도 결과를 볼 수 있어요.' : ''}</p></div>
 
     <section className="na-card"><h2><span>1</span>품종</h2>
       <Seg name="na-cultivar" legend="품종" value={cultivar} options={[{value: '후지', label: '후지'}, {value: '홍로', label: '홍로'}]} onChange={v => { setCultivar(v); setWx({state: 'idle'}); setVals(null); }} /></section>
@@ -144,11 +146,13 @@ export default function NewApple({onBack, onSaved}: {onBack: () => void; onSaved
       <label className="na-field"><span>상자 수</span><input type="number" inputMode="numeric" min={1} step={1} placeholder="예: 120" value={boxes} onChange={e => setBoxes(e.target.value)} /><em>상자</em></label>
       <p className="ma-sub">상자 수를 넣으면 무게가 줄어든 만큼을 ‘몇 상자 무게’로도 보여 줘요.</p></details>
 
-    {preview && <section className="na-card na-preview" aria-label="미리보기"><h2>저장 {preview.day}일 뒤 (미리보기)</h2>
+    {guest && preview && missing.length === 0 && <section className="na-card na-result" aria-label="결과"><h2>결과</h2><LotPreview lot={preview.lot} /><p className="ma-sub">시연용 계산 · 출하·안전 판정 아님</p></section>}
+    {!guest && preview && <section className="na-card na-preview" aria-label="미리보기"><h2>저장 {preview.day}일 뒤 (미리보기)</h2>
       <div className="ma-rows">{preview.rows.map(({k, r}) => <div key={k} className="ma-row"><span>{SHORT[k]}</span><div>{r.ok ? <><b>{easyChange(k, r.value, r.first, preview.weather)}</b><small>{fmtNum(r.value, metricMeta[k].digits)} {k === 'firmness' ? 'N' : metricMeta[k].unit}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div></div>)}</div>
       <p className="ma-sub">시연용 계산 · 출하·안전 판정 아님</p></section>}
 
     {err && <p className="error-box" role="alert">{err}</p>}
-    <div className="ma-actions"><button type="button" className="ma-primary big" disabled={saving} onClick={() => void save()}>{saving ? <Loader2 className="spin" size={18} aria-hidden="true" /> : <Check size={18} aria-hidden="true" />}저장하기</button></div>
+    {guest ? <div className="ma-actions"><button type="button" className="ma-primary big" onClick={onLogin}>가입하고 내 사과 저장하기</button></div>
+    : <div className="ma-actions"><button type="button" className="ma-primary big" disabled={saving} onClick={() => void save()}>{saving ? <Loader2 className="spin" size={18} aria-hidden="true" /> : <Check size={18} aria-hidden="true" />}저장하기</button></div>}
   </div>;
 }

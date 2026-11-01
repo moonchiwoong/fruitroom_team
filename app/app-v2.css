@@ -989,3 +989,7 @@ body{padding-bottom:64px}
   .ma-detail{max-width:760px}
 }
 .ag-svg{max-height:280px}
+/* 간단 체험 */
+.try-simple .try-tabs button{min-height:46px;font-size:15px}
+.na-result h2{font-size:16px}
+.lp{display:grid;gap:12px}
