@@ -70,7 +70,7 @@ AI 도우미 코드는 남아 있지만 `AI_*` 환경변수를 넣지 않아 꺼
 
 ### 데이터베이스
 
-새 Supabase 프로젝트라면 `supabase/` 폴더의 SQL을 파일 이름(날짜) 순서대로 실행합니다.
+새 Supabase 프로젝트라면 `supabase/` 폴더의 SQL을 파일 이름(날짜) 순서대로 실행합니다. 첫 파일 `2026-10-01_base_tables.sql`이 사과·측정·파일 등 기본 테이블을 만들고, 이후 파일이 권한 규칙(RLS)·프로필·함수를 더합니다. 파일 저장소 버킷(`fruitroom_files`, 비공개)은 Supabase Storage에서 만듭니다.
 가입은 아이디 방식이므로 Supabase Authentication → Email의 **Confirm email을 꺼 두어야** 합니다.
 
 ## 검증
