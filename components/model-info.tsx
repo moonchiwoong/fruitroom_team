@@ -174,7 +174,7 @@ export default function ModelInfo({modelId, metric, context}: {modelId?: Storage
       <ul className="mi-checks">
         <li className="ok"><CheckCircle2 size={16} /><div><b>시작값 일치</b> — 적용 모델과 필요한 초기값이 있는 조건에서 0일차 경도·당도·산도는 초기값, 모델 감모율은 0%입니다. 모델이 없는 항목은 0이 아닙니다.</div></li>
         <li className="ok"><CheckCircle2 size={16} /><div><b>구간 경계 연속</b> — 홍로 경도·산도는 60일 경계에서 연속이고, 후지 당도 구간선형식은 100·200일 경계에서 이어집니다.</div></li>
-        <li className="warn"><AlertTriangle size={16} /><div><b>후지 1-MCP 경도식의 출처 변경</b> — 이전 소스는 <code>y₀ − 0.002288t + 0.00002365t²</code>를 표시했습니다. 최신 제공 파일 사과_품질예측_회귀식.xlsx의 Sheet1!E6은 초기값 유지식이고 C6 모형 유형은 이차 회귀로 남아 있어 문서 내부 표기가 불일치합니다. 이전 번들 엑셀 E6은 이차식입니다. 최신 명시 수식을 기준으로 버전을 분리했으며 활성식은 <code>{mcpFirmness?.formula ?? '출처 확인 중'}</code>입니다. {mcpFirmness?.warnings.map((warning, index) => <p key={index}>{warning}</p>)} 출처 차이를 보정계수로 섞지 않습니다.</div></li>
+        <li className="ok"><CheckCircle2 size={16} /><div><b>후지 1-MCP 경도: 저장 중 초기 경도 유지</b> — 적용식은 <code>{mcpFirmness?.formula ?? 'y = y₀'}</code>입니다. 이전 분석의 이차식(<code>y₀ − 0.002288t + 0.00002365t²</code>)도 200일간 변화가 0.5 N 미만이어서, 최신 엑셀대로 초기 경도 유지로 단순화했습니다. 1-MCP가 연화를 늦추는 알려진 효과와 같은 방향이지만, 상온 유통 뒤나 장기 저장 뒤의 연화는 이 식에 반영되지 않습니다. 엑셀의 모형 유형 칸(‘2차’)은 표기 오류로 보고 수식을 기준으로 했습니다.</div></li>
         <li className="warn"><AlertTriangle size={16} /><div><b>1-MCP·CA 산도식의 100일 이후 정체</b> — <code>y₀·(1 − ⅓·min(t/100, 1))</code>는 식의 구조상 100일 이후 초기값의 2/3로 고정됩니다(원자료 비고: ‘호흡억제’). 관측 자료에서 확인된 특성인지는 미확인입니다.</div></li>
         <li className="warn"><AlertTriangle size={16} /><div><b>검증 자료 없음</b> — 별도 평가 자료와 오차가 없어 예측구간·신뢰구간을 표시하지 않습니다.</div></li>
       </ul>
