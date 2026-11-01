@@ -91,6 +91,7 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
     return () => { live = false; };
   }, [pend?.region, pend?.year, waitSept]); // eslint-disable-line react-hooks/exhaustive-deps
   const p = useMemo(() => lotPredictor(lot, obs ?? [], override), [lot, obs, override]);
+  const p0 = useMemo(() => (obs?.length ? lotPredictor(lot, [], override) : null), [lot, obs, override]);
   const hongro = /홍로/.test(lot.variety || '');
   // 홍로 식은 120일까지, 후지는 장기 저장이 많아 150·200일도 보여 줍니다(식 표시 범위 안).
   const days = [...new Set([...(p.todayDay !== null && p.todayDay >= 0 ? [p.todayDay] : []), 30, 60, 90, 120, ...(hongro ? [] : [150, 200])])].sort((a, b) => a - b);
@@ -176,7 +177,7 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
     <div className="ma-actions">
       <button type="button" className="ma-primary big" onClick={() => setMeasure(true)}><Plus size={18} aria-hidden="true" />측정 추가</button>
     </div>
-    <AppleGraph p={p} obs={obs ?? []} sel={sel} maxDay={hongro ? 120 : 200} />
+    <AppleGraph p={p} p0={p0} obs={obs ?? []} sel={sel} maxDay={hongro ? 120 : 200} />
     <Apple3D p={p} sel={sel} cultivar={lot.variety || ''} />
     {msg && <div key={msg} className="ma-toast" role="status">✓ {msg}</div>}
     <section className="ma-records" aria-label="최근 측정 기록"><h2>최근 측정</h2>
