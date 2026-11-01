@@ -6,8 +6,6 @@ import type {TrackerRequest} from '@/components/quality-tracker';
 import type {ModelInfoContext} from '@/components/model-info';
 import type {Lot} from '@/lib/lot-types';
 import {exampleForm, payloadFromForm} from '@/lib/tracker-form';
-import {addDays, todayKST} from '@/lib/tracker';
-import {lotPredictor} from '@/lib/lot-predict';
 import type {Observation} from '@/lib/lot-types';
 
 const NewApple = dynamic(() => import('@/components/new-apple'), {ssr: false, loading: () => <div className="loading-strip">화면을 준비하고 있어요…</div>});
@@ -81,12 +79,8 @@ function SimpleTry({mode, setMode, onLogin}: {mode: Mode; setMode: (m: Mode) => 
   const example = useMemo(() => {
     const f = exampleForm(), payload = payloadFromForm(f, 'real');
     const lot = {id: 'example', ...payload, latest_observation: null} as unknown as Lot;
-    // 예시 측정값: 손으로 정한 숫자 대신, 같은 예측식으로 계산한 값을 반올림해 씁니다(실제 측정이 아니라는 것을 화면에 밝힘).
-    const p = lotPredictor(lot, []), start = lot.storage_start_date || lot.intake_date, today = todayKST();
-    const obs = [7, 14, 21, 27].map(d => ({d, date: addDays(start, d)})).filter(x => x.date <= today).map(({d, date}) => {
-      const v = (m: 'firmness' | 'brix' | 'acidity', k: number) => { const r = p.at(m, d); return r.ok ? Math.round(r.value * k) / k : null; };
-      return {id: `example-${d}`, lot_id: 'example', date, firmness: v('firmness', 10), brix: v('brix', 10), acidity: v('acidity', 1000), weight: null, tracked_weight: null, defects: '없음', sample_count: 10, notes: '예시(식으로 계산한 가상 값)'} as unknown as Observation;
-    });
+    // 예시는 측정 기록 없이 처음 값에서 우리 예측식으로 0일부터 계산한 선 하나만 보여 줍니다.
+    const obs: Observation[] = [];
     return {lot, obs};
   }, []);
   return <div className="ma try-simple">
@@ -97,7 +91,7 @@ function SimpleTry({mode, setMode, onLogin}: {mode: Mode; setMode: (m: Mode) => 
     {mode === 'example' ? <>
       <div className="ma-title"><h1>예시 사과 · 후지</h1><p>후지 · 일반 저온 · 1-MCP 미처리 · <b>예시 데이터(실제 기록 아님)</b></p></div>
       <LotPreview lot={example.lot} observations={example.obs} obsLabel="예시 측정" />
-      <p className="ma-foot">예시 측정값은 예측식으로 계산한 가상 값이에요(실제 측정 아님) · 시연용 계산 · 출하·안전 판정 아님</p>
+      <p className="ma-foot">처음 값(예시)에서 예측식으로 0일부터 계산했어요 · 시연용 계산 · 출하·안전 판정 아님</p>
       <div className="ma-actions"><button type="button" className="ma-primary big" onClick={() => setMode('real')}>내 사과로 해 보기</button></div>
     </> : <NewApple guest onLogin={onLogin} />}
   </div>;
