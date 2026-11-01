@@ -142,7 +142,8 @@
     {
       "name": "kjfp-25-7-779.pdf",
       "sha256": "2626d6a7f3804fdd700226da612c07c70a4c86a2c62e12fbcdd56774a1f01810",
-      "bytes": 2260408
+      "bytes": 2260408,
+      "note": "저작권 때문에 저장소에서 원문 PDF를 뺐습니다. 원문: https://doi.org/10.11002/kjfp.2018.25.7.779"
     }
   ],
   "legacyFujiWorkbook": {
