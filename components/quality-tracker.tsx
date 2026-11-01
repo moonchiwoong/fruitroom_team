@@ -1043,7 +1043,7 @@ function WeatherChoices({form, setForm, errors, estimate, harvestDate, onHarvest
     {estimate ? <><p className="qt3-estimate"><span className="qt3-tag">날씨 기반 추정</span>경도 {fmtNum(estimate.firmness, 1)} N · 당도 {fmtNum(estimate.brix, 1)} °Brix · 산도 {fmtNum(estimate.acidity, 2)} %</p></>
       : picked === HONGRO_WEATHER_FIELDS.length ? null : <p className="qt3-help">{HONGRO_WEATHER_FIELDS.length - picked}개 값이 더 있어야 초기 품질을 추정해요.</p>}
     <details className="qt3-more"><summary>계산 근거</summary>
-    {harvest && harvest.m === 9 && <p className="qt3-note warn qt-weather-sept" role="note"><AlertTriangle size={16} aria-hidden="true" /><span>식의 ‘9월 강수량’은 9월 1~30일 전체 합계예요. 수확일(9월 {harvest.d}일) 뒤에 온 비도 들어가며, 9월이 끝나야 자동으로 계산돼요.</span></p>}
+    {harvest && harvest.m === 9 && <p className="qt3-note warn qt-weather-sept" role="note"><AlertTriangle size={16} aria-hidden="true" /><span>식의 ‘9월 강수량’은 9월 1~30일 전체 합계예요. 수확일(9월 {harvest.d}일) 뒤에 온 비도 들어가며, 9월이 끝나야 자동으로 계산돼요. 그래서 수확 당일 예측이 아니라, 지난 관측자료로 계산한 참고 추정이에요.</span></p>}
     {harvest && harvest.m < 9 && <p className="qt3-note warn qt-weather-sept" role="note"><AlertTriangle size={16} aria-hidden="true" /><span>9월 전에 수확했어요. 식에는 9월 강수량이 들어가지만 이 사과의 재배 기간에는 9월이 없어요. 추정값 해석에 주의해 주세요.</span></p>}
     <div className="qt3-note info"><Info size={16} /><div><span>{fromApi ? '날씨 값은 농촌진흥청 농업기상 관측(거창읍) 일자료로 계산했어요: 4월 일최저기온 평균, 5~6월·7~8월 (일평균기온 − 5℃) 합계, 9월 강수량 합계. 초기 품질은 이 값으로 추정한 값이며 실측이 아니에요.' : '날씨 값은 초기 품질을 추정하기 위한 입력이에요. 직접 입력한 값은 실측 기상자료와 구분해 기록해요.'}</span></div></div>
     </details>

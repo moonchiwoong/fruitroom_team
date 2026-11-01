@@ -8,7 +8,7 @@ import type {Lot, Observation} from '@/lib/lot-types';
 import {requestJson} from '@/components/lot-forms';
 import {LotEditor, MeasurementForm} from '@/components/lot-dialogs';
 import {lotPredictor, easyChange, EASY_LABEL, EASY_METRICS, weatherPending, type WeatherValues} from '@/lib/lot-predict';
-import {lotReadiness, baselineObservation, storageStart, quantityUnit} from '@/lib/lot-readiness';
+import {lotReadiness, baselineObservation, storageStart, quantityUnit, weatherInitial} from '@/lib/lot-readiness';
 import {fmtNum, metricMeta, todayKST, addDays, daysBetween, isDate} from '@/lib/tracker';
 import {AppleGraph, Apple3D} from '@/components/apple-graph';
 
@@ -59,7 +59,7 @@ function AppleCard({lot, onOpen}: {lot: Lot; onOpen: () => void}) {
   const hint = ready.status === 'unsupported' || ready.status === 'conditions' ? {tone: 'muted', text: '기록만 · 예측은 준비 중이에요'}
     : waitSept ? {tone: 'warn', text: '10월부터 날씨로 자동 추정 · 당도나 단단함을 재면 바로 예측돼요'}
     : !firm?.ok && loss?.ok ? {tone: 'warn', text: '당도나 단단함을 한 번 재 주세요'}
-    : since !== null && since >= 21 && !lot.details?.archived_on ? {tone: 'warn', text: lot.latest_observation || lot.initial_measured_on ? `마지막 측정 ${since}일 전 · 한 번 재 주세요` : `저장 ${since}일째 측정 없음 · 한 번 재 주세요`} : null;
+    : since !== null && since >= 21 && !lot.details?.archived_on ? {tone: 'warn', text: lot.latest_observation || (lot.initial_measured_on && !weatherInitial(lot)) ? `마지막 측정 ${since}일 전 · 한 번 재 주세요` : `아직 직접 측정한 기록이 없어요 · 저장 ${since}일째`} : null;
   return <button type="button" className="ma-card" onClick={onOpen}>
     <span className="ma-card-top"><b>{lot.name}</b><span>{d !== null && d >= 0 ? `${d}일째` : ''}</span></span>
     <span className="ma-card-sub">{[lot.variety, REGION[lot.details?.fuji_weather?.region ?? lot.details?.region ?? ''] ?? (lot.details?.hongro?.source === 'weather' ? '거창' : null), lot.location, lot.storage].filter(Boolean).join(' · ')}</span>
@@ -162,14 +162,14 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
     {override && <p className="ma-hint">{pend?.year}년 농업기상 자료로 처음 품질을 자동 추정했어요(실측 아님).</p>}
     <div className="ma-days" role="group" aria-label="저장 일수">{days.map(d => <button key={d} type="button" aria-pressed={sel === d} className={sel === d ? 'active' : ''} onClick={() => setDay(d)}>{d === p.todayDay ? '오늘' : `${d}일`}</button>)}</div>
     <p className="ma-date">{p.start ? `${md(addDays(p.start, sel))} 기준 (저장 ${sel}일째)` : ''}</p>
-    <div className="ma-rows">{EASY_METRICS.map(m => { const r = p.at(m, sel);
+    {obs === null ? <div className="ma-rows" aria-label="측정 기록을 불러와 계산하는 중" role="status"><span className="ma-sk" style={{height: 18}} /><span className="ma-sk" style={{height: 18, width: '80%'}} /><span className="ma-sk" style={{height: 18, width: '60%'}} /></div> : <div className="ma-rows">{EASY_METRICS.map(m => { const r = p.at(m, sel);
       const boxes = m === 'loss' && r.ok && typeof lot.quantity === 'number' && quantityUnit(lot) === '상자' && lot.quantity > 0 ? ` · ${lot.quantity}상자 기준 약 ${fmtNum(lot.quantity * r.value / 100, 1)}상자 무게만큼` : '';
-      return <div key={m + ':' + sel} className="ma-row"><span>{SHORT[m]}</span><div>{r.ok ? <><b>{easyChange(m, r.value, r.first, p.weather)}</b><small>{fmtNum(r.value, metricMeta[m].digits)} {unit(m, hongro)}{m === 'firmness' && kgUser ? ` (${asKg(r.value)})` : ''}{boxes}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div></div>; })}</div>
+      return <div key={m + ':' + sel} className="ma-row"><span>{SHORT[m]}</span><div>{r.ok ? <><b>{easyChange(m, r.value, r.first, p.weather)}</b><small>{fmtNum(r.value, metricMeta[m].digits)} {unit(m, hongro)}{m === 'firmness' && kgUser ? ` (${asKg(r.value)})` : ''}{boxes}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div></div>; })}</div>}
     <section className="ma-target" aria-label="내 단단함 기준"><h2>내 기준</h2>
       <div className="ma-target-row"><label htmlFor="ma-target">단단함</label><input id="ma-target" type="number" inputMode="decimal" min={1} max={300} step="any" placeholder="예: 50" value={target} onChange={e => setTarget(e.target.value)} /><span>N</span>
         <button type="button" className="ma-ghost" disabled={busy || target === (lot.details?.firmness_target != null ? String(lot.details.firmness_target) : '')} onClick={() => void saveTarget()}>저장</button></div>
       {Number(target) > 0 && <p className="ma-sub">{target} N은 {asKg(Number(target))}이에요. (kg 기계 숫자 × 9.8 = N)</p>}
-      {reach ? <p>{reach.text}</p> : <p className="ma-sub">내가 정한 단단함에 계산상 언제쯤 닿는지 보여 줘요. 출하 판정이 아니라 계산이에요.</p>}
+      {obs === null ? <p className="ma-sub">측정 기록을 불러오는 중이에요…</p> : reach ? <p>{reach.text}</p> : <p className="ma-sub">내가 정한 단단함에 계산상 언제쯤 닿는지 보여 줘요. 출하 판정이 아니라 계산이에요.</p>}
     </section>
     <div className="ma-actions">
       <button type="button" className="ma-primary big" onClick={() => setMeasure(true)}><Plus size={18} aria-hidden="true" />측정 추가</button>
@@ -188,7 +188,7 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
     <p className="ma-foot">{p.weather ? '처음 품질은 날씨로 추정 · ' : ''}{fromMeasured ? '내가 잰 값부터 이어 계산 · ' : ''}시연용 계산 · 출하·안전 판정 아님 {openModel && <button type="button" className="linkbtn" onClick={openModel}>계산 근거</button>} <button type="button" className="linkbtn" onClick={() => setEdit(true)}><Pencil size={13} aria-hidden="true" />사과 정보 수정</button></p>
     {measure && <MeasurementForm open lot={lot} isBaseline={false} hasBaseline={!!baselineObservation(lot, obs ?? [])} onClose={() => setMeasure(false)} onSaved={m => { setMeasure(false); setMsg(m); setN(x => x + 1); void reload(); }} />}
     {editObs && <MeasurementForm open lot={lot} observation={editObs} isBaseline={baselineObservation(lot, obs ?? [])?.id === editObs.id} hasBaseline={!!baselineObservation(lot, obs ?? [])} onClose={() => setEditObs(null)} onSaved={m => { setEditObs(null); setMsg(m); setN(x => x + 1); void reload(); }} />}
-    <div className="ma-manage"><button type="button" className="ma-ghost" disabled={busy} onClick={() => void archive(!lot.details?.archived_on)}>{lot.details?.archived_on ? '저장 중 목록으로 되돌리기' : '출하 완료로 옮기기'}</button><button type="button" className="ma-ghost" onClick={exportCsv}>기록 내려받기 (엑셀)</button><button type="button" className="linkbtn ma-danger" disabled={busy} onClick={() => void remove()}>이 사과 지우기</button></div>
+    <div className="ma-manage"><button type="button" className="ma-ghost" disabled={busy} onClick={() => void archive(!lot.details?.archived_on)}>{lot.details?.archived_on ? '저장 중 목록으로 되돌리기' : '출하 완료로 옮기기'}</button><button type="button" className="ma-ghost" onClick={exportCsv}>기록 내려받기 (CSV · 엑셀에서 열림)</button><button type="button" className="linkbtn ma-danger" disabled={busy} onClick={() => void remove()}>이 사과 지우기</button></div>
     {edit && <LotEditor open lot={lot} onClose={() => setEdit(false)} onSaved={() => { setEdit(false); setMsg('사과 정보를 저장했어요.'); void reload(); }} />}
   </div>;
 }
