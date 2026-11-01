@@ -1,11 +1,16 @@
 'use client';
 import BigTextToggle from '@/components/big-text-toggle';
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import dynamic from 'next/dynamic';
 import type {TrackerRequest} from '@/components/quality-tracker';
 import type {ModelInfoContext} from '@/components/model-info';
+import type {Lot} from '@/lib/lot-types';
+import {exampleForm, payloadFromForm} from '@/lib/tracker-form';
+import {demoAnalysis, demoLots} from '@/lib/demo-lots';
+import {todayKST} from '@/lib/tracker';
 
-const QualityTracker = dynamic(() => import('@/components/quality-tracker'), {ssr: false, loading: () => <div className="loading-strip">화면을 준비하고 있어요…</div>});
+const NewApple = dynamic(() => import('@/components/new-apple'), {ssr: false, loading: () => <div className="loading-strip">화면을 준비하고 있어요…</div>});
+const LotPreview = dynamic(() => import('@/components/lot-preview'), {ssr: false, loading: () => <div className="loading-strip">예시를 불러오는 중…</div>});
 const ModelInfo = dynamic(() => import('@/components/model-info'), {ssr: false, loading: () => <div className="loading-strip">계산 근거를 불러오는 중…</div>});
 
 type View = 'track' | 'basis';
@@ -18,7 +23,7 @@ const readUrl = (): {view: View; mode: Mode} => {
 /** 비회원 체험: 예시로 결과를 보고, 내 측정값도 입력해 볼 수 있습니다. 저장할 때만 로그인합니다. */
 export default function GuestTry() {
   const [{view, mode}, setState] = useState(readUrl);
-  const [request, setRequest] = useState<TrackerRequest>(() => ({mode: readUrl().mode, lotId: 'new', n: 1}));
+  const [, setRequest] = useState<TrackerRequest>(() => ({mode: readUrl().mode, lotId: 'new', n: 1}));
   const [modelContext, setModelContext] = useState<ModelInfoContext | undefined>();
   const [trackerVisited, setTrackerVisited] = useState(() => view === 'track');
   const modeRef = useRef(mode);
@@ -58,15 +63,36 @@ export default function GuestTry() {
     </div></header>
     <main className="site-main">
       <div className="page-hero"><div className="page-hero-inner">
-        <h1>{view === 'basis' ? '계산 근거·적용 범위' : '사과 품질을 확인해 보세요'}</h1>
-        {view !== 'basis' && <p>보관 조건을 기록하고, 초기 품질 입력 방식을 골라 주세요. 가입하지 않아도 써 볼 수 있어요.</p>}
+        <h1>{view === 'basis' ? '계산 근거·적용 범위' : '애플트랙 체험'}</h1>
+        {view !== 'basis' && <p>예시 사과를 보거나, 내 사과 정보를 넣어 바로 결과를 볼 수 있어요. 가입하지 않아도 돼요.</p>}
       </div></div>
       <div className="page-body">
-        {trackerVisited && <div hidden={view !== 'track'}><QualityTracker guest lots={[]} onLotsChanged={() => undefined} request={request} openModelInfo={context => {setModelContext(context); go({view: 'basis'});}} openLot={() => undefined}
-          onModeChange={m => go({mode: m})} onRequireLogin={() => toLogin()} /></div>}
+        {trackerVisited && <div hidden={view !== 'track'}><SimpleTry mode={mode} setMode={m => go({mode: m})} onLogin={() => toLogin(true)} /></div>}
         {view === 'basis' && <ModelInfo context={modelContext} />}
       </div>
     </main>
     <footer className="site-footer"><div className="site-footer-bottom guest-foot">애플트랙 by FarmBridge · 체험 화면의 예시 데이터는 실제 측정 기록이 아니며, 계산은 시연용입니다.</div></footer>
+  </div>;
+}
+
+/** 간단 체험: ‘예시 사과’(예시 데이터)와 ‘내 사과로 해 보기’(저장 없이 결과) 두 가지만 있습니다. */
+function SimpleTry({mode, setMode, onLogin}: {mode: Mode; setMode: (m: Mode) => void; onLogin: () => void}) {
+  const example = useMemo(() => {
+    const f = exampleForm(), payload = payloadFromForm(f, 'real');
+    const lot = {id: 'example', ...payload, latest_observation: null} as unknown as Lot;
+    const obs = demoAnalysis(demoLots()[0], todayKST()).observations.map(o => ({...o, acidity: null, tracked_weight: null}));
+    return {lot, obs};
+  }, []);
+  return <div className="ma try-simple">
+    <div className="ma-days try-tabs" role="tablist" aria-label="체험 방식">
+      <button type="button" role="tab" aria-selected={mode === 'example'} className={mode === 'example' ? 'active' : ''} onClick={() => setMode('example')}>예시 사과 보기</button>
+      <button type="button" role="tab" aria-selected={mode === 'real'} className={mode === 'real' ? 'active' : ''} onClick={() => setMode('real')}>내 사과로 해 보기</button>
+    </div>
+    {mode === 'example' ? <>
+      <div className="ma-title"><h1>예시 사과 · 후지</h1><p>후지 · 일반 저온 · 1-MCP 미처리 · <b>예시 데이터(실제 기록 아님)</b></p></div>
+      <LotPreview lot={example.lot} observations={example.obs} obsLabel="예시 측정" />
+      <p className="ma-foot">시연용 계산 · 출하·안전 판정 아님</p>
+      <div className="ma-actions"><button type="button" className="ma-primary big" onClick={() => setMode('real')}>내 사과로 해 보기</button></div>
+    </> : <NewApple guest onLogin={onLogin} />}
   </div>;
 }

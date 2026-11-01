@@ -19,7 +19,7 @@ class Boundary extends Component<{children: ReactNode}, {failed: boolean}> {
 }
 
 type P = ReturnType<typeof lotPredictor>;
-export function AppleGraph({p, obs, sel, maxDay}: {p: P; obs: Observation[]; sel: number; maxDay: number}) {
+export function AppleGraph({p, obs, sel, maxDay, measLabel = '내가 잰 값'}: {p: P; obs: Observation[]; sel: number; maxDay: number; measLabel?: string}) {
   const [m, setM] = useState<MetricId>('firmness');
   const W = 340, H = 180, L = 40, R = 10, T = 12, B = 26;
   const data = useMemo(() => {
@@ -47,7 +47,7 @@ export function AppleGraph({p, obs, sel, maxDay}: {p: P; obs: Observation[]; sel
         {data.meas.map((pt, i) => <circle key={i} cx={x(pt.d)} cy={y(pt.v)} r={4} className="ag-meas"><title>{`${pt.d}일 실측 ${fmtNum(pt.v, metricMeta[m].digits)} ${UNIT(m)}`}</title></circle>)}
         {selR.ok && sel <= maxDay && <circle cx={x(sel)} cy={y(selR.value)} r={5} className="ag-sel" />}
       </svg>
-      <p className="ag-legend"><span className="ag-k line" />계산값{data.meas.length > 0 && <><span className="ag-k dot" />내가 잰 값</>}<span className="ag-unit">단위 {UNIT(m)}</span></p>
+      <p className="ag-legend"><span className="ag-k line" />계산값{data.meas.length > 0 && <><span className="ag-k dot" />{measLabel}</>}<span className="ag-unit">단위 {UNIT(m)}</span></p>
     </>}
   </section>;
 }
