@@ -6,7 +6,7 @@
 
 - `data/evidence/사과_품질예측_회귀식.xlsx`: 이번 요청에서 지정한 후지 저장 품질 식.
 - `data/evidence/거창_품질예측식(1).xlsx`: 이번 요청에서 지정한 홍로 0℃·4℃ 저장 품질 근사식.
-- `data/evidence/kjfp-25-7-779.pdf`: 홍로 저온저장 연구 원문.
+- 홍로 저온저장 연구 원문(유진기 외 2018): https://doi.org/10.11002/kjfp.2018.25.7.779 (저작권 때문에 PDF는 저장소에 넣지 않음)
 - `data/evidence/source-manifest.json`: 위 원본들의 SHA-256, 크기, 엑셀 비어 있지 않은 셀의 전사와 기존 후지 파일의 비교 정보.
 - 기존 `data/storage-quality-model.xlsx`는 과거 수식의 근거를 추적할 수 있도록 덮어쓰지 않고 보존했다.
 
