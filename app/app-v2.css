@@ -996,3 +996,10 @@ body{padding-bottom:64px}
 .ag-measline{fill:none;stroke:var(--c-warn);stroke-width:1.6;stroke-dasharray:4 4;opacity:.8}
 .ag-baseline{fill:none;stroke:#9aa79c;stroke-width:2;opacity:.75}
 .ag-k.base{width:16px;height:3px;border-radius:2px;background:#9aa79c;margin-left:8px}
+/* 체험 화면: ‘예시 사과’와 ‘내 사과로 해 보기’ 폭을 같게(PC 760px, 휴대폰은 화면 폭) */
+.ma.try-simple{max-width:760px!important;width:100%}
+.try-simple .ma{width:100%;max-width:none!important;margin:0;padding:0}
+/* 결과 카드 안의 그래프는 카드 안 카드가 되지 않게(휴대폰에서 그래프가 작아지지 않도록) */
+.na-result .ag{border:0;padding:0;background:transparent}
+@media(max-width:600px){.na-result{padding:14px 12px}}
+.ag-tick{font-size:12px}
