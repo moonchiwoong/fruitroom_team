@@ -82,7 +82,7 @@ export function Apple3D({p, sel, cultivar}: {p: P; sel: number; cultivar: string
         <figure><figcaption><b>저장 {day}일째</b><span>{loss === null ? '계산 없음' : `무게 약 ${fmtNum(loss, 1)}% 감소`}</span></figcaption><Boundary><QualityAppleViewer bare day={day} cultivar={cultivar} metrics={now} /></Boundary></figure>
       </div>
       <p className="ag-cmp-cap">{caption}</p>
-      <p className="qt-help">위쪽 날짜 버튼을 바꾸면 오른쪽 사과가 바뀌어요. 손가락으로 돌려 볼 수 있어요. 무게 감소 계산값으로 그린 설명용 모델이고, 실제 사진으로 검증하지 않았어요. 단단함·단맛·신맛은 모양에 반영하지 않아요.</p>
+      <p className="qt-help">위쪽 날짜 버튼을 바꾸면 오른쪽 사과가 바뀌어요. 손가락으로 돌려 볼 수 있어요. 실제 사과 사진을 바탕으로 만든 3D 모델이에요. 크기·주름 변화는 무게 감소 계산값으로 그린 것이고, 저장 중 사과를 찍어 비교한 건 아니에요. 단단함·단맛·신맛은 모양에 반영하지 않아요.</p>
     </div>}
   </details>;
 }
