@@ -1011,3 +1011,4 @@ body{padding-bottom:64px}
 .mi-open{white-space:normal;text-align:left;max-width:100%}
 @media(max-width:380px){.app-header .site-utils .big-text-toggle .btt-t{display:none!important}.site-utils .big-text-toggle .btt-ga::after{content:"+";margin-left:1px}}
 .account-id>div{min-width:0}.account-id h2,.account-id p{overflow-wrap:anywhere}
+.na-save-link{justify-self:center;margin-top:4px;font-size:14px}

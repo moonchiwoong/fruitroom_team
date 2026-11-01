@@ -146,13 +146,15 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
       <label className="na-field"><span>상자 수</span><input type="number" inputMode="numeric" min={1} step={1} placeholder="예: 120" value={boxes} onChange={e => setBoxes(e.target.value)} /><em>상자</em></label>
       <p className="ma-sub">상자 수를 넣으면 무게가 줄어든 만큼을 ‘몇 상자 무게’로도 보여 줘요.</p></details>
 
-    {guest && preview && missing.length === 0 && <section className="na-card na-result" aria-label="결과"><h2>결과</h2><LotPreview lot={preview.lot} /><p className="ma-sub">시연용 계산 · 출하·안전 판정 아님</p></section>}
+    {guest && missing.length > 0 && <p className="ma-hint muted na-guest-hint">{missing.join(', ')}을(를) 고르면 아래에 바로 결과가 나와요. 가입하지 않아도 돼요.</p>}
+    {guest && preview && missing.length === 0 && <section id="na-result" className="na-card na-result" aria-label="결과"><h2>결과</h2><LotPreview lot={preview.lot} /><p className="ma-sub">시연용 계산 · 출하·안전 판정 아님</p>
+      <button type="button" className="linkbtn na-save-link" onClick={onLogin}>이 사과를 계속 기록하려면 가입하기 →</button></section>}
     {!guest && preview && <section className="na-card na-preview" aria-label="미리보기"><h2>저장 {preview.day}일 뒤 (미리보기)</h2>
       <div className="ma-rows">{preview.rows.map(({k, r}) => <div key={k} className="ma-row"><span>{SHORT[k]}</span><div>{r.ok ? <><b>{easyChange(k, r.value, r.first, preview.weather)}</b><small>{fmtNum(r.value, metricMeta[k].digits)} {k === 'firmness' ? 'N' : metricMeta[k].unit}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div></div>)}</div>
       <p className="ma-sub">시연용 계산 · 출하·안전 판정 아님</p></section>}
 
     {err && <p className="error-box" role="alert">{err}</p>}
-    {guest ? <div className="ma-actions"><button type="button" className="ma-primary big" onClick={onLogin}>가입하고 내 사과 저장하기</button></div>
+    {guest ? null
     : <div className="ma-actions"><button type="button" className="ma-primary big" disabled={saving} onClick={() => void save()}>{saving ? <Loader2 className="spin" size={18} aria-hidden="true" /> : <Check size={18} aria-hidden="true" />}저장하기</button></div>}
   </div>;
 }
