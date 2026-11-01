@@ -119,7 +119,7 @@ export function formFromLot(l: Lot): TrackerForm {
 export function exampleForm(): TrackerForm {
   const t = todayKST(), start = addDays(t, -28);
   return {
-    ...emptyForm(), name: '예시 물량 · 후지', variety: '후지', harvest_date: addDays(t, -29), intake_date: start, sameStart: true,
+    ...emptyForm(), name: '예시 사과 · 후지', variety: '후지', harvest_date: addDays(t, -29), intake_date: start, sameStart: true,
     initialSameStart: true, initial_measured_on: start, initial_sample_count: '10', firmness: '72.0', brix: '14.2', acidity: '0.38', weight: '285',
     packaging: '통기성 상자', location: '1호 저장고', storage: '일반 저온', mcp: '미처리', mcpSelected: true,
     measure: {probe_mm: '11.1', peeled: '껍질 제거', position: '적도부 양면', fruit_temp: '1', instrument: '예시 경도계'},
