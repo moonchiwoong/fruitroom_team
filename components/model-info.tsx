@@ -184,7 +184,7 @@ export default function ModelInfo({modelId, metric, context}: {modelId?: Storage
 
     <section className="mi-card" id="mi-regression">
       <h2>연구 중인 모델·참고 자료</h2>
-      <p><b>이 영역의 산지별 기상 회귀식은 현재 기본 품질 예측 결과에 사용하지 않습니다.</b> 별도로 제공하는 참고 계산입니다. 홍로의 날씨 기반 초기값 추정은 이 식과 다른 기능이며, 홍로 입력에서 직접 선택한 경우에만 결과의 초기값으로 사용됩니다.</p>
+      <p><b>후지(청송·장수·영주)에서 ‘날씨로 추정’을 고르면 이 산지별 기상 회귀식으로 처음 품질을 추정합니다.</b> 아래 참고 계산 화면에서 바꾼 값은 저장된 사과 기록에 반영되지 않습니다. 홍로(거창)는 이 식이 아닌 별도의 거창 회귀식을 사용합니다. 두 식 모두 별도 평가 자료로 정확도를 검증하지 않았습니다.</p>
       <details className="mi-disclosure">
       <summary>산지별 기상 회귀식과 참고 계산 펼치기</summary>
       <p className="qt-help">이 영역의 학습 적합도는 학습 자료에 대한 값이며 별도 평가 자료의 예측 성능이나 서비스 전체의 정확도가 아닙니다.</p>

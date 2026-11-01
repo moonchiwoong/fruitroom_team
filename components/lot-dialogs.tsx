@@ -137,6 +137,11 @@ export function MeasurementForm({open, lot, observation, prefill, isBaseline, ha
     if (!isDate(f.date)) return setError('측정일을 입력해 주세요.');
     const fn = firmN(); if (Number.isNaN(fn)) return setError('경도는 숫자로 입력해 주세요.');
     const n = (v: string) => v.trim() === '' ? null : v.trim();
+    // 물리적으로 불가능한 값(음수 등)은 확인창 없이 바로 막습니다.
+    const bad: string[] = [], neg = (v: string) => v.trim() !== '' && Number.isFinite(Number(v)) && Number(v) < 0;
+    if (neg(f.brix)) bad.push('단맛'); if (neg(f.acidity)) bad.push('신맛'); if (fn !== null && fn < 0) bad.push('단단함');
+    if (neg(f.weight) || neg(f.trackedWeight)) bad.push('무게');
+    if (bad.length) return setError(`${bad.join('·')}은(는) 0보다 작을 수 없어요. 입력값을 확인해 주세요.`);
     // 흔히 나오는 범위를 크게 벗어나면 한 번 더 확인만 합니다(값을 바꾸거나 막지 않음).
     const odd: string[] = [];
     const bx = Number(f.brix), ac = Number(f.acidity);
