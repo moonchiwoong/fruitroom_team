@@ -85,7 +85,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
 
   const activeLot = loaded.lot && isHongroVariety(loaded.lot.variety) === hongro ? loaded.lot : null;
   const official = useMemo<TrackerForm>(() => {
-    if (mode === 'example') return hongro ? {...emptyForm(), variety: '홍로', name: '예시 물량 · 홍로', sameStart: true, initialSameStart: true, mcpSelected: true, mcp: '미처리', temperature: '0', intake_date: addDays(today, -28), initial_measured_on: addDays(today, -28), hongro: exampleHongroForm()} : exampleForm();
+    if (mode === 'example') return hongro ? {...emptyForm(), variety: '홍로', name: '예시 사과 · 홍로', sameStart: true, initialSameStart: true, mcpSelected: true, mcp: '미처리', temperature: '0', intake_date: addDays(today, -28), initial_measured_on: addDays(today, -28), hongro: exampleHongroForm()} : exampleForm();
     return activeLot ? formFromLot(activeLot) : {...emptyForm(), variety: hongro ? '홍로' : '후지', hongro: emptyHongroForm()};
   }, [mode, activeLot, hongro, today]);
   const officialSig = signature(official);
@@ -165,7 +165,8 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const [selectedDay, setSelectedDayState] = useState<number | null>(null);
   const [selectionDateRaw, setSelectionDateRaw] = useState<string | null>(null);
   const setSelectedDay = (day: number | null) => { setSelectionDateRaw(null); setSelectedDayState(day); };
-  const selDay = selectionDateRaw && startOk ? daysBetween(startDate, selectionDateRaw) : selectedDay ?? (hongro ? asOfDay + 30 : Math.min(MODEL_RANGE.displayDays, Math.max(0, asOfDay + 30)));
+  // 처음에는 ‘오늘’을 보여 줍니다(저장을 막 시작했으면 30일 뒤).
+  const selDay = selectionDateRaw && startOk ? daysBetween(startDate, selectionDateRaw) : selectedDay ?? (asOfDay > 0 ? Math.min(maxDays, asOfDay) : Math.min(maxDays, 30));
   const selDate = startOk ? addDays(startDate, selDay) : '';
   const selectedDayLabel = Number.isFinite(selDay) ? `${selDay}일차` : '미입력';
   useEffect(() => { setSelectedDay(null); }, [recordScope]);
@@ -342,7 +343,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     changeLabel:futureLabel,
   }) : '저장 시작일을 입력하면 날짜별 변화를 요약해 드립니다.';
 
-  const lotName = exampleMode ? `예시 물량 · ${hongro ? '홍로' : '후지'}` : activeLot?.name ?? (form.name || '새 입력(저장 전)');
+  const lotName = exampleMode ? `예시 사과 · ${hongro ? '홍로' : '후지'}` : activeLot?.name ?? (form.name || '새 입력(저장 전)');
   const env = activeLot || exampleMode ? loaded.stats : null;
   const selectedValue = at(metric), latestPoint = measured[metric].at(-1);
   const latestConditions = latestPoint ? measurementCompatibility(form.measure, pastObs.find(o => o.id === latestPoint.id)?.details?.measure) : null;
@@ -632,11 +633,11 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
     <section className="qt3-card qt3-lotbar" aria-label="물량 선택" hidden={!guest}>
       <div className="qt3-lotbar-top">
         <div className="qt3-lotbtns" role="group" aria-label="물량 고르기">
-          <button type="button" className={'qt3-pill' + (!exampleMode && lotKey === 'new' ? ' active' : '')} aria-pressed={!exampleMode && lotKey === 'new'} onClick={startNewLot}><Plus size={16} />새 물량</button>
-          {guest ? <button type="button" className="qt3-pill" disabled title="로그인하면 저장한 물량을 불러올 수 있어요">기존 물량 불러오기</button>
+          <button type="button" className={'qt3-pill' + (!exampleMode && lotKey === 'new' ? ' active' : '')} aria-pressed={!exampleMode && lotKey === 'new'} onClick={startNewLot}><Plus size={16} />새 사과</button>
+          {guest ? null
             : <label className={'qt3-pill qt3-pill-select' + (!exampleMode && lotKey !== 'new' ? ' active' : '')}>
-              <span>{!exampleMode && activeLot ? activeLot.name : '기존 물량 불러오기'}</span><ChevronDown size={16} />
-              <select id="qt-lot-select" aria-label="기존 물량 불러오기" value={!exampleMode && lotKey !== 'new' ? lotKey : ''} disabled={!lots.length}
+              <span>{!exampleMode && activeLot ? activeLot.name : '저장한 사과 불러오기'}</span><ChevronDown size={16} />
+              <select id="qt-lot-select" aria-label="저장한 사과 불러오기" value={!exampleMode && lotKey !== 'new' ? lotKey : ''} disabled={!lots.length}
                 onChange={e => { if (!e.target.value) return; if (exampleMode) changeMode('real'); setLotKey(e.target.value); setBaseline(null); setSelectedDay(null); }}>
                 <option value="">{lots.length ? '저장한 물량 고르기' : '저장한 물량이 없어요'}</option>
                 {lots.map(l => <option key={l.id} value={l.id}>{l.name}{l.name.includes(l.variety) ? '' : ` · ${l.variety}`}{l.team_shared ? ' · 팀 공유' : ''}</option>)}
@@ -795,12 +796,12 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
           <div className="qt5-main qt5-main-full">
           <div className="qt2-chart qt4-chart">
           <div className="qt-chartbox">
-          <div className="qt2-chart-head"><h2>{metricMeta[metric].label} 변화</h2>
+          <div className="qt2-chart-head"><h2>{({firmness: '단단함', brix: '단맛(당도)', acidity: '신맛(산도)', loss: '무게 감소'} as Record<MetricId, string>)[metric]} 변화</h2>
         <div className="seg qt-tabs" role="tablist" aria-label="지표" onKeyDown={e => {
           const i = visibleMetrics.indexOf(metric); const next = e.key === 'ArrowRight' ? (i + 1) % visibleMetrics.length : e.key === 'ArrowLeft' ? (i + visibleMetrics.length - 1) % visibleMetrics.length : e.key === 'Home' ? 0 : e.key === 'End' ? visibleMetrics.length - 1 : -1;
           if (next >= 0) { e.preventDefault(); setMetric(visibleMetrics[next]); (e.currentTarget.children[next] as HTMLButtonElement).focus(); }
         }}>
-          {visibleMetrics.map(m => <button key={m} id={'qt-tab-' + m} role="tab" aria-controls="qt-metric-result" tabIndex={metric === m ? 0 : -1} aria-selected={metric === m} className={metric === m ? 'active' : ''} onClick={() => setMetric(m)}>{metricMeta[m].label}</button>)}
+          {visibleMetrics.map(m => <button key={m} id={'qt-tab-' + m} role="tab" aria-controls="qt-metric-result" tabIndex={metric === m ? 0 : -1} aria-selected={metric === m} className={metric === m ? 'active' : ''} onClick={() => setMetric(m)}>{({firmness: '단단함', brix: '단맛', acidity: '신맛', loss: '무게 감소'} as Record<MetricId, string>)[m]}</button>)}
         </div></div>
           {startOk ? <TrackerChart maxDays={maxDays} unit={displayUnit(metric)} sourceLabel={hongro ? sourceLabel : undefined} metric={metric} series={series[metric]} baseline={hongro ? showConditions ? {series:comparisonSeries(num(form.temperature)===0?4:0,metric),label:num(form.temperature)===0?'4℃ 저온저장':'0℃ 저온저장'} : null : baseline && compatible && !sameAsBaseline ? {series: baseline.series[metric], label: baseline.label} : null}
             measured={measured[metric]} startDate={startDate} asOfDay={asOfDay} selectedDay={selDay} onSelect={setSelectedDay} exampleMode={exampleMode} />
