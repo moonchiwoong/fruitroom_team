@@ -64,7 +64,7 @@ export default function ModelInfo({modelId, metric, context}: {modelId?: Storage
       <ul>
         <li><b>처음 품질</b>: 직접 잰 값, 또는 수확한 해 농업기상(거창·청송·장수·영주 관측소) 자료로 산지별 회귀식이 추정한 값이에요.</li>
         <li><b>저장 중 변화</b>: 품종·보관 방식·1-MCP·온도별 저장식으로 저장 일수에 따라 계산해요. 직접 잰 값이 있으면 그 값에서 이어 계산해요.</li>
-        <li><b>정확도</b>: 아직 검증되지 않은 시연용 계산이에요. 출하·안전 여부는 판정하지 않아요.</li>
+        <li><b>정확도</b>: 아직 검증되지 않은 시연용 계산이에요. 출하·안전 여부는 판정하지 않아요. 색 변화·저장 병은 예측하지 않아요.</li>
       </ul>
     </section>
     <details className="mi-more"><summary>자세한 연구 정보 보기 (수식·자료·단위)</summary>
