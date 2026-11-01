@@ -993,3 +993,4 @@ body{padding-bottom:64px}
 .try-simple .try-tabs button{min-height:46px;font-size:15px}
 .na-result h2{font-size:16px}
 .lp{display:grid;gap:12px}
+.ag-measline{fill:none;stroke:var(--c-warn);stroke-width:1.6;stroke-dasharray:4 4;opacity:.8}
