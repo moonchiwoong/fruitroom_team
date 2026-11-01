@@ -994,3 +994,5 @@ body{padding-bottom:64px}
 .na-result h2{font-size:16px}
 .lp{display:grid;gap:12px}
 .ag-measline{fill:none;stroke:var(--c-warn);stroke-width:1.6;stroke-dasharray:4 4;opacity:.8}
+.ag-baseline{fill:none;stroke:#9aa79c;stroke-width:2;opacity:.75}
+.ag-k.base{width:16px;height:3px;border-radius:2px;background:#9aa79c;margin-left:8px}
