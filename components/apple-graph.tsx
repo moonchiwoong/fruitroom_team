@@ -22,7 +22,7 @@ type P = ReturnType<typeof lotPredictor>;
 /** p0: 측정 기록 없이 처음 값으로만 계산한 예측(있으면 연한 회색 ‘처음 예측’ 선으로 비교). */
 export function AppleGraph({p, p0, obs, sel, maxDay, measLabel = '내가 잰 값'}: {p: P; p0?: P | null; obs: Observation[]; sel: number; maxDay: number; measLabel?: string}) {
   const [m, setM] = useState<MetricId>('firmness');
-  const W = 340, H = 180, L = 40, R = 10, T = 12, B = 26;
+  const W = 340, H = 210, L = 40, R = 10, T = 12, B = 26;
   const data = useMemo(() => {
     const pts: {d: number; v: number | null; seg: string}[] = [], base: {d: number; v: number | null}[] = [];
     for (let d = 0; d <= maxDay; d += 2) { const r = p.at(m, d); pts.push({d, v: r.ok ? r.value : null, seg: r.ok ? r.from : ''}); if (p0) { const r0 = p0.at(m, d); base.push({d, v: r0.ok ? r0.value : null}); } }
