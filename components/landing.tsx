@@ -9,6 +9,8 @@ import {regions, type RegionId} from '@/lib/initial-quality';
 import {addDays, computeSeries, describeChange, fmtDate, fmtNum, todayKST, valueAt, type MetricId} from '@/lib/tracker';
 import {HANDOFF_KEY} from '@/lib/tracker-form';
 import {PROFILE_REGIONS} from '@/lib/profile-regions';
+import {MetricIcon, METRIC_COLOR, METRIC_LABEL} from '@/components/health/metric-icons';
+import '@/components/health/health.css';
 
 type Mode = 'signup' | 'login' | 'reset' | 'recovery';
 
@@ -34,7 +36,7 @@ function useInView<T extends Element>(enabled: boolean) {
 
 /** 로그인 전 첫 화면. 체험은 /try 에서 로그인 없이 바로 시작합니다. */
 export default function Landing({recovery = false, onRecovered}: {recovery?: boolean; onRecovered?: () => void}) {
-  const [mode, setMode] = useState<Mode>(recovery ? 'recovery' : 'signup');
+  const [mode, setMode] = useState<Mode>(recovery ? 'recovery' : 'login');
   const [handoff, setHandoff] = useState(false);
   const [motion] = useState(motionOK);
   // 움직임 줄이기 설정이거나 3D를 쓸 수 없으면 기존 첫 화면(정지 화면)을 보여 줍니다.
@@ -60,61 +62,23 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
   }, [recovery]);
   function goJoin(m?: Mode) { if (m) setMode(m); document.getElementById('join')?.scrollIntoView({block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'}); }
 
-  const d = (i: number) => ({'data-reveal': '', style: {'--d': `${i * 90}ms`} as React.CSSProperties});
-  return <div ref={rootRef} className={'landing landing-v2' + (motion ? ' lv-motion' : '')}>
-    <Hero onJoin={goJoin} animate={motion} />
-
-    <main>
-      {story && <AppleSplitStory onFail={storyFail} intro={<div className="lv-hero-copy as-intro-copy">
-        <p className="lv-kicker">사과 품질을 데이터로</p>
-        <h2>사과 한 알에서<br />시작되는 기록</h2>
-        <p className="lv-lead">측정값과 저장 조건으로 사과의 변화를 살펴보세요.</p>
-      </div>} />}
-
-      <section id="service-guide" className="lv-section" aria-labelledby="lv-how">
-        <h2 id="lv-how" {...d(0)}>세 단계면 충분해요</h2>
-        <ol className="lv-steps">
-          <li {...d(1)}><span>1</span><div><b>새 사과 등록</b><p>품종·생산지·수확일과 저장고 온도만 넣어요. 처음 품질은 그 해 농업기상 자료로 자동 추정해요(직접 잰 값이 있으면 그 값을 써요).</p></div></li>
-          <li {...d(2)}><span>2</span><div><b>저장 중 변화 보기</b><p>오늘, 30·60·90·120일 뒤 단단함·무게·단맛·신맛을 ‘처음보다 약 몇 %’로 쉽게 보여줘요.</p></div></li>
-          <li {...d(3)}><span>3</span><div><b>재면 더 정확하게</b><p>당도나 단단함을 재서 넣으면 그 값에서 다시 이어 계산하고, 예측과 실제의 차이도 보여줘요.</p></div></li>
-        </ol>
+  const cards: [MetricId, string][] = [['firmness', '저장 일수별 단단함'], ['brix', '단맛 변화'], ['acidity', '신맛 변화'], ['loss', '무게가 줄어든 정도']];
+  return <div ref={rootRef} className="lh">
+    <header className="lh-top lh-up"><img src="/assets/appletrack-logo.svg" alt="애플트랙" width={152} height={34} /><a href="/try">로그인 없이 체험하기</a><BigTextToggle /></header>
+    <div className="lh-wrap">
+      <section aria-labelledby="lh-title">
+        <p className="lh-kicker lh-up lh-d1">사과 저장 품질 기록</p>
+        <h1 id="lh-title" className="lh-up lh-d2">저장고 속 사과,<br />오늘은 어떨까요?</h1>
+        <p className="lh-lead lh-up lh-d3">{handoff ? '로그인하면 체험 화면에서 입력하던 내용으로 돌아가 이어서 저장할 수 있어요.' : '수확 때 잰 값과 저장 온도로 경도·당도·산도 변화를 계산해 보여 드려요.'}</p>
+        <div id="join" className="lh-up lh-d4"><AuthCard mode={mode} setMode={setMode} onRecovered={onRecovered} /></div>
       </section>
-
-      <section className="lv-section lv-split" aria-labelledby="lv-kinds">
-        <div {...d(0)}>
-          <h2 id="lv-kinds">값이 어디서 왔는지 항상 보여 줍니다</h2>
-          <p className="lv-body">측정한 값과 계산한 값, 예시 값을 섞지 않아요. 측정하지 않은 항목은 0으로 바꾸지 않고 ‘미측정’으로 남깁니다.</p>
-          <ul className="lv-kinds">
-            <li><span className="kind k-measured">실측</span>직접 측정해 기록한 값</li>
-            <li><span className="kind k-model">모델 계산</span>수식으로 계산한 값 · 현재는 시연용</li>
-            <li><span className="kind k-example">예시</span>체험용 가상 값 · 실제 기록 아님</li>
-            <li><span className="kind k-missing">미측정</span>측정하지 않은 항목</li>
-          </ul>
-        </div>
-        <figure className="lv-flow" {...d(1)}>
-          <ol>
-            <li><span className="lv-flow-icon" aria-hidden="true"><Gauge size={22} strokeWidth={1.75} /></span><b>측정</b><p>경도계·당도계 등으로 표본을 측정해요.</p></li>
-            <li><span className="lv-flow-icon" aria-hidden="true"><ClipboardList size={22} strokeWidth={1.75} /></span><b>기록</b><p>측정일·표본 수와 함께 값을 남겨요. 재지 않은 항목은 ‘미측정’으로 둬요.</p></li>
-            <li><span className="lv-flow-icon" aria-hidden="true"><LineChart size={22} strokeWidth={1.75} /></span><b>비교</b><p>같은 날짜의 계산값과 나란히 놓고 차이를 확인해요.</p></li>
-          </ol>
-          <figcaption>서비스 흐름 도식 · 실제 측정 사진이 아닙니다</figcaption>
-        </figure>
-      </section>
-
-      <section id="join" className="lv-join" aria-labelledby="lv-join-title">
-        <div className="lv-join-copy" {...d(0)}>
-          <h2 id="lv-join-title">{mode === 'login' ? '다시 오셨네요' : '내 기록을 저장하려면'}</h2>
-          <p>{handoff ? '로그인하면 체험 화면에서 입력하던 내용으로 돌아가 이어서 저장할 수 있어요.' : '가입하면 내 사과와 측정 기록을 내 계정에 저장해요. 내 기록은 나만 볼 수 있어요.'}</p>
-        </div>
-        <div className="lv-join-card" {...d(1)}><AuthCard mode={mode} setMode={setMode} onRecovered={onRecovered} /></div>
-      </section>
-    </main>
-
-    <footer className="l-footer">
-      <span>© 애플트랙 by FarmBridge</span>
-      <span>계산값은 시연용이며 출하·안전 판정을 대신하지 않습니다.</span>
-      <span className="l-footer-legal"><a href="/privacy"><b>개인정보처리방침</b></a> · <a href="/terms">이용약관</a> · <a href="mailto:mooncw@jbnu.ac.kr">문의</a></span>
-    </footer>
+      <div className="lh-stage" aria-hidden="true">
+        <div className="lh-ring" />
+        <img className="lh-apple lh-up lh-d2" src="/assets/apple-still.webp" alt="" />
+        {cards.map(([m, t], i) => <div key={m} className={`lh-card lh-c${i} lh-up lh-d${i + 2}`}><div className={motion ? 'lh-float' : ''}><span className="hs-lab" style={{color: METRIC_COLOR[m]}}><MetricIcon m={m} />{METRIC_LABEL[m]}</span><p>{t}</p></div></div>)}
+      </div>
+    </div>
+    <footer className="lh-foot"><span>© 애플트랙 by FarmBridge</span><span>계산값은 시연용이며 출하·안전 판정을 대신하지 않습니다.</span><a href="/privacy"><b>개인정보처리방침</b></a><a href="/terms">이용약관</a><a href="mailto:mooncw@jbnu.ac.kr">문의</a></footer>
   </div>;
 }
 

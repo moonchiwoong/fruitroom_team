@@ -1,5 +1,6 @@
 'use client';
 import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react';
+import '@/components/health/health.css';
 import dynamic from 'next/dynamic';
 import BigTextToggle from '@/components/big-text-toggle';
 import {Apple, ArrowRight, ArrowUpRight, BookOpen, ClipboardList, Home as HomeIcon, Info, LineChart, LogOut, Menu, MessageCircle, ShieldCheck, UserRound, X} from 'lucide-react';
@@ -20,11 +21,12 @@ const QualityTracker = dynamic(() => import('@/components/quality-tracker'), {ss
 const MyApples = dynamic(() => import('@/components/my-apples'), {ssr: false, loading: () => <div className="loading-strip">사과 목록을 불러오는 중…</div>});
 const ModelInfo = dynamic(() => import('@/components/model-info'), {ssr: false, loading: () => <div className="loading-strip">모델 정보를 불러오는 중…</div>});
 const Account = dynamic(() => import('@/components/account'), {ssr: false});
+const HomeSummary = dynamic(() => import('@/components/health/home-summary'), {ssr: false, loading: () => <div className="loading-strip">요약을 불러오는 중…</div>});
 const ServicePreview = dynamic(() => import('@/components/landing').then(m => m.ServicePreview), {ssr: false});
 
 type Page = 'home' | 'track' | 'lots' | 'model' | 'account';
 const pages: {id: Page; label: string; icon: typeof Apple; kicker: string; title: string; desc: string; hidden?: boolean}[] = [
-  {id: 'home', label: '홈', icon: HomeIcon, kicker: '', title: '', desc: ''},
+  {id: 'home', label: '요약', icon: HomeIcon, kicker: '', title: '', desc: ''},
   {id: 'track', hidden: true, label: '품질 예측', icon: LineChart, kicker: '', title: '품질 예측', desc: '초기 품질을 입력하고, 저장 기간에 따른 변화를 계산해 실제 측정값과 비교하세요.'},
   {id: 'lots', label: '내 사과', icon: ClipboardList, kicker: 'MY APPLES', title: '내 사과', desc: '물량별 초기·후속 측정 기록, 온습도 이력, 사진을 한곳에서 확인합니다.'},
   {id: 'model', hidden: true, label: '모델 정보', icon: BookOpen, kicker: 'MODEL INFO', title: '모델 정보', desc: '계산에 쓰는 수식과 출처, 적용 조건, 검증 상태를 확인합니다. 기상 기반 회귀식도 여기에서 볼 수 있어요.'},
@@ -65,7 +67,6 @@ export default function Home() {
   // 소개·체험 화면에서 ‘실측값 입력’·‘예시로 체험’을 누르고 로그인한 경우
   const sessionUser = session?.userId;
   // 로그인한 농가는 홈 대신 바로 ‘내 사과’ 목록에서 시작합니다(주소에 다른 화면이 지정된 경우는 그대로).
-  useEffect(() => { if (sessionUser && tabRef.current === 'home' && !location.hash.slice(1)) setTab('lots'); }, [sessionUser, setTab]);
   useEffect(() => {
     try {
       const intent = sessionStorage.getItem('appletrack:intent');
@@ -87,7 +88,7 @@ export default function Home() {
   return <div className="site">
     <SiteHeader tab={tab} setTab={setTab} menu={menu} setMenu={setMenu} />
     <main className={'site-main tab-' + tab}>
-      {tab === 'home' && <HomePage lots={lots} loaded={lotsLoaded} error={lotsError} retry={reload} openTracker={openTracker} setTab={setTab} openLot={id => { setLotFocus(id); setTab('lots'); }} newLot={() => { setLotFocus(null, true); setTab('lots'); }} onAskAI={() => setAIContext({mode:'real',scope:'all'})} />}
+      {tab === 'home' && <HomeSummary lots={lots} loaded={lotsLoaded} error={lotsError} retry={reload} name={session?.displayName ?? ''} openLot={id => { setLotFocus(id); setTab('lots'); }} newLot={() => { setLotFocus(null, true); setTab('lots'); }} />}
       {tab === 'account' && <PageHead title="내 정보" desc="이름·소속·주 산지를 관리합니다." />}
       {tab === 'model' && <PageHead title="계산 근거" />}
       <div className="page-body">
@@ -123,7 +124,7 @@ function SiteHeader({tab, setTab, menu, setMenu}: {tab: Page; setTab: (p: Page) 
   return <header className="site-header2 app-header"><div className="site-header-inner">
     <Brand onClick={() => setTab('home')} />
     <nav className={'site-nav' + (menu ? ' open' : '')} aria-label="주요 메뉴">
-      {pages.filter(p => !p.hidden && !(p.id === 'home' && signedIn)).map(p => <button key={p.id} className={'nav-link' + (tab === p.id ? ' active' : '')} aria-current={tab === p.id ? 'page' : undefined} onClick={() => setTab(p.id)}>{p.label}</button>)}
+      {pages.filter(p => !p.hidden).map(p => <button key={p.id} className={'nav-link' + (tab === p.id ? ' active' : '')} aria-current={tab === p.id ? 'page' : undefined} onClick={() => setTab(p.id)}>{p.label}</button>)}
       <div className="nav-mobile-foot">{session && <button onClick={() => void session.signOut()}><LogOut size={15} />로그아웃</button>}</div>
     </nav>
     <div className="site-utils"><BigTextToggle /><ProjectGuide />
@@ -145,54 +146,10 @@ function PageHead({title, desc, action}: {title: ReactNode; desc?: ReactNode; ac
 const storageDays = (l: Lot) => Math.max(0, daysBetween(storageStart(l), todayKST()));
 const shortDate = (d: string) => { const [, m, day] = d.split('-').map(Number); return `${m}월 ${day}일`; };
 
-function HomePage({lots, loaded, error, retry, openTracker, setTab, onAskAI, openLot, newLot}: {lots: Lot[]; loaded: boolean; error: string; retry: () => void; onAskAI: () => void; openTracker: (m: 'real' | 'example', lotId?: string) => void; setTab: (p: Page) => void; openLot: (id: string) => void; newLot: () => void}) {
-  const session = useTeamSession();
-  return <div className="app-home">
-    <section className="ah-hero">
-      <div className="ah-hero-copy">
-        <h1 className="app-title">저장한 사과,<br />변화를 살피세요.</h1>
-        <p className="app-lead">측정한 값을 기록하고, 저장 중 품질 변화를 확인하세요.</p>
-        <div className="ah-actions">
-          <button className="btn btn-primary btn-lg" onClick={newLot}>새 사과 등록하기<ArrowUpRight size={18} /></button>
-          <button className="ah-textlink" onClick={() => openTracker('example')}>처음이라면 예시로 체험하기<ArrowRight size={17} /></button>
-        </div>
-      </div>
-      <div className="ah-hero-preview"><ServicePreview animate={false} /></div>
-    </section>
-
-    <section className="ah-section" aria-labelledby="ah-my">
-      <div className="ah-section-head"><div><p className="ah-eyebrow">MY APPLES</p><h2 id="ah-my" className="app-subtitle">내 저장 사과</h2></div>
-        {lots.length > 0 && <button className="ah-textlink" onClick={() => setTab('lots')}>전체 보기<ArrowUpRight size={16} /></button>}</div>
-      {!loaded ? <div className="loading-strip" role="status">내 사과를 불러오는 중입니다.</div>
-        : error ? <div className="error-box" role="alert">{error}<button onClick={retry}>다시 불러오기</button></div>
-        : lots.length ? <ul className="ah-lots">{[...lots].sort((a, b) => storageStart(b).localeCompare(storageStart(a)) || (b.created_at ?? '').localeCompare(a.created_at ?? '')).slice(0, 4).map(l => { const o = l.latest_observation; const brix = o?.brix ?? null; const shared = !!l.owner_id && !!session?.userId && l.owner_id !== session.userId;
-          return <li key={l.id} className="ah-lot">
-            <img className="ah-lot-photo" src={applePhoto(l.id)} alt="" loading="lazy" />
-            <div className="ah-lot-name"><button type="button" className="ah-lot-link" onClick={() => openLot(l.id)}><b>{l.name}{!l.name.includes(l.variety) && <> · {l.variety}</>}</b></button>{shared && <em className="lm-tag">공유받음</em>}<span>{l.location || '저장고 미입력'} · {typeof l.quantity === 'number' ? `${l.quantity.toLocaleString('ko-KR')}${quantityUnit(l)}` : '수량 미입력'} · 저장 {storageDays(l)}일째</span></div>
-            <dl className="ah-lot-meta">
-              <div><dt>최근 측정</dt><dd>{o ? `${shortDate(o.date)} · ${l.observation_count ?? 1}회` : '아직 기록 없음'}</dd></div>
-              <div><dt>당도</dt><dd>{o ? (brix !== null ? `${fmtNum(brix, 1)} °Brix` : <>— <small>이번 기록에서 미측정</small></>) : l.brix !== null ? <>{fmtNum(l.brix, 1)} °Brix <small>초기 측정</small></> : '미측정'}</dd></div>
-            </dl>
-            <div className="ah-lot-action"><button className="ah-textlink" onClick={() => openTracker('real', l.id)}>품질 변화 보기<ArrowUpRight size={16} /></button>
-              <button className="btn btn-outline" onClick={() => openLot(l.id)}>기록 보기</button></div>
-          </li>; })}</ul>
-        : <div className="ah-empty"><img src={applePhoto('empty')} alt="" /><div><b>아직 등록한 사과가 없어요.</b><p>저장을 시작한 사과를 등록하고, 측정한 값을 기록해 보세요.</p></div>
-          <button className="btn btn-primary" onClick={newLot}>새 사과 등록하기</button></div>}
-    </section>
-
-    <section className="ah-section ah-steps" aria-labelledby="ah-how">
-      <h2 id="ah-how" className="app-subtitle">기록에서 변화까지,<br />세 단계면 충분해요.</h2>
-      <ol>{[['01', '사과 등록', '저장하는 사과를 등록하세요.'], ['02', '측정값 기록', '주기적으로 측정한 값을 기록하세요.'], ['03', '품질 변화 확인', '저장 중인 사과의 품질 변화를 한눈에 확인하세요.']].map(([n, t, d]) =>
-        <li key={n}><span>{n}</span><b>{t}</b><p>{d}</p></li>)}</ol>
-    </section>
-    <div className="ah-ask"><MessageCircle size={18} /><span>지금 내 사과 상태가 궁금하다면</span><button className="ah-textlink" data-ai-return onClick={onAskAI}>내 사과 상태 보기<ArrowRight size={16} /></button></div>
-  </div>;
-}
-
 function SiteFooter({setTab}: {setTab: (p: Page) => void}) {
   const signedIn = !!useTeamSession()?.userId;
   return <footer className="site-footer"><div className="site-footer-inner">
     <div className="footer-brand"><div><img src="/assets/appletrack-logo.svg" alt="애플트랙" width={170} height={42} style={{display:'block', width:'clamp(132px, 16vw, 170px)', height:'auto'}} /><p>수확일만 넣으면 저장 중 사과 품질 변화를 보여줘요. 직접 잰 값과 계산값을 구분해 표시하며, 출하·안전 판정은 하지 않아요.</p></div></div>
-    <nav aria-label="하단 메뉴">{pages.filter(p => !p.hidden && !(p.id === 'home' && signedIn)).map(p => <button key={p.id} onClick={() => setTab(p.id)}>{p.label}</button>)}</nav>
+    <nav aria-label="하단 메뉴">{pages.filter(p => !p.hidden).map(p => <button key={p.id} onClick={() => setTab(p.id)}>{p.label}</button>)}</nav>
   </div><div className="site-footer-bottom"><ShieldCheck size={14} />사과 품질 예측·저장 관리 · FarmBridge</div><div className="site-footer-legal"><a href="/privacy"><b>개인정보처리방침</b></a><a href="/terms">이용약관</a><a href="mailto:mooncw@jbnu.ac.kr">문의</a></div></footer>;
 }
