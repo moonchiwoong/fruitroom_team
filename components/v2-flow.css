@@ -1,0 +1,56 @@
+/* 새 화면 시안: 카드·그림자 없이 선과 표 위주. 강조색은 하나만. */
+.v2{--ink:#1a1a1a;--mute:#6e6e6e;--line:#e2e2e2;--acc:#b3261e;max-width:560px;margin:0 auto;min-height:100dvh;background:#fff;color:var(--ink);font-variant-numeric:tabular-nums;display:flex;flex-direction:column}
+.v2 h1{font-size:21px;font-weight:700;margin:4px 0 8px;letter-spacing:-.3px}
+.v2-top{display:flex;align-items:baseline;gap:12px;padding:14px 18px;border-bottom:1px solid var(--ink)}
+.v2-top strong{font-size:16px}
+.v2-back{border:0;background:none;padding:0;font:inherit;font-size:15px;font-weight:700;color:var(--ink);cursor:pointer}
+.v2-crumb{font-size:12px;color:var(--mute);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v2-old{font-size:12px;color:var(--mute)}
+.v2-preview{margin:0;padding:6px 18px;font-size:11px;color:var(--mute);border-bottom:1px solid var(--line)}
+.v2-pad{padding:14px 18px 0}
+.v2-k{margin:0;font-size:12px;color:var(--mute)}
+.v2-map{height:min(62dvh,520px);transition:height .5s cubic-bezier(.2,.7,.2,1);border-bottom:1px solid var(--line);background:#fafafa}
+.v2-map.zoomed{height:220px}.v2-map.compact{height:120px}
+.v2-map svg{width:100%;height:100%;display:block}
+.v2-map .prov{fill:#e9e9e9;stroke:#fff;stroke-width:2}
+.v2-map .prov.on{fill:#dcdcdc}
+.v2-map .pin{cursor:pointer;outline:none}
+.v2-map .pin .hit{fill:transparent}
+.v2-map .pin circle:not(.hit){fill:var(--acc);stroke:#fff}
+.v2-map .pin text{font-weight:700;fill:var(--ink);paint-order:stroke;stroke:#fafafa;stroke-width:.25em}
+.v2-map .pin:focus-visible circle:not(.hit){stroke:var(--ink)}
+.v2-map.zoomed .pin:not(.sel){opacity:.35}
+.v2-legend{font-size:12px;color:#444;border-top:1px solid var(--ink);padding-top:8px;margin:10px 0}
+.v2-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--acc);vertical-align:0}
+.v2-list{border-top:1px solid var(--ink);margin-top:6px}
+.v2-row{display:flex;align-items:center;gap:12px;width:100%;padding:13px 0;border:0;border-bottom:1px solid var(--line);background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.v2-row-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.v2-row-main b{font-size:15px}
+.v2-row-main small{font-size:12px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v2-row-day{font-size:15px}
+.v2-empty{font-size:14px;color:var(--mute);margin:14px 0}
+.v2-btn{display:block;margin:16px 0 8px;border:1px solid var(--ink);text-align:center;padding:11px 0;font-size:14px;color:var(--ink);text-decoration:none}
+.v2-note{font-size:11px;color:var(--mute);line-height:1.6;margin:10px 0 0}
+.v2-err{color:var(--acc);font-size:13px}
+.v2-date{margin:0;font-size:12px;color:var(--mute)}
+.v2-stage{position:relative;min-height:300px;margin:6px 0;display:flex;align-items:center;justify-content:center;padding:58px 0}
+.v2-apple{width:min(220px,56%)}
+.v2-apple-empty{display:grid;place-items:center;height:100%;font-size:12px;color:var(--mute)}
+.v2-metric{position:absolute;width:42%;display:flex;flex-direction:column}
+.v2-metric span{font-size:11px;color:var(--mute)}
+.v2-metric b{font-size:22px;font-weight:500}
+.v2-metric b small{font-size:12px;color:var(--mute);font-weight:400}
+.v2-metric b.na{font-size:14px;color:var(--mute)}
+.v2-metric.c0{left:18px;top:0}.v2-metric.c1{right:18px;top:0;text-align:right;align-items:flex-end}
+.v2-metric.c2{left:18px;bottom:0}.v2-metric.c3{right:18px;bottom:0;text-align:right;align-items:flex-end}
+.v2-seg{display:flex;border:1px solid var(--ink);margin-bottom:12px}
+.v2-seg button{flex:1;border:0;border-right:1px solid var(--ink);background:#fff;padding:8px 0;font:inherit;font-size:13px;cursor:pointer;color:var(--ink)}
+.v2-seg button:last-child{border-right:0}
+.v2-seg button.on{background:var(--ink);color:#fff}
+.v2-credit{margin:auto 0 0;padding:16px 18px;font-size:10px;color:#9a9a9a}
+@media (prefers-reduced-motion:reduce){.v2-map{transition:none}}
+.v2 .ag{border:0;border-top:1px solid var(--ink);border-radius:0;background:none;box-shadow:none;padding:12px 0 0;margin:0}
+.v2 .ag h2{font-size:13px;color:var(--mute);font-weight:500}
+.v2 .ag .ma-days{background:none;border:1px solid var(--ink);border-radius:0;padding:0;gap:0}
+.v2 .ag .ma-days button{border-radius:0;box-shadow:none}
+.v2 .ag .ma-days button.active{background:var(--ink);color:#fff}
