@@ -60,3 +60,30 @@
 @keyframes lhBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 @media (max-width:860px){.lh-wrap{grid-template-columns:1fr}.lh-stage{order:-1;height:300px;margin:0 -8px}.lh-ring{left:50%;transform:translateX(-50%);top:0;width:280px}.lh-apple{left:50%;top:40px;width:170px;margin-left:-85px}.lh-c2{display:none}.lh-c0{left:0;top:30px}.lh-c1{right:0;top:60px}.lh-c3{right:4%;bottom:6px}}
 @media (prefers-reduced-motion:reduce){.lh-up{opacity:1;animation:none}.lh-float{animation:none}}
+/* ===== 헬스앱형 공통 테마: 로그인 후 모든 화면 ===== */
+:root{--hx-max:1080px;--hx-pad:24px;--hx-bg:#F2F2F7;--hx-acc:#E5322D;--hx-sub:#8A8A8E}
+@media (max-width:720px){:root{--hx-pad:16px}}
+/* 상단·본문·하단 폭과 좌우 여백을 하나로 맞춤(상단과 내용이 따로 놀지 않도록) */
+.app-header .site-header-inner,.site-footer-inner,.site-footer-bottom,.site-footer-legal,.app-head-inner{max-width:var(--hx-max)!important;margin-left:auto;margin-right:auto;padding-left:var(--hx-pad)!important;padding-right:var(--hx-pad)!important;box-sizing:border-box}
+.hs,.ma{max-width:var(--hx-max)!important;padding-left:var(--hx-pad)!important;padding-right:var(--hx-pad)!important;box-sizing:border-box;margin-left:auto;margin-right:auto}
+body:has(.app-header) .site-main{background:var(--hx-bg)}
+body:has(.app-header) .site-main .page-body{max-width:var(--hx-max);margin:0 auto;padding-left:var(--hx-pad);padding-right:var(--hx-pad);box-sizing:border-box}
+body:has(.app-header) .site-main .page-body .ma,body:has(.app-header) .site-main .page-body .hs{padding-left:0!important;padding-right:0!important}
+.app-header .nav-link.active::after{background:var(--hx-acc)!important}
+/* 화면 제목: 헬스앱처럼 큰 굵은 제목, 구분선 없음 */
+.app-head{border-bottom:0!important;background:var(--hx-bg)}
+.app-head-inner{padding-top:20px!important;padding-bottom:4px!important}
+.app-title,.app-subtitle,.ma-head h1{font-family:inherit!important;font-weight:800!important;letter-spacing:-1px!important}
+.app-title,.ma-head h1{font-size:34px!important;line-height:1.2}
+.app-desc{color:var(--hx-sub)}
+/* 카드: 흰 바탕, 둥근 모서리, 테두리·그림자 없음 */
+.ma-card,.ma-rows,.na-card,.iq-card,.mi-card,.mi-refresh .mi-card,.ag,.ag-3d,.ma-records{background:#fff!important;border:0!important;border-radius:14px!important;box-shadow:none!important}
+.ma-row-lab{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+.ma-row b{font-weight:700}
+/* 주 버튼은 사과 빨강 하나로 */
+.ma-primary,.btn-primary,.hs-btn{background:var(--hx-acc)!important;border-color:var(--hx-acc)!important;color:#fff!important}
+.ma-days button.active,.ma-days button[aria-pressed=true]{background:#fff!important;color:#000!important;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.ma-days{background:#E3E3E8;border-radius:9px;padding:2px}
+.ma-days button{border-radius:7px;border:0;background:transparent}
+/* PC: 내 사과 목록은 2열 */
+@media (min-width:900px){.ma-list{display:grid!important;grid-template-columns:1fr 1fr;gap:10px}}
