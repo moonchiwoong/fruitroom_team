@@ -305,6 +305,15 @@ function AuthCard({mode, setMode, onRecovered}: {mode: Mode; setMode: (m: Mode) 
     finally { setBusy(false); }
   }
 
+  // 카카오 로그인: Supabase에 카카오 연결(REST API 키·Client Secret)이 켜져 있어야 동작합니다.
+  async function kakao() {
+    setError(''); setBusy(true);
+    try {
+      const r = await supabaseBrowser().auth.signInWithOAuth({provider: 'kakao', options: {redirectTo: window.location.origin + '/'}});
+      if (r.error) { setError(/provider is not enabled|Unsupported provider/i.test(r.error.message) ? '카카오 로그인이 아직 설정되지 않았어요. 운영자에게 알려 주세요.' : authMessage(r.error)); setBusy(false); }
+    } catch { setError('연결하지 못했어요. 잠시 후 다시 시도해 주세요.'); setBusy(false); }
+  }
+
   const title = {signup: '회원가입', login: '로그인', reset: '비밀번호 찾기', recovery: '새 비밀번호 설정'}[mode];
   return <div className="auth-card l-auth">
     {(mode === 'signup' || mode === 'login') && <div className="seg l-tabs" role="tablist">
@@ -335,6 +344,11 @@ function AuthCard({mode, setMode, onRecovered}: {mode: Mode; setMode: (m: Mode) 
       {mode === 'signup' && <p className="auth-legal" style={{fontSize: 13, color: 'var(--c-sub)', margin: '4px 0 0'}}>가입하면 <a href="/terms" target="_blank" rel="noreferrer">이용약관</a>과 <a href="/privacy" target="_blank" rel="noreferrer">개인정보처리방침</a>을 확인한 것으로 봐요.</p>}
       <button className="btn btn-primary" disabled={busy} type="submit">{busy && <Loader2 className="spin" size={16} />}{busy ? '처리 중…' : mode === 'signup' ? '가입하고 시작하기' : mode === 'login' ? '로그인' : mode === 'reset' ? '재설정 메일 받기' : '비밀번호 바꾸기'}</button>
       {error && <p role="alert" className="auth-error">{error}</p>}
+      {(mode === 'login' || mode === 'signup') && <div className="l-kakao">
+        <span className="l-or">또는</span>
+        <button type="button" className="btn l-kakao-btn" disabled={busy} onClick={() => void kakao()}><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7l-1 3.6c-.1.3.3.6.6.4l4.2-2.8c.5.1 1 .1 1.5.1 5.5 0 10-3.6 10-8S17.5 3 12 3z"/></svg>카카오로 {mode === 'signup' ? '시작하기' : '로그인'}</button>
+        <p className="auth-legal" style={{fontSize: 12, color: 'var(--c-sub)', margin: '6px 0 0'}}>카카오로 시작하면 <a href="/terms" target="_blank" rel="noreferrer">이용약관</a>과 <a href="/privacy" target="_blank" rel="noreferrer">개인정보처리방침</a>을 확인한 것으로 봐요.</p>
+      </div>}
       {mode === 'login' && <button type="button" className="l-textlink" onClick={() => switchTo('reset')}>비밀번호를 잊으셨나요?</button>}
       {mode === 'reset' && <button type="button" className="l-textlink" onClick={() => switchTo('login')}>로그인으로 돌아가기</button>}
     </form>}

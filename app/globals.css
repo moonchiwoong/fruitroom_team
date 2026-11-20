@@ -691,3 +691,8 @@ footer.site-footer{display:block;padding:0;font-size:inherit;line-height:inherit
  .mi-kinds{grid-template-columns:1fr}
 }
 .l-hero .l-note{font-size:13px;margin-top:14px;color:var(--ink-3)}
+/* 카카오 로그인 버튼(카카오 디자인 가이드: 노란 배경 #FEE500, 검은 글자) */
+.l-kakao{margin-top:14px;text-align:center}
+.l-or{display:block;font-size:12px;color:var(--c-sub,#8b95a1);margin-bottom:10px}
+.l-kakao-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:#FEE500;color:rgba(0,0,0,.85);border:0;border-radius:12px;min-height:48px;font-size:16px;font-weight:700;cursor:pointer}
+.l-kakao-btn:disabled{opacity:.6}

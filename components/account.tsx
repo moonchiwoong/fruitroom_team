@@ -66,7 +66,7 @@ export default function Account({onOpenPredict}: {onOpenPredict: () => void}) {
         <p className="account-sub">{session.isTeam ? '팀원 계정입니다. 내 사과와 함께 팀이 공유한 사과을 볼 수 있고, 새 사과를 팀과 공유할 수 있어요.' : '개인 계정입니다. 내가 등록한 사과·기록·예측은 나만 볼 수 있어요.'}</p>
       </section>
       <button className="btn btn-ghost account-logout" onClick={() => void session.signOut()}><LogOut size={15} />로그아웃</button>
-      <LoginChange email={session.email} />
+      {session.provider !== 'kakao' && <LoginChange email={session.email} />}
       <Withdraw onDone={() => void session.signOut()} />
     </div>
   </div>;
