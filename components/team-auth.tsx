@@ -12,6 +12,8 @@ import {type ProfileRegion} from '@/lib/profile-regions';
 export type Profile = {name: string; affiliation: string; region: ProfileRegion | ''; default_inputs: Inputs | null};
 export type Session = {
   userId: string; email: string; loginId: string; profile: Profile; isTeam: boolean;
+  /** 'email'(아이디·비밀번호) 또는 'kakao'. 카카오 계정은 비밀번호 바꾸기를 보여 주지 않습니다. */
+  provider: string;
   displayName: string;
   saveProfile: (patch: Partial<Profile>) => Promise<string | null>;
   signOut: () => Promise<void>;
@@ -24,7 +26,7 @@ const emptyProfile: Profile = {name: '', affiliation: '', region: '', default_in
 
 export default function TeamAuth({children}: {children: ReactNode}) {
   const [state, setState] = useState<'loading' | 'out' | 'in' | 'recovery'>('loading');
-  const [user, setUser] = useState<{id: string; email: string; meta: Record<string, unknown>} | null>(null);
+  const [user, setUser] = useState<{id: string; email: string; meta: Record<string, unknown>; provider: string} | null>(null);
   const [profile, setProfile] = useState<Profile>(emptyProfile);
   const [isTeam, setIsTeam] = useState(false);
   const loadVersion = useRef(0);
@@ -40,7 +42,7 @@ export default function TeamAuth({children}: {children: ReactNode}) {
     if (version !== loadVersion.current) return;
     trackAccount(data.user?.id ?? null);
     if (!data.user) { setUser(null); setProfile(emptyProfile); setIsTeam(false); setState(s => s === 'recovery' ? s : 'out'); return; }
-    const u = {id: data.user.id, email: data.user.email ?? '', meta: (data.user.user_metadata ?? {}) as Record<string, unknown>};
+    const u = {id: data.user.id, email: data.user.email ?? '', meta: (data.user.user_metadata ?? {}) as Record<string, unknown>, provider: String(data.user.app_metadata?.provider ?? 'email')};
     const [p, t] = await Promise.all([
       c.from('profiles').select('name,affiliation,region,default_inputs').eq('id', u.id).maybeSingle(),
       c.from('team_members').select('user_id').eq('user_id', u.id).maybeSingle(),
@@ -108,8 +110,10 @@ export default function TeamAuth({children}: {children: ReactNode}) {
   if (state === 'out' || state === 'recovery' || !user) return <Landing recovery={state === 'recovery'} onRecovered={() => setState(user ? 'in' : 'out')} />;
 
   const session: Session = {
-    userId: user.id, email: user.email, profile, isTeam,
-    displayName: profile.name || user.email.split('@')[0], loginId: displayLogin(user.email),
+    userId: user.id, email: user.email, profile, isTeam, provider: user.provider,
+    // 카카오 계정은 이메일이 없을 수 있어, 카카오 이름(닉네임) → 이메일 앞부분 순으로 보여 줍니다.
+    displayName: profile.name || String(user.meta.full_name ?? user.meta.name ?? user.meta.nickname ?? '') || (user.email ? user.email.split('@')[0] : '카카오 사용자'),
+    loginId: user.provider === 'kakao' ? '카카오 계정으로 로그인' : displayLogin(user.email),
     saveProfile,
     signOut: async () => {
       const scope = accountScope.current;
