@@ -3,7 +3,7 @@
 // 개인 기록은 로그인한 본인 것만(/api/lots) 보여 줍니다. 계산은 기존 lotPredictor만 씁니다(새 식·보정 없음).
 // 지도 도형: svg-maps/south-korea (CC BY 4.0, https://github.com/VictorCazanave/svg-maps)
 import './v2-flow.css';
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent} from 'react';
 import dynamic from 'next/dynamic';
 import southKoreaRaw from '@svg-maps/south-korea';
 import type {Lot, Observation} from '@/lib/lot-types';
@@ -14,6 +14,7 @@ import {fmtNum, metricMeta, addDays, todayKST} from '@/lib/tracker';
 import {PROFILE_REGIONS, type ProfileRegion} from '@/lib/profile-regions';
 import {AppleGraph} from '@/components/apple-graph';
 import {useTeamSession} from '@/components/team-auth';
+import {compareShipping, type ShipInput} from '@/lib/ship-compare';
 
 const southKorea = southKoreaRaw as unknown as {viewBox: string; locations: {id: string; name: string; path: string}[]};
 const QualityAppleViewer = dynamic(() => import('@/components/quality-apple-viewer'), {ssr: false, loading: () => <div className="v2-apple-empty">3D 사과를 불러오는 중…</div>});
@@ -41,40 +42,62 @@ function lotRegion(l: Lot): ProfileRegion | null {
 const UNIT = (m: string) => m === 'firmness' ? 'N' : metricMeta[m as 'brix'].unit;
 const LABEL: Record<string, string> = {firmness: '경도', brix: '당도', acidity: '산도', loss: '감모율'};
 
+const NewApple = dynamic(() => import('@/components/new-apple'), {ssr: false, loading: () => <div className="v2-apple-empty">입력 화면을 여는 중…</div>});
+
+function useWide() {
+  const [wide, setWide] = useState(false);
+  useEffect(() => { const q = window.matchMedia('(min-width: 900px)'); const f = () => setWide(q.matches); f(); q.addEventListener('change', f); return () => q.removeEventListener('change', f); }, []);
+  return wide;
+}
+
+type View = 'list' | 'apple' | 'map' | 'new';
 export default function V2Flow() {
-  const session = useTeamSession();
+  const session = useTeamSession(), wide = useWide();
   const [lots, setLots] = useState<Lot[] | null>(null), [err, setErr] = useState('');
-  const [region, setRegion] = useState<ProfileRegion | null>(null), [lotId, setLotId] = useState<string | null>(null);
-  useEffect(() => { requestJson<{lots: Lot[]}>('/api/lots').then(d => setLots(d.lots.filter(l => !l.details?.archived_on && !(l.owner_id && session?.userId && l.owner_id !== session.userId)))).catch(e => { setErr((e as Error).message); setLots([]); }); // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  const counts = useMemo(() => { const c: Partial<Record<ProfileRegion, number>> = {}; for (const l of lots ?? []) { const r = lotRegion(l); if (r) c[r] = (c[r] ?? 0) + 1; } return c; }, [lots]);
-  const unassigned = useMemo(() => (lots ?? []).filter(l => !lotRegion(l)), [lots]);
-  const lot = lots?.find(l => l.id === lotId) ?? null;
-  const step = lot ? 3 : region ? 2 : 1;
-  const back = () => { if (lot) setLotId(null); else setRegion(null); };
-  return <div className="v2">
+  const [view, setView] = useState<View>('list'), [lotId, setLotId] = useState<string | null>(null), [newRegion, setNewRegion] = useState<ProfileRegion | null>(null);
+  const reload = useCallback(async () => {
+    try { const d = await requestJson<{lots: Lot[]}>('/api/lots'); const mine = d.lots.filter(l => !l.details?.archived_on && !(l.owner_id && session?.userId && l.owner_id !== session.userId)); setLots(mine); setErr(''); return mine; }
+    catch (e) { setErr((e as Error).message); setLots([]); return [] as Lot[]; }
+  }, [session?.userId]);
+  useEffect(() => { void reload(); }, [reload]);
+  // PC에서는 목록 옆에 결과를 늘 보여 주므로, 고른 사과가 없으면 첫 사과를 보여 줍니다.
+  const lot = lots?.find(l => l.id === lotId) ?? (wide && view === 'list' ? lots?.[0] ?? null : null);
+  const shown: View = view === 'list' && lot && wide ? 'apple' : view;
+  const open = (id: string) => { setLotId(id); setView('apple'); window.scrollTo({top: 0}); };
+  const start = () => { setNewRegion(null); setView('map'); window.scrollTo({top: 0}); };
+  const crumb = shown === 'map' ? '저장 시작 › 지역 고르기' : shown === 'new' ? `저장 시작 › ${newRegion ? nameOf(newRegion) : ''}` : shown === 'apple' && lot ? `내 사과 › ${lot.name || lot.variety}` : '내 사과';
+  return <div className="v2" data-view={shown}>
     <header className="v2-top">
-      {step > 1 ? <button type="button" className="v2-back" onClick={back}>← {step === 3 ? '내 저장고' : '지도'}</button> : <strong>애플트랙</strong>}
-      <span className="v2-crumb">{[region ? nameOf(region) : '지역 선택', region && '내 저장고', lot?.name].filter(Boolean).join(' › ')}</span>
+      {shown !== 'list' && !wide ? <button type="button" className="v2-back" onClick={() => setView(shown === 'new' ? 'map' : 'list')}>← {shown === 'new' ? '지도' : '내 사과'}</button> : <strong>애플트랙</strong>}
+      <span className="v2-crumb">{crumb}</span>
       <a className="v2-old" href="/">기존 화면</a>
     </header>
     <p className="v2-preview">새 화면 미리보기 · {session?.displayName ? `${session.displayName}님 기록만 표시` : '본인 기록만 표시'}</p>
-    <RegionMap region={step === 3 ? region : region} counts={counts} onPick={r => { setRegion(r); setLotId(null); }} compact={step === 3} />
-    {step === 1 && <section className="v2-pad">
-      <h1>저장고가 있는 지역을 누르세요</h1>
-      <p className="v2-legend"><b className="v2-dot" /> 예측식이 있는 4곳 · 회색 지역은 아직 예측 준비 중</p>
-      {err && <p className="v2-err">사과 목록을 불러오지 못했어요: {err}</p>}
-      {unassigned.length > 0 && <div className="v2-list"><p className="v2-k">지역이 정해지지 않은 사과 {unassigned.length}건</p>{unassigned.map(l => <LotRow key={l.id} lot={l} onOpen={() => { setRegion(null); setLotId(l.id); }} />)}</div>}
-    </section>}
-    {step === 2 && region && <section className="v2-pad">
-      <p className="v2-k">내 저장고 · {nameOf(region)}</p>
-      <h1>{lots === null ? '불러오는 중…' : `저장 중인 사과 ${counts[region] ?? 0}건`}</h1>
-      <div className="v2-list">{(lots ?? []).filter(l => lotRegion(l) === region).map(l => <LotRow key={l.id} lot={l} onOpen={() => setLotId(l.id)} />)}</div>
-      {lots !== null && !counts[region] && <p className="v2-empty">이 지역에 등록한 사과가 없어요.</p>}
-      <a className="v2-btn" href="/#lots">+ 사과 등록 (기존 화면에서)</a>
-      <p className="v2-note">로그인한 본인이 등록한 사과만 보여요. 다른 농가 기록은 보이지 않아요.</p>
-    </section>}
-    {step === 3 && lot && <AppleCenter lot={lot} />}
+    <div className="v2-body">
+      <aside className="v2-side">
+        <div className="v2-pad">
+          <button type="button" className="v2-btn solid" onClick={start}>+ 저장 시작하기</button>
+          <h1>{lots === null ? '불러오는 중…' : `내가 보관 중인 사과 ${lots.length}건`}</h1>
+          {err && <p className="v2-err">사과 목록을 불러오지 못했어요: {err}</p>}
+          <div className="v2-list">{(lots ?? []).map(l => <LotRow key={l.id} lot={l} active={shown === 'apple' && lot?.id === l.id} onOpen={() => open(l.id)} />)}</div>
+          {lots !== null && !lots.length && !err && <p className="v2-empty">아직 보관 중인 사과가 없어요. ‘저장 시작하기’로 첫 사과를 등록하세요.</p>}
+          <p className="v2-note">로그인한 본인이 등록한 사과만 보여요. 다른 농가 기록은 보이지 않아요.</p>
+        </div>
+      </aside>
+      <main className="v2-main">
+        {shown === 'map' && <section>
+          <div className="v2-pad"><p className="v2-k">저장 시작 1/2</p><h1>어느 지역 사과인가요?</h1></div>
+          <RegionMap region={newRegion} counts={{}} compact={false} onPick={r => { setNewRegion(r); window.setTimeout(() => setView('new'), 650); }} />
+          <div className="v2-pad"><p className="v2-legend"><b className="v2-dot" /> 예측식이 있는 4곳(거창 홍로 · 청송·장수·영주 후지) · 회색 지역은 아직 예측 준비 중</p></div>
+        </section>}
+        {shown === 'new' && newRegion && <section className="v2-new">
+          <div className="v2-pad"><p className="v2-k">저장 시작 2/2 · {nameOf(newRegion)}</p></div>
+          <NewApple initialRegion={newRegion} onBack={() => setView('map')} onSaved={async l => { await reload(); open(l.id); }} />
+        </section>}
+        {shown === 'apple' && lot && <AppleCenter key={lot.id} lot={lot} />}
+        {shown === 'list' && wide && <div className="v2-pad"><p className="v2-empty">왼쪽에서 사과를 고르거나 ‘저장 시작하기’를 누르세요.</p></div>}
+      </main>
+    </div>
     <p className="v2-credit">지도: svg-maps (CC BY 4.0)</p>
   </div>;
 }
@@ -107,11 +130,12 @@ function RegionMap({region, counts, onPick, compact}: {region: ProfileRegion | n
   </div>;
 }
 
-function LotRow({lot, onOpen}: {lot: Lot; onOpen: () => void}) {
+function LotRow({lot, onOpen, active = false}: {lot: Lot; onOpen: () => void; active?: boolean}) {
+  const r = lotRegion(lot);
   const p = useMemo(() => { try { return lotPredictor(lot, []); } catch { return null; } }, [lot]);
   const day = p?.todayDay;
-  return <button type="button" className="v2-row" onClick={onOpen}>
-    <span className="v2-row-main"><b>{lot.name || lot.variety}</b><small>{[lot.variety, lot.storage, lot.details?.storage_temperature != null ? `${lot.details.storage_temperature}℃` : null, lot.observation_count ? `실측 ${lot.observation_count}회` : '실측 없음'].filter(Boolean).join(' · ')}</small></span>
+  return <button type="button" className={`v2-row ${active ? 'on' : ''}`} aria-current={active || undefined} onClick={onOpen}>
+    <span className="v2-row-main"><b>{lot.name || lot.variety}</b><small>{[r ? nameOf(r) : null, lot.variety, lot.storage, lot.details?.storage_temperature != null ? `${lot.details.storage_temperature}℃` : null, lot.observation_count ? `실측 ${lot.observation_count}회` : '실측 없음'].filter(Boolean).join(' · ')}</small></span>
     <span className="v2-row-day">{day !== null && day !== undefined && day >= 0 ? `${day}일째` : '—'}</span><span aria-hidden="true">›</span>
   </button>;
 }
@@ -140,7 +164,34 @@ function AppleCenter({lot}: {lot: Lot}) {
     <div className="v2-pad">
       <div className="v2-seg" role="group" aria-label="날짜">{steps.map(a => <button key={a} type="button" aria-pressed={add === a} className={add === a ? 'on' : ''} onClick={() => setAdd(a)}>{a === 0 ? (base === today ? '오늘' : `${base}일`) : `+${a}일`}</button>)}</div>
       <AppleGraph p={p} p0={p0} obs={obs} sel={sel} maxDay={maxDay} />
+      <ShipCompare lot={lot} p={p} base={base} />
       <p className="v2-note">기존 팀 계산식 결과 · 정확도 검증 전 · 출하·안전 판정 아님. 기록 수정·측정 추가는 <a href="/#lots">기존 화면</a>에서 할 수 있어요.</p>
     </div>
+  </section>;
+}
+
+const won = (n: number) => Math.round(n).toLocaleString('ko-KR');
+/** 출하 조건 비교: 입력한 물량·가격·저장비로만 계산합니다. 입력값은 저장하지 않습니다. */
+function ShipCompare({lot, p, base}: {lot: Lot; p: NonNullable<ReturnType<typeof lotPredictor>>; base: number}) {
+  const kgUnit = lot.details?.quantity_unit === 'kg' && lot.quantity ? String(lot.quantity) : '';
+  const [v, setV] = useState<ShipInput>({nowKg: kgUnit, nowPrice: '', laterKg: '', cost: '', laterPrice: ''});
+  const r = compareShipping(v);
+  const set = (k: keyof ShipInput) => (e: ChangeEvent<HTMLInputElement>) => setV(x => ({...x, [k]: e.target.value}));
+  const later = base + 30, q = (m: 'firmness' | 'brix') => { const x = p.at(m, later); return x.ok ? `${fmtNum(x.value, metricMeta[m].digits)} ${UNIT(m)}` : '계산 없음'; };
+  const field = (k: keyof ShipInput, label: string, unit: string, opt = false) => <label className="v2-field"><span>{label}{opt && <em> (선택)</em>}</span><span className="v2-in"><input inputMode="decimal" value={v[k]} onChange={set(k)} aria-label={label} /><i>{unit}</i></span></label>;
+  return <section className="v2-ship" aria-label="출하 조건 비교">
+    <h2>출하 조건 비교 · 지금 vs 30일 더 저장</h2>
+    <p className="v2-k">{lot.variety} · 저장 시작 {p.start ?? '—'} · 30일 뒤(저장 {later}일째) 계산값: 경도 {q('firmness')}, 당도 {q('brix')}</p>
+    <div className="v2-fields">
+      {field('nowKg', '지금 팔 수 있는 물량', 'kg')}{field('nowPrice', '지금 가격', '원/kg')}
+      {field('laterKg', '30일 뒤 판매 가능 물량', 'kg')}{field('cost', '추가 저장비 (30일 총액)', '원')}
+      {field('laterPrice', '30일 뒤 예상 가격', '원/kg', true)}
+    </div>
+    {!r.ok ? <p className="v2-ship-msg">{r.reason ?? `입력이 필요해요: ${r.missing.join(', ')}`}</p> : <table className="v2-ship-out"><tbody>
+      <tr><th>지금 출하 수입</th><td>{won(r.nowRevenue)} 원</td></tr>
+      <tr><th>30일 뒤 같은 수입이 되는 가격</th><td><b>{won(r.breakEven)} 원/kg</b></td></tr>
+      {r.diff !== null && <tr><th>30일 뒤 출하 − 지금 출하</th><td><b className={r.diff < 0 ? 'neg' : ''}>{r.diff > 0 ? '+' : ''}{won(r.diff)} 원</b></td></tr>}
+    </tbody></table>}
+    <p className="v2-note">입력값으로만 계산한 결과예요. 시세나 판매 가능 물량을 예측하지 않고, 입력값은 저장하지 않아요. 기준 가격은 원 단위 올림.</p>
   </section>;
 }

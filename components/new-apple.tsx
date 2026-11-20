@@ -26,12 +26,13 @@ function Seg<T extends string>({name, legend, value, options, onChange}: {name: 
 type Weather = {state: 'idle' | 'loading' | 'ok' | 'pending' | 'error'; msg?: string; key?: string};
 
 /** guest: 비회원 체험. 저장하지 않고 결과를 바로 보여 주며, 저장 버튼은 가입·로그인으로 보냅니다. */
-export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onBack?: () => void; onSaved?: (lot: Lot) => void | Promise<void>; guest?: boolean; onLogin?: () => void}) {
+/** initialRegion: 지도에서 고른 지역(거창이면 홍로, 그 밖은 후지 생산지로 미리 채움). 바꿀 수 있습니다. */
+export default function NewApple({onBack, onSaved, guest = false, onLogin, initialRegion}: {onBack?: () => void; onSaved?: (lot: Lot) => void | Promise<void>; guest?: boolean; onLogin?: () => void; initialRegion?: 'geochang' | FujiRegion}) {
   const session = useTeamSession(), today = todayKST();
-  const [cultivar, setCultivar] = useState<'후지' | '홍로'>('후지');
+  const [cultivar, setCultivar] = useState<'후지' | '홍로'>(initialRegion === 'geochang' ? '홍로' : '후지');
   const hongro = cultivar === '홍로';
   const profileRegion = session?.profile?.region;
-  const [region, setRegion] = useState<FujiRegion | ''>('');
+  const [region, setRegion] = useState<FujiRegion | ''>(initialRegion && initialRegion !== 'geochang' ? initialRegion : '');
   useEffect(() => { if (!region && (profileRegion === 'cheongsong' || profileRegion === 'jangsu' || profileRegion === 'yeongju')) setRegion(profileRegion); }, [profileRegion]); // eslint-disable-line react-hooks/exhaustive-deps
   const [harvest, setHarvest] = useState(''), [same, setSame] = useState(true), [start, setStart] = useState('');
   const [temp, setTemp] = useState<'0' | '4' | ''>('');

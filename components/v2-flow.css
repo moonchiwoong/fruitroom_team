@@ -54,3 +54,37 @@
 .v2 .ag .ma-days{background:none;border:1px solid var(--ink);border-radius:0;padding:0;gap:0}
 .v2 .ag .ma-days button{border-radius:0;box-shadow:none}
 .v2 .ag .ma-days button.active{background:var(--ink);color:#fff}
+/* 목록 우선 + PC 2단 */
+.v2-body{display:flex;flex-direction:column;flex:1}
+.v2[data-view=list] .v2-main{display:none}
+.v2:not([data-view=list]) .v2-side{display:none}
+.v2-side .v2-btn.solid{margin:4px 0 16px}
+.v2-btn.solid{background:var(--ink);color:#fff;border-color:var(--ink);width:100%;font:inherit;font-size:15px;cursor:pointer}
+.v2-row.on{background:#fbf3f2;box-shadow:inset 3px 0 0 var(--acc);padding-left:10px}
+.v2-new .na-card,.v2-new section{max-width:100%}
+@media (min-width:900px){
+  .v2{max-width:1240px}
+  .v2-body{flex-direction:row;align-items:flex-start}
+  .v2 .v2-side,.v2[data-view] .v2-side{display:block;width:340px;flex:none;border-right:1px solid var(--line);min-height:calc(100dvh - 120px);position:sticky;top:0}
+  .v2 .v2-main,.v2[data-view] .v2-main{display:block;flex:1;min-width:0;padding:0 12px 24px}
+  .v2-center{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:28px}
+  .v2-center > .v2-pad:first-child{grid-column:1/-1}
+  .v2-center > .v2-stage{grid-column:1;align-self:start}
+  .v2-center > .v2-pad:last-child{grid-column:2;grid-row:2/span 2;padding-top:6px}
+  .v2-map{height:min(70dvh,640px)}
+}
+/* 출하 조건 비교 */
+.v2-ship{border-top:1px solid var(--ink);margin-top:18px;padding-top:12px}
+.v2-ship h2{font-size:15px;font-weight:700;margin:0 0 4px}
+.v2-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;margin:12px 0}
+.v2-field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mute)}
+.v2-field em{font-style:normal;color:#9a9a9a}
+.v2-in{display:flex;align-items:center;border-bottom:1px solid #c9c9c9}
+.v2-in input{flex:1;min-width:0;width:0;border:0;padding:6px 0;font:inherit;font-size:16px;color:var(--ink);background:none;outline:none;text-align:right}
+.v2-in input:focus{box-shadow:0 1px 0 var(--ink)}
+.v2-in i{font-style:normal;font-size:12px;margin-left:6px;color:var(--mute)}
+.v2-ship-msg{font-size:13px;color:#444;margin:6px 0}
+.v2-ship-out{width:100%;border-collapse:collapse;margin:4px 0}
+.v2-ship-out th{text-align:left;font-weight:400;font-size:13px;color:#444;padding:8px 0;border-bottom:1px solid var(--line)}
+.v2-ship-out td{text-align:right;font-size:15px;padding:8px 0;border-bottom:1px solid var(--line)}
+.v2-ship-out b.neg{color:var(--acc)}
