@@ -62,6 +62,11 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
   }, [recovery]);
   function goJoin(m?: Mode) { if (m) setMode(m); document.getElementById('join')?.scrollIntoView({block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'}); }
 
+  // 넓은 화면·마우스 사용이면 실제 3D 사과를 천천히 돌리고, 마우스를 따라 무대가 살짝 기웁니다(움직임 줄이기 설정이면 끔).
+  const [wide3d, setWide3d] = useState(false);
+  useEffect(() => { const q = window.matchMedia('(min-width: 861px) and (pointer: fine) and (prefers-reduced-motion: no-preference)'); const f = () => setWide3d(q.matches); f(); q.addEventListener('change', f); return () => q.removeEventListener('change', f); }, []);
+  const tilt = (e: React.PointerEvent<HTMLDivElement>) => { if (!wide3d) return; const r = e.currentTarget.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5; e.currentTarget.style.setProperty('--rx', `${(-y * 8).toFixed(2)}deg`); e.currentTarget.style.setProperty('--ry', `${(x * 10).toFixed(2)}deg`); };
+  const untilt = (e: React.PointerEvent<HTMLDivElement>) => { e.currentTarget.style.setProperty('--rx', '0deg'); e.currentTarget.style.setProperty('--ry', '0deg'); };
   const cards: [MetricId, string][] = [['firmness', '저장 일수별 단단함'], ['brix', '단맛 변화'], ['acidity', '신맛 변화'], ['loss', '무게가 줄어든 정도']];
   return <div ref={rootRef} className="lh">
     <header className="lh-top lh-up"><img src="/assets/appletrack-logo.svg" alt="애플트랙" width={152} height={34} /><a href="/try">로그인 없이 체험하기</a><BigTextToggle /></header>
@@ -72,9 +77,9 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
         <p className="lh-lead lh-up lh-d3">{handoff ? '로그인하면 체험 화면에서 입력하던 내용으로 돌아가 이어서 저장할 수 있어요.' : '수확 때 잰 값과 저장 온도로 경도·당도·산도 변화를 계산해 보여 드려요.'}</p>
         <div id="join" className="lh-up lh-d4"><AuthCard mode={mode} setMode={setMode} onRecovered={onRecovered} /></div>
       </section>
-      <div className="lh-stage" aria-hidden="true">
+      <div className="lh-stage" aria-hidden="true" onPointerMove={tilt} onPointerLeave={untilt}>
         <div className="lh-ring" />
-        <img className="lh-apple lh-up lh-d2" src="/assets/apple-still.webp" alt="" />
+        <div className="lh-apple lh-up lh-d2">{wide3d ? <HeroApple3D /> : <img src="/assets/apple-still.webp" alt="" />}</div>
         {cards.map(([m, t], i) => <div key={m} className={`lh-card lh-c${i} lh-up lh-d${i + 2}`}><div className={motion ? 'lh-float' : ''}><span className="hs-lab" style={{color: METRIC_COLOR[m]}}><MetricIcon m={m} />{METRIC_LABEL[m]}</span><p>{t}</p></div></div>)}
       </div>
     </div>
@@ -327,4 +332,10 @@ function AuthCard({mode, setMode, onRecovered}: {mode: Mode; setMode: (m: Mode) 
       {mode === 'reset' && <button type="button" className="l-textlink" onClick={() => switchTo('login')}>로그인으로 돌아가기</button>}
     </form>}
   </div>;
+}
+
+const AppleViewer3D = dynamic(() => import('@/components/quality-apple-viewer'), {ssr: false, loading: () => <img src="/assets/apple-still.webp" alt="" />});
+const NO_METRIC = {ok: false, value: null, unit: ''};
+function HeroApple3D() {
+  return <AppleViewer3D bare autoRotate day={0} cultivar="후지" metrics={{firmness: NO_METRIC, brix: NO_METRIC, acidity: NO_METRIC, loss: {...NO_METRIC, unit: '%'}}} />;
 }
