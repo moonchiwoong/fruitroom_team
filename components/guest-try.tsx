@@ -1,4 +1,5 @@
 'use client';
+import '@/components/health/health.css';
 import BigTextToggle from '@/components/big-text-toggle';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import dynamic from 'next/dynamic';

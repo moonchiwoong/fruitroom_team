@@ -88,7 +88,7 @@ export default function Home() {
   return <div className="site">
     <SiteHeader tab={tab} setTab={setTab} menu={menu} setMenu={setMenu} />
     <main className={'site-main tab-' + tab}>
-      {tab === 'home' && <HomeSummary lots={lots} loaded={lotsLoaded} error={lotsError} retry={reload} name={session?.displayName ?? ''} openLot={id => { setLotFocus(id); setTab('lots'); }} newLot={() => { setLotFocus(null, true); setTab('lots'); }} />}
+      {tab === 'home' && <HomeSummary lots={lots} loaded={lotsLoaded} error={lotsError} retry={reload} name={session?.displayName ?? ''} openAccount={() => setTab('account')} openLot={id => { setLotFocus(id); setTab('lots'); }} newLot={() => { setLotFocus(null, true); setTab('lots'); }} />}
       {tab === 'account' && <PageHead title="내 정보" desc="이름·소속·주 산지를 관리합니다." />}
       {tab === 'model' && <PageHead title="계산 근거" />}
       <div className="page-body">

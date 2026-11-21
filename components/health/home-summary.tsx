@@ -2,6 +2,7 @@
 // 로그인 후 홈 ‘요약’: 보관 중인 사과 → 고른 사과의 오늘 계산값 4가지 → 한 줄 요약.
 // 값은 lotPredictor(기존 식)만 씁니다. 작은 선도 그 식으로 계산한 0일~마지막 날 값입니다(예시 모양 없음).
 import {useEffect, useMemo, useState} from 'react';
+import {josa} from '@/lib/josa';
 import type {Lot, Observation} from '@/lib/lot-types';
 import {lotPredictor, easyChange} from '@/lib/lot-predict';
 import {isHongroVariety} from '@/lib/cultivar';
@@ -15,7 +16,7 @@ const UNIT = (m: MetricId) => m === 'firmness' ? 'N' : metricMeta[m].unit;
 const ORDER: MetricId[] = ['firmness', 'brix', 'acidity', 'loss'];
 const dateLabel = () => new Date().toLocaleDateString('ko-KR', {timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', weekday: 'long'});
 
-export default function HomeSummary({lots, loaded, error, retry, openLot, newLot, name}: {lots: Lot[]; loaded: boolean; error: string; retry: () => void; openLot: (id: string) => void; newLot: () => void; name: string}) {
+export default function HomeSummary({lots, loaded, error, retry, openLot, newLot, name, openAccount}: {lots: Lot[]; loaded: boolean; error: string; retry: () => void; openLot: (id: string) => void; newLot: () => void; name: string; openAccount?: () => void}) {
   // 계산되는 사과(예측식이 있는 품종)를 앞에, 그다음 최근에 저장을 시작한 순서로 보여 줍니다.
   const active = useMemo(() => {
     const ok = (l: Lot) => { try { return lotPredictor(l, []).at('firmness', 0).ok || lotPredictor(l, []).at('loss', 0).ok ? 1 : 0; } catch { return 0; } };
@@ -24,7 +25,7 @@ export default function HomeSummary({lots, loaded, error, retry, openLot, newLot
   const [selId, setSelId] = useState<string | null>(null);
   const lot = active.find(l => l.id === selId) ?? active[0] ?? null;
   return <div className="hs">
-    <header className="hs-top"><div><p className="hs-date">{dateLabel()}</p><h1>요약</h1></div><span className="hs-avatar" aria-hidden="true">{name.slice(0, 1) || '나'}</span></header>
+    <header className="hs-top"><div><p className="hs-date">{dateLabel()}</p><h1>요약</h1></div><button type="button" className="hs-avatar" aria-label="내 정보" onClick={openAccount}>{name.slice(0, 1) || '나'}</button></header>
     <div className="hs-sec"><h2>보관 중인 사과</h2><button type="button" className="hs-link" onClick={newLot}>+ 저장 시작</button></div>
     {!loaded ? <p className="hs-note" role="status">내 사과를 불러오는 중이에요…</p>
       : error ? <p className="hs-note" role="alert">{error} <button type="button" className="hs-link" onClick={retry}>다시 불러오기</button></p>
@@ -55,7 +56,7 @@ function LotToday({lot, openLot}: {lot: Lot; openLot: (id: string) => void}) {
     <div className="hs-grid">{ORDER.map(m => <MetricCard key={m} m={m} p={p} day={today} maxDay={maxDay} onOpen={() => openLot(lot.id)} />)}</div>
     {f.ok && <><div className="hs-sec"><h2>한 줄 요약</h2></div>
       <div className="hs-card hs-hl"><span className="hs-lab" style={{color: METRIC_COLOR.firmness}}><MetricIcon m="firmness" />경도</span>
-        <p>{lot.name || lot.variety}은(는) 저장 {today}일째, {easyChange('firmness', f.value, f.first, p.weather)}.</p>
+        <p>{josa(lot.name || lot.variety, '은는')} 저장 {today}일째, {easyChange('firmness', f.value, f.first, p.weather)}.</p>
         {f.first !== null && <div className="hs-bars">
           <Bar label={p.weather ? '수확 때(추정)' : '처음'} v={f.first} max={Math.max(f.first, f.value)} color={METRIC_COLOR.firmness} />
           <Bar label="오늘(계산)" v={f.value} max={Math.max(f.first, f.value)} color="#C7C7CC" />

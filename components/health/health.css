@@ -78,7 +78,7 @@ body:has(.app-header) .site-main .page-body .ma,body:has(.app-header) .site-main
 .app-desc{color:var(--hx-sub)}
 /* 카드: 흰 바탕, 둥근 모서리, 테두리·그림자 없음 */
 .ma-card,.ma-rows,.na-card,.iq-card,.mi-card,.mi-refresh .mi-card,.ag,.ag-3d,.ma-records{background:#fff!important;border:0!important;border-radius:14px!important;box-shadow:none!important}
-.ma-row-lab{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+.ma-row-lab{display:inline-flex;align-items:center;gap:6px;font-weight:700;white-space:nowrap;flex:none}
 .ma-row b{font-weight:700}
 /* 주 버튼은 사과 빨강 하나로 */
 .ma-primary,.btn-primary,.hs-btn{background:var(--hx-acc)!important;border-color:var(--hx-acc)!important;color:#fff!important}
@@ -106,3 +106,26 @@ body:has(.app-header) .site-main .page-body .ma,body:has(.app-header) .site-main
 .rmp-chips button small{font-size:11px;font-weight:400;color:#8A8A8E}
 .rmp-chips button.on{border:2px solid var(--hx-acc,#E5322D);background:#FDECEC}
 .rmp-credit{font-size:11px;color:#8A8A8E;margin:6px 0 0}
+/* ===== 디자인 점검(2026-11-22) ===== */
+/* 요약 화면 동그라미는 내 정보로 가는 버튼 */
+button.hs-avatar{border:0;font:inherit;cursor:pointer}
+/* 하단: 화면마다 반복되는 큰 소개 대신 한 줄로 */
+body:has(.app-header) .site-footer{background:var(--hx-bg);border-top:1px solid #E5E5EA;color:var(--hx-sub)}
+body:has(.app-header) .site-footer-inner{padding-top:14px!important;padding-bottom:4px!important;align-items:center}
+body:has(.app-header) .footer-brand p,body:has(.app-header) .site-footer nav{display:none}
+body:has(.app-header) .footer-brand img{width:96px!important}
+body:has(.app-header) .site-footer-bottom,body:has(.app-header) .site-footer-legal{background:transparent!important;font-size:12px;padding-top:2px!important;padding-bottom:10px!important;justify-content:flex-start}
+/* PC 사과 상세: 한 줄이 너무 길어지지 않게(왼쪽 정렬은 유지) */
+@media (min-width:900px){.ma.ma-detail>*{max-width:760px}}
+/* 로그인 화면의 ‘글자 크게’ 버튼이 선처럼 보이던 문제 */
+.lh-top .big-text-toggle{display:inline-flex;align-items:center;gap:4px;border:1px solid #D1D6DB;border-radius:999px;padding:5px 10px;background:#fff;font-size:13px;color:#4E5968;min-width:0;height:auto}
+/* 체험 화면도 같은 색·모양으로 */
+.site.guest .site-main{background:var(--hx-bg)}
+.try-tabs{background:#E3E3E8!important;border-radius:9px!important;padding:2px!important;border:0!important}
+.try-tabs button{border-radius:7px!important;border:0!important;background:transparent!important;color:#000!important;box-shadow:none!important}
+.try-tabs button.active,.try-tabs button[aria-selected=true],.try-tabs button[aria-pressed=true]{background:#fff!important;box-shadow:0 1px 2px rgba(0,0,0,.12)!important}
+.site.guest .btn-primary,.site.guest .ma-primary{background:var(--hx-acc)!important;border-color:var(--hx-acc)!important;color:#fff!important}
+.site.guest .ma-rows,.site.guest .ag{background:#fff;border-radius:14px}
+.lh-top .big-text-toggle .btt-ga,.lh-top .big-text-toggle .btt-t{display:inline!important;font-size:13px;width:auto;height:auto;opacity:1;position:static}
+.site.guest .site-footer{background:var(--hx-bg)!important;color:var(--hx-sub)!important;border-top:1px solid #E5E5EA}
+.site.guest .site-footer *{color:var(--hx-sub)!important}

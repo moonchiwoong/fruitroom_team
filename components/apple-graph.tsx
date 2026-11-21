@@ -1,6 +1,7 @@
 'use client';
 // ‘내 사과’ 상세의 그래프와 3D 사과 모양. 값은 lotPredictor(기존 예측식)가 낸 것만 그립니다. 계산 못 한 날은 선을 끊습니다.
 import {Component, useMemo, useState, type ReactNode} from 'react';
+import {josa} from '@/lib/josa';
 import dynamic from 'next/dynamic';
 import {Loader2, Plus} from 'lucide-react';
 import type {Observation} from '@/lib/lot-types';
@@ -45,7 +46,7 @@ export function AppleGraph({p, p0, obs, sel, maxDay, measLabel = '내가 잰 값
   const ticks = [0, Math.round(maxDay / 4), Math.round(maxDay / 2), Math.round(maxDay * 3 / 4), maxDay];
   return <section className="ag" aria-label="저장 중 변화 그래프"><h2>그래프</h2>
     <div className="ma-days" role="group" aria-label="볼 항목">{EASY_METRICS.map(k => <button key={k} type="button" aria-pressed={m === k} className={m === k ? 'active' : ''} onClick={() => setM(k)}>{SHORT[k].replace(' 감소', '')}</button>)}</div>
-    {!data ? <p className="ma-sub">{SHORT[m]}은(는) 계산할 수 없어요. {(() => { const r = p.at(m, sel); return r.ok ? '' : r.reason; })()}</p> : <>
+    {!data ? <p className="ma-sub">{josa(SHORT[m], '은는')} 계산할 수 없어요. {(() => { const r = p.at(m, sel); return r.ok ? '' : r.reason; })()}</p> : <>
       <svg viewBox={`0 0 ${W} ${H}`} className="ag-svg" role="img" aria-label={`${SHORT[m]} 저장 일수별 계산값`}>
         {[data.lo + (data.hi - data.lo) * .1, (data.lo + data.hi) / 2, data.hi - (data.hi - data.lo) * .1].map(v => <g key={v}><line x1={L} x2={W - R} y1={y(v)} y2={y(v)} className="ag-grid" /><text x={L - 6} y={y(v) + 4} textAnchor="end" className="ag-tick">{fmtNum(v, Math.max(0, Math.min(3, Math.ceil(-Math.log10((data.hi - data.lo) / 4)))))}</text></g>)}
         {ticks.map((d, i) => <text key={d} x={x(d)} y={H - 8} textAnchor={i === ticks.length - 1 ? 'end' : i === 0 ? 'start' : 'middle'} className="ag-tick">{d}일</text>)}

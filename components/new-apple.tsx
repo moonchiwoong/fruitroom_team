@@ -3,6 +3,7 @@
 // 저장 형식과 검사는 기존 품질 예측 화면과 같은 lib/tracker-form(payloadFromForm·validateForm)을 그대로 씁니다.
 // 계산은 lib/lot-predict(기존 예측식)만 쓰고, 날씨 값이 다 없으면 계산하지 않습니다(값을 채우거나 추정하지 않음).
 import {useEffect, useMemo, useState, type ReactNode} from 'react';
+import {josa} from '@/lib/josa';
 import {ArrowLeft, Check, Loader2} from 'lucide-react';
 import type {Lot} from '@/lib/lot-types';
 import {requestJson} from '@/components/lot-forms';
@@ -110,7 +111,7 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
   const missing = [!harvest && '수확일', !same && !start && '저장 시작일', hongro && !temp && '저장고 온도', !hongro && !mcp && '1-MCP 처리 여부', source === 'weather' && !wRegion && '생산지', source === 'measured' && !m.brix.trim() && !m.firmness.trim() && !m.acidity.trim() && '잰 값(하나 이상)'].filter(Boolean) as string[];
   async function save() {
     setErr('');
-    if (missing.length) { setErr(`${missing.join(', ')}을(를) 골라 주세요.`); return; }
+    if (missing.length) { setErr(`${josa(missing.join(', '), '을를')} 골라 주세요.`); return; }
     const e = Object.values(validateForm(form, true)).filter(Boolean) as string[];
     if (e.length) { setErr(e[0]); return; }
     setSaving(true);
@@ -179,7 +180,7 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
       <p className="ma-sub">상자 수를 넣으면 무게가 줄어든 만큼을 ‘몇 상자 무게’로도 보여 줘요.</p></details>
 
     </>}
-    {guest && missing.length > 0 && <p className="ma-hint muted na-guest-hint">{missing.join(', ')}을(를) 고르면 아래에 바로 결과가 나와요. 가입하지 않아도 돼요.</p>}
+    {guest && missing.length > 0 && <p className="ma-hint muted na-guest-hint">{josa(missing.join(', '), '을를')} 고르면 아래에 바로 결과가 나와요. 가입하지 않아도 돼요.</p>}
     {guest && preview && missing.length === 0 && <section id="na-result" className="na-card na-result" aria-label="결과"><h2>결과</h2><LotPreview lot={preview.lot} /><p className="ma-sub">시연용 계산 · 출하·안전 판정 아님</p>
       <button type="button" className="linkbtn na-save-link" onClick={onLogin}>이 사과를 계속 기록하려면 가입하기 →</button></section>}
     {!guest && preview && <section className="na-card na-preview" aria-label="미리보기"><h2>저장 {preview.day}일 뒤 (미리보기)</h2>

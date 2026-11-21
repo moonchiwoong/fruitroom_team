@@ -2,6 +2,7 @@
 // ‘내 사과’: 농가용 단순 화면. 목록 → 사과 상세 → 측정 추가만 있습니다.
 // 계산은 lib/lot-predict.ts(기존 예측식 그대로)를 씁니다. 새 사과 등록·그래프·3D도 이 화면 안에서 엽니다.
 import {useEffect, useMemo, useState} from 'react';
+import {josa} from '@/lib/josa';
 import {MetricIcon, METRIC_COLOR} from '@/components/health/metric-icons';
 import dynamic from 'next/dynamic';
 import {ArrowLeft, ArrowRight, Loader2, Pencil, Plus} from 'lucide-react';
@@ -35,7 +36,7 @@ export default function MyApples({lots, loadError, reload, openTracker, focus, o
   const done = all.filter(l => l.details?.archived_on), viewDone = showDone && done.length > 0, sorted = viewDone ? done : all.filter(l => !l.details?.archived_on);
   const lot = lots.find(l => l.id === openId) ?? null;
   if (creating) return <NewApple onBack={() => setCreating(false)} onSaved={async l => { await reload(); setCreating(false); setCreated(l.id); setOpenId(l.id); }} />;
-  if (lot) return <AppleDetail key={lot.id} lot={lot} firstMsg={created === lot.id ? `‘${lot.name}’을(를) 등록했어요.` : ''} onBack={() => { setOpenId(null); setCreated(''); }} reload={reload} openTracker={openTracker} openModel={openModel} />;
+  if (lot) return <AppleDetail key={lot.id} lot={lot} firstMsg={created === lot.id ? `‘${josa(lot.name, '을를').replace(lot.name, lot.name + '’')} 등록했어요.` : ''} onBack={() => { setOpenId(null); setCreated(''); }} reload={reload} openTracker={openTracker} openModel={openModel} />;
   return <div className="ma">
     <div className="ma-head"><h1>내 사과</h1>{all.length > 0 && <button type="button" className="ma-primary" onClick={() => setCreating(true)}><Plus size={18} aria-hidden="true" />새 사과</button>}</div>
     {loadError && <p className="error-box" role="alert">목록을 불러오지 못했어요. {loadError} <button type="button" className="linkbtn" onClick={() => void reload()}>다시 불러오기</button></p>}
@@ -151,7 +152,7 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${lot.name.replace(/[\\/:*?"<>|]/g, '_')}.csv`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
   async function remove() {
-    if (!window.confirm(`‘${lot.name}’을(를) 지울까요? 측정 기록도 모두 지워지고 되돌릴 수 없어요.`)) return;
+    if (!window.confirm(`‘${josa(lot.name, '을를').replace(lot.name, lot.name + '’')} 지울까요? 측정 기록도 모두 지워지고 되돌릴 수 없어요.`)) return;
     if (!window.confirm('정말 지울까요? 다 판 사과라면 ‘출하 완료’로 옮겨 두는 걸 추천해요.')) return;
     setBusy(true); try { await post('delete', {}); await reload(); onBack(); } catch (e) { window.alert((e as Error).message); } finally { setBusy(false); }
   }

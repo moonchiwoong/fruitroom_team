@@ -1,6 +1,6 @@
 'use client';
 import {useEffect, useState} from 'react';
-import {Check, Loader2, LogOut, Mail, MapPin, Save, ShieldCheck, Users, X} from 'lucide-react';
+import {Check, Loader2, LogOut, MapPin, Save, ShieldCheck, UserRound, Users, X} from 'lucide-react';
 import {useTeamSession} from '@/components/team-auth';
 import {PROFILE_REGIONS} from '@/lib/profile-regions';
 import {authMessage, supabaseBrowser} from '@/lib/supabase-browser';
@@ -30,7 +30,7 @@ export default function Account({onOpenPredict}: {onOpenPredict: () => void}) {
     <section className="iq-card account-main">
       <div className="account-id">
         <span className="account-avatar">{session.displayName.slice(0, 1).toUpperCase()}</span>
-        <div><h2>{session.displayName}</h2><p><Mail size={14} />{session.loginId}</p></div>
+        <div><h2>{session.displayName}</h2><p><UserRound size={14} />{session.provider === 'kakao' ? session.loginId : `아이디 ${session.loginId}`}</p></div>
       </div>
       <form onSubmit={save} className="account-form">
         <label>이름<input value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} maxLength={50} required /></label>

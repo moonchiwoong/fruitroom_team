@@ -1,7 +1,8 @@
 // 항목별 색·아이콘(헬스앱 방식). 당도는 피를 떠올리지 않도록 꿀색 각설탕으로 표시합니다.
 import type {MetricId} from '@/lib/tracker';
 export const METRIC_COLOR: Record<MetricId, string> = {firmness: '#F07014', brix: '#D99500', acidity: '#2FA84F', loss: '#0A7CF0'};
-export const METRIC_LABEL: Record<MetricId, string> = {firmness: '경도', brix: '당도', acidity: '산도', loss: '무게 감소'};
+// 화면 전체에서 같은 말을 씁니다(농가용 쉬운 말). 단위 표기로 경도·당도·산도임을 알 수 있어요.
+export const METRIC_LABEL: Record<MetricId, string> = {firmness: '단단함', brix: '단맛', acidity: '신맛', loss: '무게 감소'};
 export function MetricIcon({m, size = 18}: {m: MetricId; size?: number}) {
   const c = METRIC_COLOR[m];
   return <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden="true">
