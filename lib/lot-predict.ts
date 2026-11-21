@@ -30,11 +30,11 @@ export type LotPoint = {ok: true; value: number; first: number | null; from: 'in
 
 export type WeatherValues = {chang_min4: number | null; chang_LC56: number | null; chang_LC78: number | null; chang_9rain: number | null};
 /** 날씨로 추정하는 물량인데 저장할 때 날씨 값이 다 없었던 경우(예: 9월 수확 직후). 지역과 연도를 돌려줍니다. */
-export function weatherPending(lot: Lot): {region: 'geochang' | 'cheongsong' | 'jangsu' | 'yeongju'; year: number} | null {
+export function weatherPending(lot: Lot): {region: string; year: number} | null {
   const d = lot.details ?? {}, start = storageStart(lot), yearOf = (s?: string | null) => s && isDate(s) ? +s.slice(0, 4) : null;
   if (isHongroVariety(lot.variety) && d.hongro?.source === 'weather') {
     const w = d.hongro.weather as Record<string, unknown>, y = yearOf(lot.harvest_date) ?? yearOf(start);
-    return y && Object.values(w ?? {}).some(v => v === null || v === undefined || v === '') ? {region: 'geochang', year: y} : null;
+    return y && Object.values(w ?? {}).some(v => v === null || v === undefined || v === '') ? {region: d.hongro.region ?? 'geochang', year: y} : null;
   }
   const f = d.fuji_weather;
   if (f && (!f.estimate || Object.values(f.inputs).some(v => v === null))) { const y = f.year ?? yearOf(lot.harvest_date) ?? yearOf(start); return y ? {region: f.region, year: y} : null; }

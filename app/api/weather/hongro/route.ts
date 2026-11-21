@@ -27,9 +27,9 @@ export async function GET(req: Request) {
     const msg = e instanceof RdaError ? `농업기상 자료를 받지 못했어요: ${scrub(e.message)}` : '농업기상 서버에 연결하지 못했어요. ';
     return Response.json({error: msg}, {status: 502});
   }
-  const vars = computeHongroWeather(year, rows, today);
+  const vars = computeHongroWeather(year, rows, today, {minTo: station.minTo, rainMonth: station.rainMonth});
   return Response.json({
-    year, region: regionKey, station: {code: station.code, name: station.name}, source: '농촌진흥청 국립농업과학원 농업기상 관측(농업날씨365) 일자료', fetchedAt: new Date().toISOString(),
+    year, region: regionKey, station: {code: station.code, name: station.name}, rainMonth: station.rainMonth, minTo: station.minTo, source: '농촌진흥청 국립농업과학원 농업기상 관측(농업날씨365) 일자료', fetchedAt: new Date().toISOString(),
     variables: vars.map(v => ({key: v.key, value: v.value, period: v.period, days: v.days, expectedDays: v.expectedDays, reason: v.reason ?? null})),
   }, {headers: {'cache-control': 'private, max-age=600'}});
 }

@@ -1,9 +1,11 @@
-import {calculateHongro, HONGRO_WEATHER_FIELDS, type HongroResult, type HongroStorage} from './hongro';
+import {type HongroRegion, calculateHongro, HONGRO_WEATHER_FIELDS, type HongroResult, type HongroStorage} from './hongro';
 import {parseOptionalNumber} from './quality-policy';
 
 export type HongroTrackerForm = {
   source: 'measured' | 'weather';
   storage: HongroStorage;
+  /** 날씨로 추정할 때 쓰는 산지 회귀식(기본 거창). */
+  region?: HongroRegion;
   initial: Record<'firmness' | 'brix' | 'acidity' | 'weight' | 'diameter', string>;
   weather: Record<'chang_min4' | 'chang_LC56' | 'chang_LC78' | 'chang_9rain', string>;
 };
@@ -50,7 +52,7 @@ export function calculateHongroForm(h:HongroTrackerForm,days:number):HongroResul
   const need=h.source==='weather'?HONGRO_WEATHER_FIELDS.filter(({key})=>!String(h.weather[key]??'').trim()).map(f=>f.label):(['firmness','brix','acidity'] as const).filter(k=>!String(h.initial[k]??'').trim()).map(k=>({firmness:'초기 경도',brix:'초기 당도',acidity:'초기 산도'})[k]);
   if(need.length)throw new Error(`계산에 필요한 입력이 비어 있어요: ${need.join(', ')}.`);
   const number=(value:string)=>{const p=parseOptionalNumber(value);if(p.status!=='valid')throw new Error('계산에 필요한 입력값을 확인해 주세요.');return p.value;};
-  const common={cultivar:'hongro' as const,region:'geochang' as const,storage:h.storage,days};
+  const common={cultivar:'hongro' as const,region:(h.region??'geochang') as HongroRegion,storage:h.storage,days};
   if(h.source==='weather')return calculateHongro({...common,source:'weather',weather:Object.fromEntries(HONGRO_WEATHER_FIELDS.map(({key})=>[key,number(h.weather[key])]))});
   const initial=Object.fromEntries(Object.entries(h.initial).filter(([,value])=>value.trim()!=='').map(([key,value])=>[key,number(value)]));
   return calculateHongro({...common,source:'measured',initial});

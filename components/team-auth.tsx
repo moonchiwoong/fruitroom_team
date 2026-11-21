@@ -52,7 +52,7 @@ export default function TeamAuth({children}: {children: ReactNode}) {
     const meta = u.meta;
     setProfile(!p.error && p.data ? {...emptyProfile, ...p.data} : {
       name: String(meta.name ?? ''), affiliation: String(meta.affiliation ?? ''),
-      region: (['geochang', 'cheongsong', 'jangsu', 'yeongju'].includes(String(meta.region)) ? meta.region : '') as Profile['region'], default_inputs: null,
+      region: (['geochang', 'cheongsong', 'jangsu', 'yeongju', 'chungju', 'gunwi', 'pocheon', 'hwaseong'].includes(String(meta.region)) ? meta.region : '') as Profile['region'], default_inputs: null,
     });
     setIsTeam(!t.error && !!t.data);
     setUser(u); setState(s => s === 'recovery' ? s : 'in');

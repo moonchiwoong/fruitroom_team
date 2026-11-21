@@ -3,7 +3,7 @@ import {useCallback, useEffect, useMemo, useState} from 'react';
 import {ArrowDown, ArrowUp, Minus, Bookmark, BookmarkCheck, FolderOpen, Loader2, Save, Trash2, UserRound, CloudRain, Download, Info, MapPin, RotateCcw, Sprout, Thermometer, TriangleAlert, Warehouse} from 'lucide-react';
 import {
   contributions, defaultInputs, inputInfo, inputKeys, MAX_STORAGE_DAYS, metricInfo, metricKeys, predictAll, predictMetric,
-  regionIds, regions, regionSummary, reliability, samples,
+  sampleRegionIds, hasSamples, regions, regionSummary, reliability, samples,
   type InputKey, type Inputs, type MetricKey, type RegionId,
 } from '@/lib/initial-quality';
 import {useTeamSession} from '@/components/team-auth';
@@ -14,7 +14,8 @@ const inputIcon: Record<InputKey, typeof CloudRain> = {rain9: CloudRain, lc56: S
 
 export default function InitialQuality() {
   const session = useTeamSession();
-  const home = (session?.profile.region && session.profile.region !== 'geochang' ? session.profile.region : 'cheongsong') as RegionId;
+  const pr = session?.profile.region; // 표본 원자료가 있는 산지만 이 화면(평균·산점도)에서 다룹니다.
+  const home = (pr && pr !== 'geochang' && hasSamples(pr as RegionId) ? pr : 'cheongsong') as RegionId;
   // 내 기본값(산지·기상값)이 있으면 그 값으로 시작합니다.
   const startInputs = (r: RegionId) => r === session?.profile.region && session?.profile.default_inputs ? session.profile.default_inputs : defaultInputs(r);
   const [region, setRegion] = useState<RegionId>(home);
@@ -58,7 +59,7 @@ export default function InitialQuality() {
     <section className="iq-step">
       <StepTitle n={1} title="산지 선택" desc="산지마다 학습 데이터와 회귀식이 다릅니다." />
       <div className="iq-regions" role="radiogroup" aria-label="산지 선택">
-        {regionIds.map(r => {
+        {sampleRegionIds.map(r => {
           const s = regionSummary(r), best = metricKeys.reduce((a, m) => regions[r].equations[m].r2 > regions[r].equations[a].r2 ? m : a, metricKeys[0]);
           return <button key={r} role="radio" aria-checked={region === r} className={'iq-region' + (region === r ? ' active' : '')} onClick={() => chooseRegion(r)}>
             <span className="iq-region-name"><MapPin size={16} />{regions[r].name} 사과</span>

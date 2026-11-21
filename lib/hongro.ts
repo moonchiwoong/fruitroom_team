@@ -51,7 +51,7 @@ export const HONGRO_WEATHER_PRESETS:Record<keyof typeof HONGRO_REFERENCE_RANGES,
     {id:'high',label:'많음',hint:'태풍·잦은 가을비가 있던 해',value:presetAt('chang_9rain',0.8,0)}]},
 };
 
-/** Exact transcription from the attached coefficient image; no fitting to synthetic rows. */
+/** Exact transcription from the attached coefficient image; no fitting to synthetic rows. (거창) */
 export const HONGRO_REGRESSION = {
   diameter:{intercept:59.258570,chang_LC56:-0.122297,chang_LC78:0.108116,chang_9rain:0.003106,chang_min4:-0.761469,r2:0.8788},
   weight:{intercept:127.640760,chang_LC56:-0.945435,chang_LC78:0.743870,chang_9rain:0.084457,chang_min4:2.540380,r2:0.8968},
@@ -59,6 +59,50 @@ export const HONGRO_REGRESSION = {
   brix:{intercept:-34.446960,chang_LC56:-0.017218,chang_LC78:0.053072,chang_9rain:-0.003138,chang_min4:-1.283448,r2:0.9009},
   acidity:{intercept:2.436584,chang_LC56:-0.000036,chang_LC78:-0.001896,chang_9rain:0.000314,chang_min4:0.061400,r2:0.8507},
 } as const;
+/** 지역별 홍로 초기 품질 회귀식. 거창은 위 식, 나머지는 회귀식(5).xlsx 그대로 옮김(2026-11-22).
+ *  chang_9rain: 그 지역의 강수 변수(충주·군위·포천·화성 8월, 거창·장수 9월). chang_min4: 충주·군위는 4~5월 평균.
+ *  경도 단위는 N(작성자 확인, 원본 표의 ‘N/mm’ 표기는 오기). */
+export type HongroRegion = 'geochang'|'chungju'|'gunwi'|'pocheon'|'hwaseong'|'jangsu';
+export const HONGRO_REGIONS:HongroRegion[] = ['geochang','chungju','gunwi','pocheon','hwaseong','jangsu'];
+export const HONGRO_REGRESSIONS:Record<HongroRegion,Record<keyof typeof HONGRO_REGRESSION,{intercept:number;chang_LC56:number;chang_LC78:number;chang_9rain:number;chang_min4:number;r2:number}>> = {
+  geochang:HONGRO_REGRESSION,
+  chungju:{
+    diameter:{intercept:127.841325,chang_LC56:-0.007126,chang_LC78:-0.045229,chang_9rain:0.023802,chang_min4:2.848969,r2:0.865},
+    weight:{intercept:718.229305,chang_LC56:-0.081797,chang_LC78:-0.417228,chang_9rain:0.214179,chang_min4:21.366317,r2:0.8122},
+    firmness:{intercept:-115.466307,chang_LC56:0.044021,chang_LC78:0.088039,chang_9rain:0.049827,chang_min4:1.42278,r2:0.2238},
+    brix:{intercept:0.046131,chang_LC56:-0.012584,chang_LC78:0.01688,chang_9rain:0.00535,chang_min4:0.211175,r2:0.3442},
+    acidity:{intercept:1.430783,chang_LC56:-0.000206,chang_LC78:-0.000777,chang_9rain:-0.000101,chang_min4:0.005928,r2:0.7645},
+  },
+  gunwi:{
+    diameter:{intercept:113.702769,chang_LC56:-0.069562,chang_LC78:0.018491,chang_9rain:0.01957,chang_min4:1.270512,r2:0.6484},
+    weight:{intercept:410.398271,chang_LC56:-0.633666,chang_LC78:0.252598,chang_9rain:0.168365,chang_min4:11.02651,r2:0.7799},
+    firmness:{intercept:36.467422,chang_LC56:0.015148,chang_LC78:0.00039,chang_9rain:0.008281,chang_min4:1.4926,r2:0.2979},
+    brix:{intercept:-0.743316,chang_LC56:0.009389,chang_LC78:0.005103,chang_9rain:0.000107,chang_min4:-0.083357,r2:0.7207},
+    acidity:{intercept:-1.992089,chang_LC56:0.00022,chang_LC78:0.001882,chang_9rain:-0.000548,chang_min4:-0.070528,r2:0.7877},
+  },
+  pocheon:{
+    diameter:{intercept:184.371943,chang_LC56:-0.049318,chang_LC78:-0.029745,chang_9rain:-0.017587,chang_min4:-2.231221,r2:0.7767},
+    weight:{intercept:1145.732851,chang_LC56:-0.508121,chang_LC78:-0.25688,chang_9rain:-0.134925,chang_min4:-12.241416,r2:0.7634},
+    firmness:{intercept:-430.62627,chang_LC56:0.208654,chang_LC78:0.247471,chang_9rain:-0.010467,chang_min4:-1.525086,r2:0.8957},
+    brix:{intercept:14.737445,chang_LC56:0.00546,chang_LC78:-0.003247,chang_9rain:-0.000587,chang_min4:-0.18206,r2:0.8538},
+    acidity:{intercept:-0.645415,chang_LC56:-0.000756,chang_LC78:0.001183,chang_9rain:0.000189,chang_min4:-0.013268,r2:0.838},
+  },
+  hwaseong:{
+    diameter:{intercept:84.699412,chang_LC56:-0.063448,chang_LC78:0.052899,chang_9rain:0.012779,chang_min4:-1.397697,r2:0.3911},
+    weight:{intercept:191.131409,chang_LC56:-0.618234,chang_LC78:0.552134,chang_9rain:0.147295,chang_min4:-12.030841,r2:0.3868},
+    firmness:{intercept:-361.352702,chang_LC56:0.225278,chang_LC78:0.165133,chang_9rain:-0.02638,chang_min4:-1.224087,r2:0.9405},
+    brix:{intercept:6.147595,chang_LC56:0.003302,chang_LC78:0.003168,chang_9rain:-0.001232,chang_min4:-0.027597,r2:0.5606},
+    acidity:{intercept:-0.405473,chang_LC56:-0.000761,chang_LC78:0.001202,chang_9rain:3.2e-05,chang_min4:-0.039581,r2:0.5125},
+  },
+  jangsu:{
+    diameter:{intercept:93.137736,chang_LC56:-0.02031,chang_LC78:0.004978,chang_9rain:0.008893,chang_min4:0.315845,r2:0.3895},
+    weight:{intercept:301.077668,chang_LC56:-0.059176,chang_LC78:-0.001851,chang_9rain:0.115007,chang_min4:0.04896,r2:0.3734},
+    firmness:{intercept:39.526677,chang_LC56:0,chang_LC78:0,chang_9rain:0.216543,chang_min4:2.481844,r2:0.399},
+    brix:{intercept:14.487552,chang_LC56:-0.00393,chang_LC78:0.000881,chang_9rain:0.001949,chang_min4:-0.106394,r2:0.7703},
+    acidity:{intercept:0.017979,chang_LC56:0.000554,chang_LC78:-2.2e-05,chang_9rain:-0.000269,chang_min4:-0.019181,r2:0.8041},
+  },
+};
+export const isHongroRegion=(v:unknown):v is HongroRegion=>HONGRO_REGIONS.includes(v as HongroRegion);
 
 const nonnegative = z.number().finite().min(0);
 export const hongroInitialSchema = z.object({
@@ -68,7 +112,7 @@ export const hongroWeatherSchema = z.object({
   chang_min4:z.number().finite(),chang_LC56:z.number().finite(),chang_LC78:z.number().finite(),chang_9rain:z.number().finite(),
 }).strict();
 const common = {
-  cultivar:z.literal('hongro'),region:z.literal('geochang'),storage:z.enum(['cold0','cold4']),days:z.number().finite().min(0).max(120),
+  cultivar:z.literal('hongro'),region:z.enum(['geochang','chungju','gunwi','pocheon','hwaseong','jangsu']),storage:z.enum(['cold0','cold4']),days:z.number().finite().min(0).max(120),
 };
 export const hongroInputSchema = z.discriminatedUnion('source',[
   z.object({...common,source:z.literal('measured'),initial:hongroInitialSchema}).strict(),
@@ -91,10 +135,10 @@ export class HongroCalculationError extends Error {
 }
 
 /** Only the weather regression supplies optional initial diameter/weight; no time curves for them. */
-export function estimateHongroInitial(value:unknown):Required<HongroInitial>{
+export function estimateHongroInitial(value:unknown,region:HongroRegion='geochang'):Required<HongroInitial>{
   const weather=hongroWeatherSchema.parse(value),initial={} as Required<HongroInitial>;
   for(const metric of Object.keys(HONGRO_REGRESSION) as HongroMetric[]){
-    const c=HONGRO_REGRESSION[metric];
+    const c=HONGRO_REGRESSIONS[region][metric];
     initial[metric]=c.intercept+c.chang_LC56*weather.chang_LC56+c.chang_LC78*weather.chang_LC78+c.chang_9rain*weather.chang_9rain+c.chang_min4*weather.chang_min4;
   }
   const invalid=(Object.keys(initial) as HongroMetric[]).filter(metric=>!Number.isFinite(initial[metric])||initial[metric]<0);
@@ -119,13 +163,13 @@ export type HongroResult = ReturnType<typeof calculateHongro>;
 /** Shared pure entry point for browser and API. No coercion, implicit sample input or storage writes. */
 export function calculateHongro(value:unknown){
   const input=hongroInputSchema.parse(value);
-  const initial:HongroInitial=input.source==='measured'?{...input.initial}:estimateHongroInitial(input.weather);
+  const initial:HongroInitial=input.source==='measured'?{...input.initial}:estimateHongroInitial(input.weather,input.region);
   const comparison={cold0:scenario(initial,'cold0',input.days),cold4:scenario(initial,'cold4',input.days)};
   const selected=comparison[input.storage];
   const warnings:string[]=[];
   if(input.source==='weather'){
-    warnings.push('초기 경도 회귀식의 R²는 0.2495입니다. 합성자료에 대한 적합도이며 독립 검증 성능이나 저장 예측 정확도를 뜻하지 않습니다.');
-    for(const {key,reference} of HONGRO_WEATHER_FIELDS){
+    warnings.push(`초기 경도 회귀식의 R²는 ${HONGRO_REGRESSIONS[input.region].firmness.r2}입니다. 학습 자료에 대한 적합도이며 독립 검증 성능이나 저장 예측 정확도를 뜻하지 않습니다.`);
+    if(input.region==='geochang')for(const {key,reference} of HONGRO_WEATHER_FIELDS){
       const v=input.weather[key];
       if(v<reference.min||v>reference.max)warnings.push(`${key} 입력 ${v}는 chang_200.xlsx 합성자료 참고 범위 ${reference.min}~${reference.max} 밖입니다. 이 범위는 검증된 적용 범위가 아니며, 외삽 계산의 불확실성을 확인해 주세요.`);
     }
@@ -134,7 +178,7 @@ export function calculateHongro(value:unknown){
     modelVersion:HONGRO_MODEL_VERSION,cultivar:input.cultivar,region:input.region,initialSource:input.source,
     initialKind:input.source==='measured'?'실측 입력' as const:'기상 회귀 추정' as const,
     storageModel:'제공 엑셀 근사 모델 · 논문 직접 회귀식으로 확인되지 않음',validation:'독립 예측 성능 검증 미완료 · 0~120일은 구현 범위이며 독립적으로 검증된 적용 기간이 아님',displayDays:{min:0,max:120},
-    sourceFiles:HONGRO_SOURCE_FILES,initialRegressionR2:input.source==='weather'?Object.fromEntries((Object.keys(HONGRO_REGRESSION) as HongroMetric[]).map(key=>[key,HONGRO_REGRESSION[key].r2])) as Record<HongroMetric,number>:null,
+    sourceFiles:HONGRO_SOURCE_FILES,initialRegressionR2:input.source==='weather'?Object.fromEntries((Object.keys(HONGRO_REGRESSION) as HongroMetric[]).map(key=>[key,HONGRO_REGRESSIONS[input.region][key].r2])) as Record<HongroMetric,number>:null,
     referenceData:{file:'chang_200.xlsx',rows:200,kind:'synthetic' as const,isValidatedDomain:false as const},
     disclaimer:HONGRO_DISCLAIMER,unitsConflict:HONGRO_UNITS_CONFLICT,sugarEquationConflict:HONGRO_SUGAR_EQUATION_CONFLICT,
   };

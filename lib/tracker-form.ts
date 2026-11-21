@@ -32,7 +32,7 @@ export type TrackerForm = {
   missing: {firmness: boolean; brix: boolean; acidity: boolean};
 };
 
-export type FujiRegion = 'cheongsong' | 'jangsu' | 'yeongju';
+export type FujiRegion = 'cheongsong' | 'jangsu' | 'yeongju' | 'chungju' | 'gunwi' | 'pocheon' | 'hwaseong';
 export type FujiWeatherForm = {source: 'measured' | 'weather'; region: '' | FujiRegion; year: string; weather: {rain9: string; lc56: string; lc78: string; min4: string}};
 export const emptyFujiForm = (): FujiWeatherForm => ({source: 'measured', region: '', year: '', weather: {rain9: '', lc56: '', lc78: '', min4: ''}});
 /** 후지 날씨 추정: 지역 식(lib/initial-quality)으로 초기 품질 5개를 계산합니다. 네 값과 지역이 모두 있어야 합니다. */
@@ -49,11 +49,11 @@ export function firmnessToN(raw: string, unit: 'N' | 'kgf'): number | null {
   return unit === 'kgf' ? p.value * KGF_TO_N : p.value;
 }
 /** 자동 이름: ‘홍로 · 10월 27일 저장’, 저장 시작일이 없으면 ‘홍로 · 새 물량’. */
-const REGION_LABEL: Record<string, string> = {cheongsong: '청송', jangsu: '장수', yeongju: '영주'};
+const REGION_LABEL: Record<string, string> = {geochang: '거창', cheongsong: '청송', jangsu: '장수', yeongju: '영주', chungju: '충주', gunwi: '군위', pocheon: '포천', hwaseong: '화성'};
 /** 자동 이름: ‘품종 9/12 수확 · 생산지’. 수확일이 없으면 저장 시작일로 만듭니다. */
-export function suggestName(f: Pick<TrackerForm, 'variety' | 'sameStart' | 'intake_date' | 'storage_start_date'> & Partial<Pick<TrackerForm, 'harvest_date' | 'fuji'>>): string {
+export function suggestName(f: Pick<TrackerForm, 'variety' | 'sameStart' | 'intake_date' | 'storage_start_date'> & Partial<Pick<TrackerForm, 'harvest_date' | 'fuji' | 'hongro'>>): string {
   const hongro = isHongroVariety(f.variety), v = hongro ? '홍로' : (f.variety || '후지'), d = f.sameStart ? f.intake_date : f.storage_start_date;
-  const region = hongro ? '거창' : REGION_LABEL[f.fuji?.source === 'weather' ? f.fuji.region : ''] ?? '';
+  const region = hongro ? (REGION_LABEL[f.hongro?.region ?? 'geochang'] ?? '거창') : REGION_LABEL[f.fuji?.source === 'weather' ? f.fuji.region : ''] ?? '';
   if (f.harvest_date && isDate(f.harvest_date)) { const [, m, day] = f.harvest_date.split('-').map(Number); return `${v} ${m}/${day} 수확${region ? ` · ${region}` : ''}`; }
   if (!isDate(d)) return `${v} · 새 사과`;
   const [, m, day] = d.split('-').map(Number); return `${v} · ${m}월 ${day}일 저장`;
@@ -81,7 +81,7 @@ export function formFromLot(l: Lot): TrackerForm {
   const d: LotDetails = l.details ?? {};
   const h = isHongroVariety(l.variety) ? d.hongro : undefined;
   const hongro: HongroTrackerForm = h ? {
-    source: h.source, storage: h.storage,
+    source: h.source, storage: h.storage, ...(h.region && h.region !== 'geochang' ? {region: h.region} : {}),
     initial: {firmness:s(h.initial.firmness),brix:s(h.initial.brix),acidity:s(h.initial.acidity),weight:s(h.initial.weight),diameter:s(h.initial.diameter)},
     weather: {chang_min4:s(h.weather.chang_min4),chang_LC56:s(h.weather.chang_LC56),chang_LC78:s(h.weather.chang_LC78),chang_9rain:s(h.weather.chang_9rain)},
   } : emptyHongroForm();
@@ -171,7 +171,7 @@ export function payloadFromForm(f: TrackerForm, mode: 'real' | 'example' = 'real
       ca: {from:f.ca.from||null,to:f.ca.to||null,o2:num(f.ca.o2),co2:num(f.ca.co2)},
       tracked: {sample_id:txt(f.tracked.sample_id),count:num(f.tracked.count),initial_weight:num(f.tracked.initial_weight)},
       ...(isHongro && !legacyHongro ? {hongro: {
-        schemaVersion: 1, modelVersion: HONGRO_MODEL_VERSION, cultivar:'hongro', region:'geochang', mode:'real', source:h.source, storage:h.storage,
+        schemaVersion: 1, modelVersion: HONGRO_MODEL_VERSION, cultivar:'hongro', region:h.region ?? 'geochang', mode:'real', source:h.source, storage:h.storage,
         initial: {firmness:f.missing.firmness?null:h.source==='measured'?firmnessToN(h.initial.firmness,f.firmness_unit):hongroNum(h.initial.firmness,'measured'),brix:f.missing.brix?null:hongroNum(h.initial.brix,'measured'),acidity:f.missing.acidity?null:hongroNum(h.initial.acidity,'measured'),weight:hongroNum(h.initial.weight,'measured'),diameter:hongroNum(h.initial.diameter,'measured')},
         weather: {chang_min4:hongroNum(h.weather.chang_min4,'weather'),chang_LC56:hongroNum(h.weather.chang_LC56,'weather'),chang_LC78:hongroNum(h.weather.chang_LC78,'weather'),chang_9rain:hongroNum(h.weather.chang_9rain,'weather')},
         units: {...HONGRO_UNITS},

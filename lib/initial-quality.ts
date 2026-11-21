@@ -4,7 +4,8 @@
 import {initialQualityRows} from './initial-quality-data';
 import {fujiStorageValue, FUJI_FORMULAS} from './quality-models';
 
-export type RegionId = 'cheongsong' | 'jangsu' | 'yeongju';
+// 후지 초기 품질 회귀식이 있는 산지. 충주·군위·포천·화성은 2026-11-22 추가(회귀식(5).xlsx, 표본 원자료는 받지 않음).
+export type RegionId = 'cheongsong' | 'jangsu' | 'yeongju' | 'chungju' | 'gunwi' | 'pocheon' | 'hwaseong';
 export type InputKey = 'rain9' | 'lc56' | 'lc78' | 'min4';
 export type MetricKey = 'weight' | 'diameter' | 'firmness' | 'brix' | 'acidity';
 export type Inputs = Record<InputKey, number>;
@@ -61,9 +62,53 @@ export const regions: Record<RegionId, {name: string; area: string; equations: R
       acidity: {intercept: 0.378221, coef: {rain9: -0.000221, lc56: 0.000402, lc78: -0.000258, min4: -0.001856}, r2: 0.4437},
     },
   },
+  chungju: {
+    name: '충주', area: '충북 충주시',
+    equations: {
+      weight: {intercept: -248.684119, coef: {rain9: 0.06205, lc56: 0.692341, lc78: -0.086795, min4: -0.172139}, r2: 0.482},
+      diameter: {intercept: 35.710975, coef: {rain9: 0.010713, lc56: 0.065529, lc78: -0.011278, min4: 0.37853}, r2: 0.3701},
+      firmness: {intercept: 46.27112, coef: {rain9: -0.008247, lc56: 0.01565, lc78: -0.002013, min4: 0.152074}, r2: 0.8138},
+      brix: {intercept: -4.179275, coef: {rain9: 0.000933, lc56: 0.012874, lc78: 0.001502, min4: 0.320669}, r2: 0.5038},
+      acidity: {intercept: 0.231619, coef: {rain9: 9.4e-05, lc56: 0.000215, lc78: -1.2e-05, min4: -0.013159}, r2: 0.4886},
+    },
+  },
+  gunwi: {
+    name: '군위', area: '대구 군위군',
+    equations: {
+      weight: {intercept: -12.277288, coef: {rain9: -0.107249, lc56: -0.189322, lc78: 0.384625, min4: -1.7511}, r2: 0.9016},
+      diameter: {intercept: 43.986991, coef: {rain9: -0.010262, lc56: 0.000766, lc78: 0.036721, min4: -0.538598}, r2: 0.6942},
+      firmness: {intercept: 10.913988, coef: {rain9: 0.011646, lc56: 0.068876, lc78: -0.02011, min4: 2.068205}, r2: 0.645},
+      brix: {intercept: 1.892112, coef: {rain9: -0.002755, lc56: 0.020505, lc78: -0.004569, min4: -0.01823}, r2: 0.2162},
+      acidity: {intercept: -0.340036, coef: {rain9: -0.000178, lc56: 0.001372, lc78: -0.00037, min4: -0.010856}, r2: 0.6043},
+    },
+  },
+  pocheon: {
+    name: '포천', area: '경기 포천시',
+    equations: {
+      weight: {intercept: 402.760587, coef: {rain9: -0.115594, lc56: -0.043027, lc78: 0.003008, min4: -6.893251}, r2: 0.8063},
+      diameter: {intercept: 110.614359, coef: {rain9: -0.012665, lc56: -0.012983, lc78: -0.00122, min4: -0.899945}, r2: 0.746},
+      firmness: {intercept: -351.846295, coef: {rain9: -0.02787, lc56: 0.171307, lc78: 0.223552, min4: -5.061551}, r2: 0.7891},
+      brix: {intercept: 6.871496, coef: {rain9: -0.001199, lc56: 0.000562, lc78: 0.006736, min4: -0.396675}, r2: 0.201},
+      acidity: {intercept: -0.972928, coef: {rain9: 0.000149, lc56: -0.000989, lc78: 0.001823, min4: -0.041486}, r2: 0.8499},
+    },
+  },
+  hwaseong: {
+    name: '화성', area: '경기 화성시',
+    equations: {
+      weight: {intercept: -1105.102584, coef: {rain9: 0.07049, lc56: 0.548714, lc78: 0.719766, min4: -7.226818}, r2: 0.8596},
+      diameter: {intercept: -60.311061, coef: {rain9: 0.00815, lc56: 0.071168, lc78: 0.067971, min4: -0.899737}, r2: 0.8602},
+      firmness: {intercept: -309.044283, coef: {rain9: -0.046329, lc56: 0.261945, lc78: 0.110443, min4: -2.235269}, r2: 0.9284},
+      brix: {intercept: -35.652975, coef: {rain9: 0.003392, lc56: 0.02011, lc78: 0.025073, min4: -0.358579}, r2: 0.8403},
+      acidity: {intercept: -2.32457, coef: {rain9: 0.000141, lc56: 9.8e-05, lc78: 0.002236, min4: -0.057343}, r2: 0.689},
+    },
+  },
 };
 
 export const regionIds = Object.keys(regions) as RegionId[];
+/** 표본 원자료(data/initial-quality/*.csv)가 있어 평균·산점도·RMSE를 낼 수 있는 산지. 나머지는 회귀식만 있습니다.
+ *  rain9 키: 그 산지 회귀식의 강수 변수(충주·군위·포천·화성은 8월 강수). 기존 저장 기록과 맞추려고 키 이름은 그대로 둡니다. */
+export const sampleRegionIds: RegionId[] = ['cheongsong', 'jangsu', 'yeongju'];
+export const hasSamples = (r: RegionId) => sampleRegionIds.includes(r);
 
 export type Sample = {year: number; inputs: Inputs; actual: Record<MetricKey, number>};
 
