@@ -12,6 +12,8 @@ import {lotPredictor, easyChange, EASY_METRICS} from '@/lib/lot-predict';
 import {fmtNum, metricMeta, todayKST, isDate} from '@/lib/tracker';
 import LotPreview from '@/components/lot-preview';
 import {WEATHER_STATIONS} from '@/lib/rda-weather';
+import RegionMapPicker, {MAP_PINS, type MapRegion} from '@/components/region-map-picker';
+import '@/components/health/health.css';
 import type {HongroRegion} from '@/lib/hongro';
 
 // 품종별로 초기 품질 회귀식이 있는 산지. 관측지점·기간은 WEATHER_STATIONS 한 곳에서 관리합니다.
@@ -37,6 +39,15 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
   const hongro = cultivar === '홍로';
   const profileRegion = session?.profile?.region;
   const [region, setRegion] = useState<FujiRegion | ''>(''), [hRegion, setHRegion] = useState<HongroRegion | ''>('');
+  // 시작 방법: 'region' = 지도에서 산지를 골라 날씨로 추정, 'measured' = 직접 잰 값. 고르기 전에는 두 갈래만 보여 줍니다.
+  const [path, setPath] = useState<'region' | 'measured' | null>(null), [mapRegion, setMapRegion] = useState<MapRegion | ''>('');
+  function pickMap(r: MapRegion) {
+    setMapRegion(r); setWx({state: 'idle'}); setVals(null);
+    const cv = MAP_PINS[r].cultivars, next = cv.includes(cultivar) ? cultivar : cv[0];
+    setCultivar(next);
+    if (MAP_PINS[r].cultivars.includes('후지')) setRegion(r as FujiRegion);
+    if (MAP_PINS[r].cultivars.includes('홍로')) setHRegion(r as HongroRegion);
+  }
   useEffect(() => {
     if (!region && FUJI_REGIONS.includes(profileRegion as FujiRegion)) setRegion(profileRegion as FujiRegion);
     if (!hRegion && HONGRO_REGION_IDS.includes(profileRegion as HongroRegion)) setHRegion(profileRegion as HongroRegion);
@@ -115,13 +126,26 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
     {!guest && onBack && <button type="button" className="ma-back" onClick={onBack}><ArrowLeft size={18} aria-hidden="true" />내 사과</button>}
     <div className="ma-title"><h1>{guest ? '내 사과로 해 보기' : '새 사과'}</h1><p>다섯 가지만 고르면 저장 중 변화를 계산해요.{guest ? ' 가입하지 않아도 결과를 볼 수 있어요.' : ''}</p></div>
 
-    <section className="na-card"><h2><span>1</span>품종</h2>
-      <Seg name="na-cultivar" legend="품종" value={cultivar} options={[{value: '후지', label: '후지'}, {value: '홍로', label: '홍로'}]} onChange={v => { setCultivar(v); setWx({state: 'idle'}); setVals(null); }} /></section>
+    {path === null ? <div className="na-start" role="group" aria-label="시작 방법">
+      <button type="button" onClick={() => { setPath('region'); setSource('weather'); setWx({state: 'idle'}); }}>
+        <b>지역으로 시작</b><p>지도에서 산지를 고르면 그 해 농업기상 자료로 처음 품질을 추정해요. 잰 값이 없을 때 좋아요.</p><em>산지 8곳 · 날씨로 추정 →</em></button>
+      <button type="button" onClick={() => { setPath('measured'); setSource('measured'); setWx({state: 'idle'}); }}>
+        <b>직접 잰 값으로 시작</b><p>수확하거나 입고할 때 잰 당도·단단함·신맛을 넣어요. 하나만 있어도 돼요.</p><em>더 정확해요 →</em></button>
+    </div> : <>
+    <button type="button" className="na-switch" onClick={() => { setPath(null); setWx({state: 'idle'}); setVals(null); }}>← 시작 방법 다시 고르기 ({path === 'region' ? '지역으로 시작' : '직접 잰 값'})</button>
 
-    <section className="na-card"><h2><span>2</span>생산지</h2>
+    {path === 'region' && <section className="na-card"><h2><span>1</span>산지</h2>
+      <RegionMapPicker value={mapRegion} onPick={pickMap} />
+      {mapRegion && <p className="ma-sub">관측지점 {WEATHER_STATIONS[mapRegion].name} · 이 산지는 {MAP_PINS[mapRegion].cultivars.join('·')} 예측식이 있어요.</p>}</section>}
+
+    {(path === 'measured' || mapRegion) && <section className="na-card"><h2><span>{path === 'region' ? 2 : 1}</span>품종</h2>
+      <Seg name="na-cultivar" legend="품종" value={cultivar} options={(['후지', '홍로'] as const).filter(c => path !== 'region' || !mapRegion || MAP_PINS[mapRegion].cultivars.includes(c)).map(c => ({value: c, label: c}))} onChange={v => { setCultivar(v); setWx({state: 'idle'}); setVals(null); }} /></section>}
+
+    {path === 'measured' && <section className="na-card"><h2><span>2</span>생산지 <small className="ma-sub">기록용 · 선택</small></h2>
       {hongro ? <Seg name="na-region-h" legend="생산지" value={hRegion} options={HONGRO_REGION_IDS.map(id => ({value: id, label: label(id)}))} onChange={v => { setHRegion(v); setWx({state: 'idle'}); setVals(null); }} />
-        : <Seg name="na-region" legend="생산지" value={region} options={FUJI_REGIONS.map(id => ({value: id, label: label(id)}))} onChange={v => { setRegion(v); setWx({state: 'idle'}); setVals(null); }} />}</section>
+        : <Seg name="na-region" legend="생산지" value={region} options={FUJI_REGIONS.map(id => ({value: id, label: label(id)}))} onChange={v => { setRegion(v); setWx({state: 'idle'}); setVals(null); }} />}</section>}
 
+    {(path === 'measured' || mapRegion) && <>
     <section className="na-card"><h2><span>3</span>수확일</h2>
       <label className="na-field"><span>수확일</span><input id="na-harvest" type="date" max={today} value={harvest} onChange={e => { setHarvest(e.target.value); setWx({state: 'idle'}); }} /></label>
       <label className="new-date-check"><input type="checkbox" checked={same} onChange={e => setSame(e.target.checked)} /><span>수확 당일 바로 저장고에 넣었어요</span></label>
@@ -133,8 +157,7 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
         : <><Seg name="na-storage" legend="보관 방식" value={storage} options={[{value: '일반 저온', label: '일반 저온'}, {value: 'CA', label: 'CA'}]} onChange={v => { setStorage(v); if (v === 'CA') setMcp('미처리'); }} />
           <Seg name="na-mcp" legend="1-MCP 처리" value={mcp} options={[{value: '처리', label: '처리함', disabled: storage === 'CA', tag: storage === 'CA' ? '준비 중' : undefined}, {value: '미처리', label: '미처리'}]} onChange={setMcp} /></>}</section>
 
-    <section className="na-card"><h2><span>5</span>처음 품질</h2>
-      <Seg name="na-source" legend="처음 품질" value={source} options={[{value: 'weather', label: '날씨로 자동'}, {value: 'measured', label: '직접 잰 값'}]} onChange={v => { setSource(v); setWx({state: 'idle'}); }} />
+    <section className="na-card"><h2><span>5</span>{source === 'weather' ? '처음 품질 (날씨로 추정)' : '잰 값'}</h2>
       {source === 'weather' ? <div className="na-wx" role="status" aria-live="polite">
         {!wKey ? <p className="ma-sub">{!wRegion ? '생산지를 고르면' : '수확일을 넣으면'} 그 해 농업기상 자료로 처음 품질을 추정해요.</p>
           : wx.state === 'loading' ? <p><Loader2 className="spin" size={15} aria-hidden="true" />{year}년 4~9월 {station} 날씨를 모으는 중이에요…</p>
@@ -155,6 +178,7 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
       <label className="na-field"><span>상자 수</span><input type="number" inputMode="numeric" min={1} step={1} placeholder="예: 120" value={boxes} onChange={e => setBoxes(e.target.value)} /><em>상자</em></label>
       <p className="ma-sub">상자 수를 넣으면 무게가 줄어든 만큼을 ‘몇 상자 무게’로도 보여 줘요.</p></details>
 
+    </>}
     {guest && missing.length > 0 && <p className="ma-hint muted na-guest-hint">{missing.join(', ')}을(를) 고르면 아래에 바로 결과가 나와요. 가입하지 않아도 돼요.</p>}
     {guest && preview && missing.length === 0 && <section id="na-result" className="na-card na-result" aria-label="결과"><h2>결과</h2><LotPreview lot={preview.lot} /><p className="ma-sub">시연용 계산 · 출하·안전 판정 아님</p>
       <button type="button" className="linkbtn na-save-link" onClick={onLogin}>이 사과를 계속 기록하려면 가입하기 →</button></section>}
@@ -162,8 +186,9 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
       <div className="ma-rows">{preview.rows.map(({k, r}) => <div key={k} className="ma-row"><span>{SHORT[k]}</span><div>{r.ok ? <><b>{easyChange(k, r.value, r.first, preview.weather)}</b><small>{fmtNum(r.value, metricMeta[k].digits)} {k === 'firmness' ? 'N' : metricMeta[k].unit}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div></div>)}</div>
       <p className="ma-sub">시연용 계산 · 출하·안전 판정 아님</p></section>}
 
+    </>}
     {err && <p className="error-box" role="alert">{err}</p>}
-    {guest ? null
+    {guest || path === null ? null
     : <div className="ma-actions"><button type="button" className="ma-primary big" disabled={saving} onClick={() => void save()}>{saving ? <Loader2 className="spin" size={18} aria-hidden="true" /> : <Check size={18} aria-hidden="true" />}저장하기</button></div>}
   </div>;
 }

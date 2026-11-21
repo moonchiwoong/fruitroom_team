@@ -87,3 +87,22 @@ body:has(.app-header) .site-main .page-body .ma,body:has(.app-header) .site-main
 .ma-days button{border-radius:7px;border:0;background:transparent}
 /* PC: 내 사과 목록은 2열 */
 @media (min-width:900px){.ma-list{display:grid!important;grid-template-columns:1fr 1fr;gap:10px}}
+/* 새 사과: 시작 방법 고르기 + 지도 */
+.na-start{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.na-start button{all:unset;box-sizing:border-box;cursor:pointer;background:#fff;border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:6px;border:2px solid #E5E5EA;min-height:150px}
+.na-start button:hover,.na-start button:focus-visible{border-color:var(--hx-acc)}
+.na-start b{font-size:19px;font-weight:800;display:flex;align-items:center;gap:8px}
+.na-start p{margin:0;font-size:14px;color:#636366;line-height:1.55}
+.na-start em{margin-top:auto;font-style:normal;font-size:12px;font-weight:700;color:var(--hx-acc)}
+.na-switch{border:0;background:none;padding:0;font:inherit;font-size:14px;color:var(--hx-acc);cursor:pointer;align-self:flex-start}
+.rmp svg{width:100%;height:min(58vh,440px);display:block;background:#F7F7FA;border-radius:12px}
+.rmp-prov{fill:#E3E3E8;stroke:#fff;stroke-width:1.5}
+.rmp-pin{cursor:pointer;outline:none}.rmp-hit{fill:transparent}
+.rmp-dot{fill:var(--hx-acc,#E5322D);stroke:#fff}
+.rmp-pin text{font-weight:700;fill:#1c1c1e;paint-order:stroke;stroke:#F7F7FA;stroke-width:.3em}
+.rmp-pin.on .rmp-dot{fill:#1c1c1e}.rmp-pin:focus-visible .rmp-dot{stroke:#1c1c1e}
+.rmp-chips{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}
+.rmp-chips button{border:1px solid #D1D1D6;background:#fff;border-radius:10px;padding:7px 0;font:inherit;font-size:14px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;color:#1c1c1e}
+.rmp-chips button small{font-size:11px;font-weight:400;color:#8A8A8E}
+.rmp-chips button.on{border:2px solid var(--hx-acc,#E5322D);background:#FDECEC}
+.rmp-credit{font-size:11px;color:#8A8A8E;margin:6px 0 0}
