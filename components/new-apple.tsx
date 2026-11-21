@@ -11,8 +11,13 @@ import {emptyForm, payloadFromForm, validateForm, suggestName, type TrackerForm,
 import {lotPredictor, easyChange, EASY_METRICS} from '@/lib/lot-predict';
 import {fmtNum, metricMeta, todayKST, isDate} from '@/lib/tracker';
 import LotPreview from '@/components/lot-preview';
+import {WEATHER_STATIONS} from '@/lib/rda-weather';
+import type {HongroRegion} from '@/lib/hongro';
 
-const FUJI_REGIONS: {id: FujiRegion; label: string; station: string}[] = [{id: 'cheongsong', label: '청송', station: '청송군 청송읍'}, {id: 'jangsu', label: '장수', station: '장수군 장수읍'}, {id: 'yeongju', label: '영주', station: '영주시 봉현면'}];
+// 품종별로 초기 품질 회귀식이 있는 산지. 관측지점·기간은 WEATHER_STATIONS 한 곳에서 관리합니다.
+const FUJI_REGIONS: FujiRegion[] = ['cheongsong', 'jangsu', 'yeongju', 'chungju', 'gunwi', 'pocheon', 'hwaseong'];
+const HONGRO_REGION_IDS: HongroRegion[] = ['geochang', 'chungju', 'gunwi', 'pocheon', 'hwaseong', 'jangsu'];
+const label = (id: keyof typeof WEATHER_STATIONS) => WEATHER_STATIONS[id].label;
 const SHORT: Record<string, string> = {firmness: '단단함', loss: '무게', brix: '단맛', acidity: '신맛'};
 
 function Seg<T extends string>({name, legend, value, options, onChange}: {name: string; legend: ReactNode; value: T | ''; options: {value: T; label: string; disabled?: boolean; tag?: string}[]; onChange: (v: T) => void}) {
@@ -31,8 +36,11 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
   const [cultivar, setCultivar] = useState<'후지' | '홍로'>('후지');
   const hongro = cultivar === '홍로';
   const profileRegion = session?.profile?.region;
-  const [region, setRegion] = useState<FujiRegion | ''>('');
-  useEffect(() => { if (!region && (profileRegion === 'cheongsong' || profileRegion === 'jangsu' || profileRegion === 'yeongju')) setRegion(profileRegion); }, [profileRegion]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [region, setRegion] = useState<FujiRegion | ''>(''), [hRegion, setHRegion] = useState<HongroRegion | ''>('');
+  useEffect(() => {
+    if (!region && FUJI_REGIONS.includes(profileRegion as FujiRegion)) setRegion(profileRegion as FujiRegion);
+    if (!hRegion && HONGRO_REGION_IDS.includes(profileRegion as HongroRegion)) setHRegion(profileRegion as HongroRegion);
+  }, [profileRegion]); // eslint-disable-line react-hooks/exhaustive-deps
   const [harvest, setHarvest] = useState(''), [same, setSame] = useState(true), [start, setStart] = useState('');
   const [temp, setTemp] = useState<'0' | '4' | ''>('');
   const [storage, setStorage] = useState<'일반 저온' | 'CA'>('일반 저온'), [mcp, setMcp] = useState<'미처리' | '처리' | ''>('');
@@ -42,7 +50,8 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
   const [wx, setWx] = useState<Weather>({state: 'idle'}), [vals, setVals] = useState<Record<string, number | null> | null>(null);
   const [saving, setSaving] = useState(false), [err, setErr] = useState('');
   const startDate = same ? harvest : start, year = isDate(harvest) ? +harvest.slice(0, 4) : null;
-  const wRegion = hongro ? 'geochang' : region;
+  const wRegion = hongro ? hRegion : region;
+  const rainMonth = wRegion ? WEATHER_STATIONS[wRegion].rainMonth : 9;
 
   // 날씨로 추정: 수확한 해 4~9월 농업기상 일자료(서버 경로)로 네 값을 받습니다. 빠진 값은 비워 둡니다.
   const wKey = source === 'weather' && year && wRegion ? `${wRegion}:${year}` : '';
@@ -57,7 +66,7 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
       const v = Object.fromEntries((j.variables as {key: string; value: number | null}[]).map(x => [x.key, x.value]));
       setVals(v);
       const missing = Object.values(v).some(x => x === null);
-      setWx({state: missing ? 'pending' : 'ok', key: wKey, msg: missing ? (year && today < `${year}-10-01` ? '9월 강수량은 9월이 끝나야 집계돼서, 10월 1일부터 자동으로 추정해요. 지금 저장해 두면 돼요. 당도나 단단함을 재면 바로 예측돼요.' : ((j.variables as {reason: string | null}[]).map(x => x.reason).find(Boolean) ?? '날씨 값이 빠져 있어 지금은 계산하지 않아요.')) : undefined});
+      setWx({state: missing ? 'pending' : 'ok', key: wKey, msg: missing ? (year && today < `${year}-${String(rainMonth + 1).padStart(2, '0')}-01` ? `${rainMonth}월 강수량은 ${rainMonth}월이 끝나야 집계돼서, ${rainMonth + 1}월 1일부터 자동으로 추정해요. 지금 저장해 두면 돼요. 당도나 단단함을 재면 바로 예측돼요.` : ((j.variables as {reason: string | null}[]).map(x => x.reason).find(Boolean) ?? '날씨 값이 빠져 있어 지금은 계산하지 않아요.')) : undefined});
     }).catch(() => { if (live) setWx({state: 'error', key: wKey, msg: '날씨 자료를 불러오지 못했어요.'}); });
     return () => { live = false; };
   }, [wKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -68,7 +77,7 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
     f.initialSameStart = true; f.mcpSelected = true; f.firmness_unit = unit; f.name = name; f.name_auto = !name.trim();
     if (hongro) {
       f.storage = '일반 저온'; f.mcp = '미처리'; f.temperature = temp;
-      f.hongro = {...f.hongro, source, storage: temp === '4' ? 'cold4' : 'cold0'};
+      f.hongro = {...f.hongro, source, storage: temp === '4' ? 'cold4' : 'cold0', region: hRegion || 'geochang'};
       if (source === 'weather') f.hongro.weather = {chang_min4: s(vals?.chang_min4), chang_LC56: s(vals?.chang_LC56), chang_LC78: s(vals?.chang_LC78), chang_9rain: s(vals?.chang_9rain)};
       else f.hongro.initial = {...f.hongro.initial, ...m};
     } else {
@@ -77,7 +86,7 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
       else { f.firmness = m.firmness; f.brix = m.brix; f.acidity = m.acidity; if (region) f.fuji = {...f.fuji, region}; }
     }
     return f;
-  }, [cultivar, hongro, harvest, startDate, unit, name, temp, source, vals, m, storage, mcp, region, year]);
+  }, [cultivar, hongro, harvest, startDate, unit, name, temp, source, vals, m, storage, mcp, region, hRegion, year]);
 
   // 저장 전 미리보기: 저장될 내용 그대로 기존 예측식으로 계산합니다.
   const preview = useMemo(() => {
@@ -87,7 +96,7 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
     try { const p = lotPredictor(fake), day = 60; return {day, rows: EASY_METRICS.map(k => ({k, r: p.at(k, day)})), weather: p.weather, lot: fake}; } catch { return null; }
   }, [form, startDate]);
 
-  const missing = [!harvest && '수확일', !same && !start && '저장 시작일', hongro && !temp && '저장고 온도', !hongro && !mcp && '1-MCP 처리 여부', !hongro && source === 'weather' && !region && '생산지', source === 'measured' && !m.brix.trim() && !m.firmness.trim() && !m.acidity.trim() && '잰 값(하나 이상)'].filter(Boolean) as string[];
+  const missing = [!harvest && '수확일', !same && !start && '저장 시작일', hongro && !temp && '저장고 온도', !hongro && !mcp && '1-MCP 처리 여부', source === 'weather' && !wRegion && '생산지', source === 'measured' && !m.brix.trim() && !m.firmness.trim() && !m.acidity.trim() && '잰 값(하나 이상)'].filter(Boolean) as string[];
   async function save() {
     setErr('');
     if (missing.length) { setErr(`${missing.join(', ')}을(를) 골라 주세요.`); return; }
@@ -100,7 +109,7 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
     } catch (x) { setErr((x as Error).message); } finally { setSaving(false); }
   }
   const setUnitSaved = (u: 'N' | 'kgf') => { setUnit(u); try { window.localStorage.setItem('appletrack:firmunit', u); } catch { /* 무시 */ } };
-  const station = hongro ? '거창군 거창읍' : FUJI_REGIONS.find(r => r.id === region)?.station;
+  const station = wRegion ? WEATHER_STATIONS[wRegion].name : undefined;
 
   return <div className="ma ma-detail na">
     {!guest && onBack && <button type="button" className="ma-back" onClick={onBack}><ArrowLeft size={18} aria-hidden="true" />내 사과</button>}
@@ -110,8 +119,8 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
       <Seg name="na-cultivar" legend="품종" value={cultivar} options={[{value: '후지', label: '후지'}, {value: '홍로', label: '홍로'}]} onChange={v => { setCultivar(v); setWx({state: 'idle'}); setVals(null); }} /></section>
 
     <section className="na-card"><h2><span>2</span>생산지</h2>
-      {hongro ? <p className="na-fixed">거창 <small>홍로 예측식은 거창 자료로 만들었어요.</small></p>
-        : <Seg name="na-region" legend="생산지" value={region} options={FUJI_REGIONS.map(r => ({value: r.id, label: r.label}))} onChange={v => { setRegion(v); setWx({state: 'idle'}); setVals(null); }} />}</section>
+      {hongro ? <Seg name="na-region-h" legend="생산지" value={hRegion} options={HONGRO_REGION_IDS.map(id => ({value: id, label: label(id)}))} onChange={v => { setHRegion(v); setWx({state: 'idle'}); setVals(null); }} />
+        : <Seg name="na-region" legend="생산지" value={region} options={FUJI_REGIONS.map(id => ({value: id, label: label(id)}))} onChange={v => { setRegion(v); setWx({state: 'idle'}); setVals(null); }} />}</section>
 
     <section className="na-card"><h2><span>3</span>수확일</h2>
       <label className="na-field"><span>수확일</span><input id="na-harvest" type="date" max={today} value={harvest} onChange={e => { setHarvest(e.target.value); setWx({state: 'idle'}); }} /></label>
@@ -127,7 +136,7 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
     <section className="na-card"><h2><span>5</span>처음 품질</h2>
       <Seg name="na-source" legend="처음 품질" value={source} options={[{value: 'weather', label: '날씨로 자동'}, {value: 'measured', label: '직접 잰 값'}]} onChange={v => { setSource(v); setWx({state: 'idle'}); }} />
       {source === 'weather' ? <div className="na-wx" role="status" aria-live="polite">
-        {!wKey ? <p className="ma-sub">{!hongro && !region ? '생산지를 고르면' : '수확일을 넣으면'} 그 해 농업기상 자료로 처음 품질을 추정해요.</p>
+        {!wKey ? <p className="ma-sub">{!wRegion ? '생산지를 고르면' : '수확일을 넣으면'} 그 해 농업기상 자료로 처음 품질을 추정해요.</p>
           : wx.state === 'loading' ? <p><Loader2 className="spin" size={15} aria-hidden="true" />{year}년 4~9월 {station} 날씨를 모으는 중이에요…</p>
           : wx.state === 'ok' ? <p><b>{year}년 농업기상 {station} 관측</b>으로 추정해요(실측 아님).</p>
           : wx.state === 'pending' ? <p className="warn">{wx.msg}</p>

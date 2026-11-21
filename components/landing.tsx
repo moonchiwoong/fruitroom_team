@@ -234,6 +234,15 @@ export function ServicePreview({animate}: {animate: boolean}) {
 function AuthCard({mode, setMode, onRecovered}: {mode: Mode; setMode: (m: Mode) => void; onRecovered?: () => void}) {
   const [form, setForm] = useState({name: '', affiliation: '', region: '' as import('@/lib/profile-regions').ProfileRegion | '', email: '', password: '', confirm: '', agree: false});
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [done, setDone] = useState('');
+  // 카카오는 아이디 로그인과 따로 돕니다. 카카오 오류 화면에서 ‘뒤로’로 돌아오면(페이지 복원) 도는 표시를 풉니다.
+  const [kakaoBusy, setKakaoBusy] = useState(false);
+  useEffect(() => {
+    const reset = () => setKakaoBusy(false);
+    const onShow = (e: PageTransitionEvent) => { if (e.persisted) reset(); };
+    const onVis = () => { if (document.visibilityState === 'visible') reset(); };
+    window.addEventListener('pageshow', onShow); document.addEventListener('visibilitychange', onVis);
+    return () => { window.removeEventListener('pageshow', onShow); document.removeEventListener('visibilitychange', onVis); };
+  }, []);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm(f => ({...f, [k]: e.target.type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value}));
   const switchTo = (m: Mode) => { setMode(m); setError(''); setDone(''); };
@@ -271,11 +280,12 @@ function AuthCard({mode, setMode, onRecovered}: {mode: Mode; setMode: (m: Mode) 
 
   // 카카오 로그인: Supabase에 카카오 연결(REST API 키·Client Secret)이 켜져 있어야 동작합니다.
   async function kakao() {
-    setError(''); setBusy(true);
+    setError(''); setKakaoBusy(true);
+    window.setTimeout(() => setKakaoBusy(false), 8000); // 이동이 안 되면 8초 뒤 다시 누를 수 있게
     try {
       const r = await supabaseBrowser().auth.signInWithOAuth({provider: 'kakao', options: {redirectTo: window.location.origin + '/'}});
-      if (r.error) { setError(/provider is not enabled|Unsupported provider/i.test(r.error.message) ? '카카오 로그인이 아직 설정되지 않았어요. 운영자에게 알려 주세요.' : authMessage(r.error)); setBusy(false); }
-    } catch { setError('연결하지 못했어요. 잠시 후 다시 시도해 주세요.'); setBusy(false); }
+      if (r.error) { setError(/provider is not enabled|Unsupported provider/i.test(r.error.message) ? '카카오 로그인이 아직 설정되지 않았어요. 운영자에게 알려 주세요.' : authMessage(r.error)); setKakaoBusy(false); }
+    } catch { setError('연결하지 못했어요. 잠시 후 다시 시도해 주세요.'); setKakaoBusy(false); }
   }
 
   const title = {signup: '회원가입', login: '로그인', reset: '비밀번호 찾기', recovery: '새 비밀번호 설정'}[mode];
@@ -310,7 +320,7 @@ function AuthCard({mode, setMode, onRecovered}: {mode: Mode; setMode: (m: Mode) 
       {error && <p role="alert" className="auth-error">{error}</p>}
       {(mode === 'login' || mode === 'signup') && <div className="l-kakao">
         <span className="l-or">또는</span>
-        <button type="button" className="btn l-kakao-btn" disabled={busy} onClick={() => void kakao()}><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7l-1 3.6c-.1.3.3.6.6.4l4.2-2.8c.5.1 1 .1 1.5.1 5.5 0 10-3.6 10-8S17.5 3 12 3z"/></svg>카카오로 {mode === 'signup' ? '시작하기' : '로그인'}</button>
+        <button type="button" className="btn l-kakao-btn" disabled={kakaoBusy || busy} aria-busy={kakaoBusy} onClick={() => void kakao()}>{kakaoBusy && <Loader2 className="spin" size={16} />}<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7l-1 3.6c-.1.3.3.6.6.4l4.2-2.8c.5.1 1 .1 1.5.1 5.5 0 10-3.6 10-8S17.5 3 12 3z"/></svg>카카오로 {mode === 'signup' ? '시작하기' : '로그인'}</button>
         <p className="auth-legal" style={{fontSize: 12, color: 'var(--c-sub)', margin: '6px 0 0'}}>카카오로 시작하면 <a href="/terms" target="_blank" rel="noreferrer">이용약관</a>과 <a href="/privacy" target="_blank" rel="noreferrer">개인정보처리방침</a>을 확인한 것으로 봐요.</p>
       </div>}
       {mode === 'login' && <button type="button" className="l-textlink" onClick={() => switchTo('reset')}>비밀번호를 잊으셨나요?</button>}

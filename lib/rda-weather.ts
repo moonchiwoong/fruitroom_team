@@ -1,21 +1,33 @@
 // 홍로 초기 품질 식의 날씨 변수를 농촌진흥청 농업기상 관측 일자료로 계산합니다.
 // 정의(회귀식 작성자 확인, 2026-10-30):
-//  - 관측소: 농업날씨365(weather.rda.go.kr) 거창군 거창읍
-//  - chang_min4: 4/1~4/30 일최저기온의 평균
+//  - 관측소: 농업날씨365(weather.rda.go.kr) 지역별 지점(WEATHER_STATIONS)
+//  - chang_min4: 4/1~4/30 일최저기온의 평균. 충주·군위 회귀식은 4/1~5/31 평균(작성자 확인, 2026-11-22)
 //  - chang_LC56: 5/1~6/30 날마다 (일평균기온 − 5℃)의 합. 5℃ 미만인 날도 음수 그대로 더함
 //  - chang_LC78: 7/1~8/31, LC56과 같은 방식
-//  - chang_9rain: 9/1~9/30 강수량 합계
+//  - chang_9rain: 그 지역 회귀식의 강수 변수. 거창·청송·장수·영주는 9월, 충주·군위·포천·화성은 8월 강수량 합계
+//    (키 이름은 기존 저장 기록과 맞추려고 그대로 둡니다. 몇 월인지는 WEATHER_STATIONS[지역].rainMonth)
+//  - 생장도일 기준 5℃: 농업날씨365 생장도일(일반작물 5℃)과 같은 기준(작성자 확인, 2026-11-22)
 // 빠진 날이 있으면 값을 채우거나 추정하지 않고 계산하지 않습니다.
 
 export const RDA_DAILY_URL = 'https://apis.data.go.kr/1390802/AgriWeather/WeatherObsrInfo/V4/InsttWeather/getWeatherMonDayList4';
 export const GEOCHANG_EUP = {code: '670807A001', name: '거창군 거창읍'} as const;
-/** 지역별 회귀식을 만들 때 쓴 농업날씨365 관측소(작성자 확인, 2026-10-31). 홍로=거창, 후지=청송·장수·영주. */
+/** 지역별 회귀식을 만들 때 쓴 농업날씨365 관측소(작성자 확인: 기존 2026-10-31, 충주·군위·포천·화성 2026-11-22).
+ *  minTo: 최저기온 평균 기간의 끝 달(4=4월만, 5=4~5월). rainMonth: 강수 변수의 달. 홍로·후지는 같은 지역이면 같은 지점. */
 export const WEATHER_STATIONS = {
-  geochang: {name: '거창군 거창읍', code: '670807A001', label: '거창', cultivar: '홍로'},
-  cheongsong: {name: '청송군 청송읍', code: null, label: '청송', cultivar: '후지'},
-  jangsu: {name: '장수군 장수읍', code: null, label: '장수', cultivar: '후지'},
-  yeongju: {name: '영주시 봉현면', code: null, label: '영주', cultivar: '후지'},
+  geochang: {name: '거창군 거창읍', code: '670807A001', label: '거창', cultivar: '홍로', minTo: 4, rainMonth: 9},
+  cheongsong: {name: '청송군 청송읍', code: null, label: '청송', cultivar: '후지', minTo: 4, rainMonth: 9},
+  jangsu: {name: '장수군 장수읍', code: null, label: '장수', cultivar: '후지·홍로', minTo: 4, rainMonth: 9},
+  yeongju: {name: '영주시 봉현면', code: null, label: '영주', cultivar: '후지', minTo: 4, rainMonth: 9},
+  chungju: {name: '충주시 안림동', code: null, label: '충주', cultivar: '후지·홍로', minTo: 5, rainMonth: 8},
+  gunwi: {name: '군위군 소보면', code: null, label: '군위', cultivar: '후지·홍로', minTo: 5, rainMonth: 8},
+  pocheon: {name: '포천시 영북면', code: null, label: '포천', cultivar: '후지·홍로', minTo: 4, rainMonth: 8},
+  hwaseong: {name: '화성시 마도면', code: null, label: '화성', cultivar: '후지·홍로', minTo: 4, rainMonth: 8},
 } as const;
+/** 화면에 보여 줄 날씨 변수 이름(지역마다 기간이 다릅니다). */
+export function weatherLabels(region: keyof typeof WEATHER_STATIONS) {
+  const s = WEATHER_STATIONS[region];
+  return {chang_min4: s.minTo === 5 ? '4~5월 일최저기온 평균' : '4월 일최저기온 평균', chang_LC56: '5~6월 누적 생장도일', chang_LC78: '7~8월 누적 생장도일', chang_9rain: `${s.rainMonth}월 누적 강수량`};
+}
 export type WeatherRegion = keyof typeof WEATHER_STATIONS;
 export const GDD_BASE = 5;
 
@@ -62,13 +74,13 @@ function datesBetween(y: number, m1: number, m2: number) {
 }
 
 /** 4~9월 일자료로 네 변수를 계산합니다. 필요한 날의 값이 하나라도 없으면 그 변수는 null입니다. */
-export function computeHongroWeather(year: number, rows: DailyObs[], today?: string): WeatherVar[] {
+export function computeHongroWeather(year: number, rows: DailyObs[], today?: string, opt: {minTo: number; rainMonth: number} = {minTo: 4, rainMonth: 9}): WeatherVar[] {
   const byDate = new Map(rows.map(r => [r.date, r]));
   const spec: [WeatherKey, number, number, (r: DailyObs) => number | null, (vals: number[]) => number][] = [
-    ['chang_min4', 4, 4, r => r.min, v => v.reduce((a, b) => a + b, 0) / v.length],
+    ['chang_min4', 4, opt.minTo, r => r.min, v => v.reduce((a, b) => a + b, 0) / v.length],
     ['chang_LC56', 5, 6, r => r.mean === null ? null : r.mean - GDD_BASE, v => v.reduce((a, b) => a + b, 0)],
     ['chang_LC78', 7, 8, r => r.mean === null ? null : r.mean - GDD_BASE, v => v.reduce((a, b) => a + b, 0)],
-    ['chang_9rain', 9, 9, r => r.rain, v => v.reduce((a, b) => a + b, 0)],
+    ['chang_9rain', opt.rainMonth, opt.rainMonth, r => r.rain, v => v.reduce((a, b) => a + b, 0)],
   ];
   return spec.map(([key, m1, m2, pick, agg]) => {
     const dates = datesBetween(year, m1, m2);

@@ -1,4 +1,5 @@
 'use client';
+import {WEATHER_STATIONS} from '@/lib/rda-weather';
 import {Component, Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
 import dynamic from 'next/dynamic';
 import {AlertTriangle, ArrowLeft, ArrowRight, Info, Warehouse, ArrowUpRight, CalendarDays, Check, ChevronDown, Download, FlaskConical, Loader2, Pin, PinOff, Plus, RotateCcw, Save, Thermometer, Undo2} from 'lucide-react';
@@ -962,7 +963,7 @@ function MeasureInput({id, label, value, onValue, missing, onMissing, unit, err,
   </div>;
 }
 
-const FUJI_REGIONS: {id: FujiRegion; label: string; station: string}[] = [{id: 'cheongsong', label: '청송', station: '청송군 청송읍'}, {id: 'jangsu', label: '장수', station: '장수군 장수읍'}, {id: 'yeongju', label: '영주', station: '영주시 봉현면'}];
+const FUJI_REGIONS: {id: FujiRegion; label: string; station: string}[] = (['cheongsong', 'jangsu', 'yeongju', 'chungju', 'gunwi', 'pocheon', 'hwaseong'] as FujiRegion[]).map(id => ({id, label: WEATHER_STATIONS[id].label, station: WEATHER_STATIONS[id].name}));
 /** 후지 날씨 추정: 생산지와 수확일을 고르면 그 해 농업기상 일자료로 네 값을 계산해 지역 식으로 초기 품질을 추정합니다. */
 function FujiWeather({form, setForm, estimate}: {form: TrackerForm; setForm: (update: (f: TrackerForm) => TrackerForm) => void; estimate: Record<'weight' | 'diameter' | 'firmness' | 'brix' | 'acidity', number> | null}) {
   const fj = form.fuji ?? emptyFujiForm();

@@ -3,7 +3,9 @@ import {useMemo, useState} from 'react';
 import dynamic from 'next/dynamic';
 import {AlertTriangle, BookOpen, CheckCircle2, ChevronDown, Database} from 'lucide-react';
 import {KindBadge} from '@/components/tracker-parts';
-import {inputInfo, inputKeys, metricInfo, metricKeys, regionIds, regions, regionSummary, samples} from '@/lib/initial-quality';
+import {inputInfo, inputKeys, metricInfo, metricKeys, regionIds, sampleRegionIds, regions, regionSummary, samples} from '@/lib/initial-quality';
+import {HONGRO_REGIONS, HONGRO_REGRESSIONS} from '@/lib/hongro';
+import {WEATHER_STATIONS, weatherLabels} from '@/lib/rda-weather';
 import {MODEL_RANGE, modelLabel, metricMeta, type MetricId} from '@/lib/tracker';
 import {MODEL_REGISTRY, predictQuality, type PredictionResult} from '@/lib/quality-models';
 import type {StorageId} from '@/lib/initial-quality';
@@ -31,7 +33,7 @@ function sourceNames(result: PredictionResult): string[] {
 export default function ModelInfo({modelId, metric, context}: {modelId?: StorageId | null; metric?: MetricId; context?: ModelInfoContext}) {
   const currentResult = context;
   const [openCalc, setOpenCalc] = useState(false);
-  const dataCheck = useMemo(() => regionIds.map(r => {
+  const dataCheck = useMemo(() => sampleRegionIds.map(r => {
     const s = samples(r), years = [...new Set(s.map(x => x.year))];
     const perYear = years.map(y => { const rows = s.filter(x => x.year === y); return {y, n: rows.length, uniq: new Set(rows.map(x => inputKeys.map(k => x.inputs[k]).join('|'))).size}; });
     return {r, n: s.length, years, allUnique: perYear.every(p => p.n === p.uniq), perYear};
@@ -196,8 +198,19 @@ export default function ModelInfo({modelId, metric, context}: {modelId?: Storage
       </dl>
       <div className="qt-table-wrap mi-table-wrap"><table className="qt-table mi-regression-table">
         <thead><tr><th>산지</th>{metricKeys.map(m => <th key={m}>{metricInfo[m].label}</th>)}</tr></thead>
-        <tbody>{regionIds.map(r => { const sm = regionSummary(r); return <tr key={r}><td data-label="산지">{regions[r].name}<small> · {sm.count}건</small></td>
+        <tbody>{sampleRegionIds.map(r => { const sm = regionSummary(r); return <tr key={r}><td data-label="산지">{regions[r].name}<small> · {sm.count}건</small></td>
           {metricKeys.map(m => <td key={m} data-label={metricInfo[m].label}><small>학습 R² {regions[r].equations[m].r2.toFixed(2)}</small><br />학습 RMSE: {sm.rmse[m].toFixed(metricInfo[m].digits)} {metricInfo[m].unit}</td>)}</tr>; })}</tbody>
+      </table></div>
+      <h3 className="mi-subhead">산지별 초기 품질 회귀식 (학습 R²)</h3>
+      <p className="qt-help">충주·군위·포천·화성·장수(홍로)는 회귀식(계수·R²)만 받았고 학습 원자료는 없어 RMSE·산점도는 보여 주지 않아요. 날씨 변수의 기간과 관측지점이 산지마다 달라요.</p>
+      <div className="qt-table-wrap mi-table-wrap"><table className="qt-table mi-regression-table">
+        <thead><tr><th>품종 · 산지</th><th>관측지점 · 변수 기간</th>{metricKeys.map(m => <th key={m}>{metricInfo[m].label}</th>)}</tr></thead>
+        <tbody>
+          {regionIds.map(r => { const w = weatherLabels(r); return <tr key={'f' + r}><td data-label="품종 · 산지">후지 · {regions[r].name}</td><td data-label="관측지점">{WEATHER_STATIONS[r].name}<br /><small>{w.chang_min4} · {w.chang_9rain}</small></td>
+            {metricKeys.map(m => <td key={m} data-label={metricInfo[m].label}>R² {regions[r].equations[m].r2.toFixed(2)}</td>)}</tr>; })}
+          {HONGRO_REGIONS.map(r => { const w = weatherLabels(r); return <tr key={'h' + r}><td data-label="품종 · 산지">홍로 · {WEATHER_STATIONS[r].label}</td><td data-label="관측지점">{WEATHER_STATIONS[r].name}<br /><small>{w.chang_min4} · {w.chang_9rain}</small></td>
+            {metricKeys.map(m => <td key={m} data-label={metricInfo[m].label}>R² {HONGRO_REGRESSIONS[r][m].r2.toFixed(2)}</td>)}</tr>; })}
+        </tbody>
       </table></div>
       <div className="mi-datacheck">
         <h3><Database size={16} />학습 자료 점검</h3>
