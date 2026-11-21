@@ -13,10 +13,12 @@ import {lotPredictor, easyChange, EASY_LABEL, EASY_METRICS, weatherPending, type
 import {lotReadiness, baselineObservation, storageStart, quantityUnit, weatherInitial} from '@/lib/lot-readiness';
 import {fmtNum, metricMeta, todayKST, addDays, daysBetween, isDate} from '@/lib/tracker';
 import {AppleGraph, Apple3D} from '@/components/apple-graph';
+import MiniCharts from '@/components/mini-charts';
+import {weatherLabels, WEATHER_STATIONS} from '@/lib/rda-weather';
 
 const NewApple = dynamic(() => import('@/components/new-apple'), {ssr: false, loading: () => <div className="loading-strip">여는 중…</div>});
 
-const REGION: Record<string, string> = {geochang: '거창', cheongsong: '청송', jangsu: '장수', yeongju: '영주'};
+const REGION: Record<string, string> = Object.fromEntries(Object.entries(WEATHER_STATIONS).map(([k, v]) => [k, v.label]));
 const SHORT: Record<string, string> = {firmness: '단단함', loss: '무게', brix: '단맛', acidity: '신맛'};
 const md = (d: string) => { const [, m, day] = d.split('-').map(Number); return `${m}/${day}`; };
 const unit = (m: string, hongro: boolean) => m === 'firmness' ? (hongro ? 'N (Ø11 mm)' : 'N') : metricMeta[m as 'brix'].unit;
@@ -158,31 +160,31 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
   }
   const fromMeasured = EASY_METRICS.some(m => { const r = p.at(m, sel); return r.ok && r.from === 'measured'; });
   useEffect(() => { if (!msg) return; const t = setTimeout(() => setMsg(''), 2400); return () => clearTimeout(t); }, [msg]);
-  return <div className="ma ma-detail">
+  return <div className="ma ma-detail ma-dash">
+    <div className="dash-head">
     <button type="button" className="ma-back" onClick={onBack}><ArrowLeft size={18} aria-hidden="true" />내 사과</button>
     <div className="ma-title"><h1>{lot.name}</h1><p>{[lot.variety, REGION[lot.details?.fuji_weather?.region ?? lot.details?.region ?? ''] ?? (lot.details?.hongro?.source === 'weather' ? '거창' : null), lot.location, lot.storage, lot.details?.storage_temperature != null ? `${lot.details.storage_temperature}℃` : null].filter(Boolean).join(' · ')}{p.todayDay !== null && p.todayDay >= 0 ? ` · 저장 ${p.todayDay}일째` : ''}</p></div>
     {(ready.status === 'unsupported' || ready.status === 'conditions') && <p className="ma-hint muted">{ready.title} · {ready.detail}</p>}
     {waitSept && <p className="ma-hint warn">9월 강수량은 9월이 끝나야 집계돼서, 10월 1일부터 날씨로 자동 추정해요. 지금 당도나 단단함을 재서 ‘측정 추가’로 넣으면 바로 예측돼요.</p>}
     {override && <p className="ma-hint">{pend?.year}년 농업기상 자료로 처음 품질을 자동 추정했어요(실측 아님).</p>}
     {over && <p className="ma-hint warn">오늘은 저장 {p.todayDay}일째라 계산 범위({limit}일)를 넘었어요. 아래 날짜 버튼은 범위 안 날짜의 계산값이에요. 지금 상태는 직접 측정해 확인해 주세요.</p>}
-    <div className="ma-days" role="group" aria-label="저장 일수">{days.map(d => <button key={d} type="button" aria-pressed={sel === d} className={sel === d ? 'active' : ''} onClick={() => setDay(d)}>{d === p.todayDay ? '오늘' : `${d}일`}</button>)}</div>
-    <p className="ma-date">{p.start ? `${md(addDays(p.start, sel))} 기준 (저장 ${sel}일째)` : ''}</p>
+    </div>
+    <div className="dash-days"><div className="ma-days" role="group" aria-label="저장 일수">{days.map(d => <button key={d} type="button" aria-pressed={sel === d} className={sel === d ? 'active' : ''} onClick={() => setDay(d)}>{d === p.todayDay ? '오늘' : `${d}일`}</button>)}</div>
+    <p className="ma-date">{p.start ? `${md(addDays(p.start, sel))} 기준 (저장 ${sel}일째)` : ''}</p></div>
+    <div className="dash-tiles">
     {obs === null ? <div className="ma-rows" aria-label="측정 기록을 불러와 계산하는 중" role="status"><span className="ma-sk" style={{height: 18}} /><span className="ma-sk" style={{height: 18, width: '80%'}} /><span className="ma-sk" style={{height: 18, width: '60%'}} /></div> : <div className="ma-rows">{EASY_METRICS.map(m => { const r = p.at(m, sel);
       const boxes = m === 'loss' && r.ok && typeof lot.quantity === 'number' && quantityUnit(lot) === '상자' && lot.quantity > 0 ? ` · ${lot.quantity}상자 기준 약 ${fmtNum(lot.quantity * r.value / 100, 1)}상자 무게만큼` : '';
       return <div key={m + ':' + sel} className="ma-row"><span className="ma-row-lab" style={{color: METRIC_COLOR[m]}}><MetricIcon m={m} />{SHORT[m]}</span><div>{r.ok ? <><b>{easyChange(m, r.value, r.first, p.weather)}</b><small>{fmtNum(r.value, metricMeta[m].digits)} {unit(m, hongro)}{m === 'firmness' && kgUser ? ` (${asKg(r.value)})` : ''}{boxes}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div></div>; })}</div>}
-    <section className="ma-target" aria-label="내 단단함 기준"><h2>내 기준</h2>
-      <div className="ma-target-row"><label htmlFor="ma-target">단단함</label><input id="ma-target" type="number" inputMode="decimal" min={1} max={300} step="any" placeholder="예: 50" value={target} onChange={e => setTarget(e.target.value)} /><span>N</span>
-        <button type="button" className="ma-ghost" disabled={busy || target === (lot.details?.firmness_target != null ? String(lot.details.firmness_target) : '')} onClick={() => void saveTarget()}>저장</button></div>
-      {Number(target) > 0 && <p className="ma-sub">{target} N은 {asKg(Number(target))}이에요. (kg 기계 숫자 × 9.8 = N)</p>}
-      {obs === null ? <p className="ma-sub">측정 기록을 불러오는 중이에요…</p> : reach ? <p>{reach.text}</p> : <p className="ma-sub">내가 정한 단단함에 계산상 언제쯤 닿는지 보여 줘요. 출하 판정이 아니라 계산이에요.</p>}
-    </section>
-    <div className="ma-actions">
+    </div>
+    <div className="dash-chart only-mobile"><AppleGraph p={p} p0={p0} obs={obs ?? []} sel={sel} maxDay={hongro ? 120 : 200} /></div>
+    <section className="dash-chart only-pc" aria-label="저장 일수별 변화"><h2>저장 일수별 변화 <small>선: 계산값 · 동그라미: 내가 잰 값 · 세로선: 고른 날</small></h2><MiniCharts p={p} obs={obs ?? []} sel={sel} maxDay={hongro ? 120 : 200} /></section>
+    <div className="dash-side">
+    <div className="dash-3d"><Apple3D p={p} sel={sel} cultivar={lot.variety || ''} /></div>
+    <div className="ma-actions dash-act">
       <button type="button" className="ma-primary big" onClick={() => setMeasure(true)}><Plus size={18} aria-hidden="true" />측정 추가</button>
     </div>
-    <AppleGraph p={p} p0={p0} obs={obs ?? []} sel={sel} maxDay={hongro ? 120 : 200} />
-    <Apple3D p={p} sel={sel} cultivar={lot.variety || ''} />
     {msg && <div key={msg} className="ma-toast" role="status">✓ {msg}</div>}
-    <section className="ma-records" aria-label="최근 측정 기록"><h2>최근 측정</h2>
+    <section className="ma-records dash-rec" aria-label="최근 측정 기록"><h2>최근 측정</h2>
       {obs === null ? <div aria-label="불러오는 중" style={{display: 'grid', gap: 8}}><span className="ma-sk" style={{height: 18}} /><span className="ma-sk" style={{height: 18, width: '70%'}} /></div> : err ? <p className="error-box">{err}</p>
         : recent.length ? <><ul>{recent.map(o => <li key={o.id} className="ma-rec"><span><b>{md(o.date)}</b> {[o.brix != null ? `단맛 ${o.brix}` : null, o.firmness != null ? `단단함 ${o.firmness} N` : null, o.acidity != null ? `신맛 ${o.acidity}%` : null].filter(Boolean).join(' · ') || '값 없음'}</span>
           {(() => { const c = compareAt(o); return c ? <small className="ma-cmp">예측 {c.pred} · 실제 {c.actual} ({c.diff})</small> : null; })()}
@@ -190,6 +192,23 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
           {sortedObs.length > 3 && <button type="button" className="linkbtn" onClick={() => setAllRec(v => !v)}>{allRec ? '최근 3개만 보기' : `전체 ${sortedObs.length}개 보기`}</button>}</>
         : <p>아직 측정 기록이 없어요.</p>}
     </section>
+    </div>
+    <div className="dash-bottom">
+    <section className="ma-target dash-card" aria-label="내 단단함 기준"><h2>내 기준</h2>
+      <div className="ma-target-row"><label htmlFor="ma-target">단단함</label><input id="ma-target" type="number" inputMode="decimal" min={1} max={300} step="any" placeholder="예: 50" value={target} onChange={e => setTarget(e.target.value)} /><span>N</span>
+        <button type="button" className="ma-ghost" disabled={busy || target === (lot.details?.firmness_target != null ? String(lot.details.firmness_target) : '')} onClick={() => void saveTarget()}>저장</button></div>
+      {Number(target) > 0 && <p className="ma-sub">{target} N은 {asKg(Number(target))}이에요. (kg 기계 숫자 × 9.8 = N)</p>}
+      {obs === null ? <p className="ma-sub">측정 기록을 불러오는 중이에요…</p> : reach ? <p>{reach.text}</p> : <p className="ma-sub">내가 정한 단단함에 계산상 언제쯤 닿는지 보여 줘요. 출하 판정이 아니라 계산이에요.</p>}
+    </section>
+      <section className="dash-card dash-info" aria-label="저장 조건과 날씨"><h2>저장 조건</h2>
+        <p>{[lot.storage, lot.mcp ? `1-MCP ${lot.mcp}` : null, lot.details?.storage_temperature != null ? `${lot.details.storage_temperature}℃` : null, lot.location, typeof lot.quantity === 'number' ? `${lot.quantity}${quantityUnit(lot)}` : null].filter(Boolean).join(' · ') || '기록 없음'}</p>
+        {(() => { const h = lot.details?.hongro, f = lot.details?.fuji_weather;
+          const reg = (h?.source === 'weather' ? h.region ?? 'geochang' : f?.region) as keyof typeof WEATHER_STATIONS | undefined;
+          if (!reg || !WEATHER_STATIONS[reg]) return <p className="ma-sub">처음 품질은 직접 잰 값으로 시작했어요.</p>;
+          const lab = weatherLabels(reg), w = h?.source === 'weather' ? h.weather : f ? {chang_min4: f.inputs.min4, chang_LC56: f.inputs.lc56, chang_LC78: f.inputs.lc78, chang_9rain: f.inputs.rain9} : null;
+          return <><h2>수확한 해 날씨 <small>{WEATHER_STATIONS[reg].name}</small></h2><dl className="dash-wx">{(['chang_min4', 'chang_LC56', 'chang_LC78', 'chang_9rain'] as const).map(k => <div key={k}><dt>{lab[k]}</dt><dd>{w && w[k] != null ? fmtNum(Number(w[k]), k === 'chang_min4' ? 1 : 0) : '—'}{k === 'chang_min4' ? '℃' : k === 'chang_9rain' ? 'mm' : ''}</dd></div>)}</dl></>; })()}
+      </section>
+    </div>
     <p className="ma-foot">{p.weather ? '처음 품질은 날씨로 추정 · ' : ''}{fromMeasured ? '내가 잰 값부터 이어 계산 · ' : ''}시연용 계산 · 출하·안전 판정 아님 {openModel && <button type="button" className="linkbtn" onClick={openModel}>계산 근거</button>} <button type="button" className="linkbtn" onClick={() => setEdit(true)}><Pencil size={13} aria-hidden="true" />사과 정보 수정</button></p>
     {measure && <MeasurementForm open lot={lot} isBaseline={false} hasBaseline={!!baselineObservation(lot, obs ?? [])} onClose={() => setMeasure(false)} onSaved={m => { setMeasure(false); setMsg(m); setN(x => x + 1); void reload(); }} />}
     {editObs && <MeasurementForm open lot={lot} observation={editObs} isBaseline={baselineObservation(lot, obs ?? [])?.id === editObs.id} hasBaseline={!!baselineObservation(lot, obs ?? [])} onClose={() => setEditObs(null)} onSaved={m => { setEditObs(null); setMsg(m); setN(x => x + 1); void reload(); }} />}

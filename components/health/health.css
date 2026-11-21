@@ -116,7 +116,7 @@ body:has(.app-header) .footer-brand p,body:has(.app-header) .site-footer nav{dis
 body:has(.app-header) .footer-brand img{width:96px!important}
 body:has(.app-header) .site-footer-bottom,body:has(.app-header) .site-footer-legal{background:transparent!important;font-size:12px;padding-top:2px!important;padding-bottom:10px!important;justify-content:flex-start}
 /* PC 사과 상세: 한 줄이 너무 길어지지 않게(왼쪽 정렬은 유지) */
-@media (min-width:900px){.ma.ma-detail>*{max-width:760px}}
+
 /* 로그인 화면의 ‘글자 크게’ 버튼이 선처럼 보이던 문제 */
 .lh-top .big-text-toggle{display:inline-flex;align-items:center;gap:4px;border:1px solid #D1D6DB;border-radius:999px;padding:5px 10px;background:#fff;font-size:13px;color:#4E5968;min-width:0;height:auto}
 /* 체험 화면도 같은 색·모양으로 */
@@ -161,7 +161,7 @@ body:has(.app-header) .site-footer-bottom,body:has(.app-header) .site-footer-leg
   .site-header img[src*="appletrack-logo"],.lh-top img{transition:transform .4s var(--spring)}
   .site-header a:hover img[src*="appletrack-logo"],.site-header button:hover img[src*="appletrack-logo"],.lh-top img:hover{transform:rotate(-4deg) scale(1.06)}
   /* 화면이 바뀔 때 내용이 아래에서 올라옴 */
-  .hs>*,.ma>*{animation:hxIn .45s cubic-bezier(.2,.8,.2,1) both}
+  .hs>*,.ma>*:not(.ma-toast):not(dialog){animation:hxIn .45s cubic-bezier(.2,.8,.2,1) both}
   .hs>*:nth-child(2),.ma>*:nth-child(2){animation-delay:.04s}.hs>*:nth-child(3),.ma>*:nth-child(3){animation-delay:.08s}.hs>*:nth-child(4),.ma>*:nth-child(4){animation-delay:.12s}.hs>*:nth-child(n+5),.ma>*:nth-child(n+5){animation-delay:.16s}
 }
 @keyframes hsDraw{to{stroke-dashoffset:0}}
@@ -171,3 +171,46 @@ body:has(.app-header) .site-footer-bottom,body:has(.app-header) .site-footer-leg
 .lh-apple [data-testid="quality-apple-viewer"]{border:0!important;background:transparent!important;border-radius:0!important}
 .lh-apple [data-testid="quality-apple-viewer"]>div{background:transparent!important;height:100%!important}
 @media (min-width:861px){.lh-apple{width:min(400px,66%);left:14%;top:12%}}
+
+/* ===== PC 사과 대시보드 ===== */
+.mc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.mc{margin:0;background:#fff;border-radius:14px;padding:10px 12px 6px}
+.mc figcaption{display:flex;justify-content:space-between;align-items:baseline;font-size:14px;font-weight:700}
+.mc figcaption span{display:inline-flex;align-items:center;gap:6px}
+.mc figcaption b{font-family:'Nunito',ui-rounded,system-ui,sans-serif;font-weight:800;font-size:20px}
+.mc figcaption b small{font-size:12px;color:var(--hx-sub);font-weight:700}
+.mc>svg{width:100%;height:auto;display:block}
+.mc-grid-line{stroke:#EFEFF2}.mc-ax{font-size:10px;fill:#8A8A8E}.mc-today{stroke:var(--hx-acc);stroke-dasharray:3 3}
+.mc-na{font-size:13px;color:var(--hx-sub)}
+.dash-chart h2,.dash-card h2{font-size:15px;font-weight:800;margin:0 0 8px}
+.dash-chart h2 small,.dash-card h2 small{font-weight:400;font-size:12px;color:var(--hx-sub);margin-left:6px}
+.dash-card{background:#fff;border-radius:14px;padding:14px 16px}
+.dash-info p{margin:0 0 10px;font-size:14px}
+.dash-wx{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;margin:0}
+.dash-wx div{display:flex;justify-content:space-between;gap:8px;font-size:13px;border-bottom:1px solid #F2F2F7;padding:4px 0}
+.dash-wx dt{color:var(--hx-sub)}.dash-wx dd{margin:0;font-weight:700}
+.dash-bottom{display:grid;gap:12px}
+@media (max-width:999.98px){.only-pc{display:none!important}}
+@media (min-width:1000px){
+  .only-mobile{display:none!important}
+  .ma.ma-dash{display:grid!important;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:12px 16px;align-items:start;
+    grid-template-areas:"back back" "head head" "days days" "tiles tiles" "chart side" "bottom bottom" "foot foot" "manage manage"}
+  .ma-dash>*{grid-column:1/-1}
+  .ma-dash>.ma-back{grid-area:back}.ma-dash>.dash-head{grid-area:head}.ma-dash>.dash-days{grid-area:days}.ma-dash>.dash-tiles{grid-area:tiles}
+  .ma-dash>.dash-chart.only-pc{grid-area:chart}.ma-dash>.dash-side{grid-area:side;display:grid;gap:12px}
+  .ma-dash>.dash-bottom{grid-area:bottom;grid-template-columns:1fr 1fr}.ma-dash>.ma-foot{grid-area:foot}.ma-dash>.ma-manage{grid-area:manage}
+  .ma-dash .dash-act{margin:0}
+  .ma-dash .dash-act .ma-primary{width:100%}
+  .ma-dash .dash-tiles .ma-rows{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;background:none!important;padding:0!important}
+  .ma-dash .dash-tiles .ma-row{flex-direction:column;align-items:flex-start;background:#fff;border-radius:14px;padding:12px 14px;border:0!important;gap:6px;justify-content:flex-start}
+  .ma-dash .dash-tiles .ma-row div{text-align:left}
+  .ma-dash .dash-tiles .ma-row b{font-size:17px}
+}
+
+/* 모바일: 옆칸 묶음을 풀고 ‘측정 추가’를 그래프 위로 */
+@media (max-width:999.98px){
+  .ma-dash .dash-side{display:contents}
+  .ma-dash>.ma-back{order:1}.ma-dash>.dash-head{order:2}.ma-dash>.dash-days{order:3}.ma-dash>.dash-tiles{order:4}
+  .ma-dash .dash-act{order:5}.ma-dash>.dash-chart{order:6}.ma-dash .dash-3d{order:7}.ma-dash .dash-rec{order:8}
+  .ma-dash>.dash-bottom{order:9}.ma-dash>.ma-foot{order:10}.ma-dash>.ma-manage{order:11}
+}

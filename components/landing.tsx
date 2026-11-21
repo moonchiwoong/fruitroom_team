@@ -65,7 +65,7 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
   // 넓은 화면·마우스 사용이면 실제 3D 사과를 천천히 돌리고, 마우스를 따라 무대가 살짝 기웁니다(움직임 줄이기 설정이면 끔).
   const [wide3d, setWide3d] = useState(false);
   useEffect(() => { const q = window.matchMedia('(min-width: 861px) and (pointer: fine) and (prefers-reduced-motion: no-preference)'); const f = () => setWide3d(q.matches); f(); q.addEventListener('change', f); return () => q.removeEventListener('change', f); }, []);
-  const tilt = (e: React.PointerEvent<HTMLDivElement>) => { if (!wide3d) return; const r = e.currentTarget.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5; e.currentTarget.style.setProperty('--rx', `${(-y * 8).toFixed(2)}deg`); e.currentTarget.style.setProperty('--ry', `${(x * 10).toFixed(2)}deg`); };
+  const tilt = (e: React.PointerEvent<HTMLDivElement>) => { if (!wide3d) return; const r = e.currentTarget.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5; e.currentTarget.style.setProperty('--rx', `${(-y * 4).toFixed(2)}deg`); e.currentTarget.style.setProperty('--ry', `${(x * 5).toFixed(2)}deg`); };
   const untilt = (e: React.PointerEvent<HTMLDivElement>) => { e.currentTarget.style.setProperty('--rx', '0deg'); e.currentTarget.style.setProperty('--ry', '0deg'); };
   const cards: [MetricId, string][] = [['firmness', '저장 일수별 단단함'], ['brix', '단맛 변화'], ['acidity', '신맛 변화'], ['loss', '무게가 줄어든 정도']];
   return <div ref={rootRef} className="lh">
