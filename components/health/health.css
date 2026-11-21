@@ -345,3 +345,8 @@ html{scroll-behavior:smooth}
 .lx-region div{border-bottom-color:#F5D9D6}
 @media (prefers-reduced-motion:reduce){.lx-zoom{height:auto}.lx-zoom-pin{position:relative;height:70vh}.lx-zoom-apple{display:none}.lx-zoom-bg{opacity:1}.lx-chars .ch,.lx-zoom-msg p{opacity:1;transform:none;transition:none}}
 @media (max-width:860px){.lx-sec{min-height:auto}.lx-zoom{height:200vh}.lx-zoom-apple{width:62vw}}
+/* 과수원 사진 → 사과로 확대 (사과 중심: 사진 가로 64.2%, 세로 45.9%) */
+.lx-zoom-apple{display:none}
+.lx-zoom-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:64.2% 45.9%;transform-origin:64.2% 45.9%;transform:scale(calc(1 + var(--p)*var(--p)*7));opacity:clamp(0,calc(1 - (var(--p) - .32)*2.8),1);will-change:transform,opacity}
+.lx-zoom-photo{z-index:0}.lx-zoom-bg{z-index:1}.lx-zoom-msg{z-index:2}
+@media (prefers-reduced-motion:reduce){.lx-zoom-photo{display:none}}

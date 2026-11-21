@@ -85,7 +85,7 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
       </div>
     </div>
     <LandingSections onStart={() => { document.getElementById('join')?.scrollIntoView({behavior: 'smooth', block: 'center'}); }} />
-    <footer className="lh-foot"><span>© 애플트랙 by FarmBridge</span><span>계산값은 시연용이며 출하·안전 판정을 대신하지 않습니다.</span><a href="/privacy"><b>개인정보처리방침</b></a><a href="/terms">이용약관</a><a href="mailto:mooncw@jbnu.ac.kr">문의</a></footer>
+    <footer className="lh-foot"><span>© 애플트랙 by FarmBridge</span><span>계산값은 시연용이며 출하·안전 판정을 대신하지 않습니다.</span><a href="/privacy"><b>개인정보처리방침</b></a><a href="/terms">이용약관</a><a href="mailto:mooncw@jbnu.ac.kr">문의</a><span>사진: <a href="https://unsplash.com/ko/@chris_robert?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText" target="_blank" rel="noreferrer">chris robert</a> / <a href="https://unsplash.com/ko/%EC%82%AC%EC%A7%84/%EB%B6%89%EC%9D%80-%EC%97%B4%EB%A7%A4%EA%B0%80%EC%9E%88%EB%8A%94-%EB%82%98%EB%AC%B4-5f8SUQv83_A?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText" target="_blank" rel="noreferrer">Unsplash</a></span></footer>
   </div>;
 }
 

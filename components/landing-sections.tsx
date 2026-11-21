@@ -43,7 +43,7 @@ function AppleZoom() {
   return <section ref={ref} className="lx-zoom" aria-label="소개">
     <div className="lx-zoom-pin">
       <div className="lx-zoom-bg" />
-      <img className="lx-zoom-apple" src="/assets/apple-still.webp" alt="" />
+      <img className="lx-zoom-photo" src="/assets/photos/orchard-apple.webp" alt="파란 하늘 아래 빨간 사과가 달린 사과나무" />
       <div className={`lx-zoom-msg lx-rev ${done ? 'in' : ''}`}><h2><Chars lines={['날씨가 다르면,', '사과도 달라요']} /></h2><p>산지마다 그 해 관측 날씨로 처음 품질을 추정해요.</p></div>
     </div>
   </section>;
