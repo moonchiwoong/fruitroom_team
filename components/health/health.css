@@ -201,10 +201,10 @@ body:has(.app-header) .site-footer-bottom,body:has(.app-header) .site-footer-leg
   .ma-dash>.dash-bottom{grid-area:bottom;grid-template-columns:1fr 1fr}.ma-dash>.ma-foot{grid-area:foot}.ma-dash>.ma-manage{grid-area:manage}
   .ma-dash .dash-act{margin:0}
   .ma-dash .dash-act .ma-primary{width:100%}
-  .ma-dash .dash-tiles .ma-rows{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;background:none!important;padding:0!important}
-  .ma-dash .dash-tiles .ma-row{flex-direction:column;align-items:flex-start;background:#fff;border-radius:14px;padding:12px 14px;border:0!important;gap:6px;justify-content:flex-start}
-  .ma-dash .dash-tiles .ma-row div{text-align:left}
-  .ma-dash .dash-tiles .ma-row b{font-size:17px}
+  .ma-dash .dash-tiles .ma-rows,.lp-dash .dash-tiles .ma-rows{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;background:none!important;padding:0!important}
+  .ma-dash .dash-tiles .ma-row,.lp-dash .dash-tiles .ma-row{flex-direction:column;align-items:flex-start;background:#fff;border-radius:14px;padding:12px 14px;border:0!important;gap:6px;justify-content:flex-start}
+  .ma-dash .dash-tiles .ma-row div,.lp-dash .dash-tiles .ma-row div{text-align:left}
+  .ma-dash .dash-tiles .ma-row b,.lp-dash .dash-tiles .ma-row b{font-size:17px}
 }
 
 /* 모바일: 옆칸 묶음을 풀고 ‘측정 추가’를 그래프 위로 */
@@ -244,3 +244,22 @@ body:has(.app-header) .site-footer-bottom,body:has(.app-header) .site-footer-leg
   .hs-today .hs-val b{font-size:26px}
   .hs-today .hs-spark{justify-self:end;margin-top:-6px}
 }
+
+/* ===== 체험 화면(/try)도 같은 대시보드·머리말 ===== */
+.lp-dash{display:flex;flex-direction:column;gap:14px}
+.lp-dash .dash-side{display:contents}
+.site.guest .page-hero{background:transparent!important;border:0!important}
+.site.guest .page-hero-inner{max-width:var(--hx-max);margin:0 auto;padding:20px var(--hx-pad) 0!important;box-sizing:border-box;text-align:left}
+.site.guest .page-hero h1{font-size:34px;font-weight:800;letter-spacing:-1px;margin:0;font-family:inherit}
+.site.guest .page-hero p{color:var(--hx-sub);margin:4px 0 0}
+.try-simple .ma-title h1{font-size:24px!important}
+@media (min-width:1000px){
+  .lp-dash{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:12px 16px;align-items:start;grid-template-areas:"days days" "tiles tiles" "chart side"}
+  .lp-dash>*{grid-column:1/-1}
+  .lp-dash>.dash-days{grid-area:days}.lp-dash>.dash-tiles{grid-area:tiles}.lp-dash>.dash-chart.only-pc{grid-area:chart}
+  .lp-dash>.dash-side{grid-area:side;display:grid;gap:12px}
+  .try-simple .try-tabs{max-width:420px}
+}
+/* 체험 화면: 머리말·본문을 상단 로고와 같은 선에 맞춤 */
+.site.guest .page-hero-inner{width:100%!important;max-width:var(--hx-max)!important}
+.site.guest .try-simple{max-width:none!important;width:100%;margin:0!important;padding-left:0!important;padding-right:0!important}

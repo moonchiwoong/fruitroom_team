@@ -53,7 +53,7 @@ export default function GuestTry() {
   const toLogin = (signup = false) => { window.location.href = signup ? '/?auth=signup#join' : '/?auth=login#join'; };
 
   return <div className="site guest">
-    <header className="site-header2"><div className="site-header-inner">
+    <header className="site-header2 app-header"><div className="site-header-inner">
       <a className="brand2" href="/" aria-label="애플트랙 첫 화면"><img src="/assets/appletrack-logo.svg" alt="" width={170} height={42} style={{display:'block', width:'clamp(132px, 16vw, 170px)', height:'auto'}} /></a>
       <nav className="guest-nav" aria-label="체험 메뉴">
         <button className={'nav-link' + (view === 'track' ? ' active' : '')} aria-current={view === 'track' ? 'page' : undefined} onClick={() => go({view: 'track'})}>품질 예측 체험</button>
