@@ -11,6 +11,7 @@ import {HANDOFF_KEY} from '@/lib/tracker-form';
 import {PROFILE_REGIONS} from '@/lib/profile-regions';
 import {MetricIcon, METRIC_COLOR, METRIC_LABEL} from '@/components/health/metric-icons';
 import '@/components/health/health.css';
+import LandingSections from '@/components/landing-sections';
 
 type Mode = 'signup' | 'login' | 'reset' | 'recovery';
 
@@ -69,7 +70,7 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
   const untilt = (e: React.PointerEvent<HTMLDivElement>) => { e.currentTarget.style.setProperty('--rx', '0deg'); e.currentTarget.style.setProperty('--ry', '0deg'); };
   const cards: [MetricId, string][] = [['firmness', '저장 일수별 단단함'], ['brix', '단맛 변화'], ['acidity', '신맛 변화'], ['loss', '무게가 줄어든 정도']];
   return <div ref={rootRef} className="lh">
-    <header className="lh-top lh-up"><img src="/assets/appletrack-logo.svg" alt="애플트랙" width={152} height={34} /><a href="/try">로그인 없이 체험하기</a><BigTextToggle /></header>
+    <header className="lh-top lh-up"><img src="/assets/appletrack-logo.svg" alt="애플트랙" width={152} height={34} /><nav className="lh-nav" aria-label="소개"><a href="#how">사용법</a><a href="#regions">산지</a><a href="#dashboard">대시보드</a><a href="#ship">출하 비교</a></nav><a href="/try">로그인 없이 체험하기</a><BigTextToggle /></header>
     <div className="lh-wrap">
       <section aria-labelledby="lh-title">
         <p className="lh-kicker lh-up lh-d1">사과 저장 품질 기록</p>
@@ -83,6 +84,7 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
         {cards.map(([m, t], i) => <div key={m} className={`lh-card lh-c${i} lh-up lh-d${i + 2}`}><div className={motion ? 'lh-float' : ''}><span className="hs-lab" style={{color: METRIC_COLOR[m]}}><MetricIcon m={m} />{METRIC_LABEL[m]}</span><p>{t}</p></div></div>)}
       </div>
     </div>
+    <LandingSections onStart={() => { document.getElementById('join')?.scrollIntoView({behavior: 'smooth', block: 'center'}); }} />
     <footer className="lh-foot"><span>© 애플트랙 by FarmBridge</span><span>계산값은 시연용이며 출하·안전 판정을 대신하지 않습니다.</span><a href="/privacy"><b>개인정보처리방침</b></a><a href="/terms">이용약관</a><a href="mailto:mooncw@jbnu.ac.kr">문의</a></footer>
   </div>;
 }
