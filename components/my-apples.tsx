@@ -14,6 +14,7 @@ import {lotReadiness, baselineObservation, storageStart, quantityUnit, weatherIn
 import {fmtNum, metricMeta, todayKST, addDays, daysBetween, isDate} from '@/lib/tracker';
 import {AppleGraph, Apple3D} from '@/components/apple-graph';
 import MiniCharts from '@/components/mini-charts';
+import ShipCompareCard from '@/components/ship-compare-card';
 import {weatherLabels, WEATHER_STATIONS} from '@/lib/rda-weather';
 
 const NewApple = dynamic(() => import('@/components/new-apple'), {ssr: false, loading: () => <div className="loading-strip">여는 중…</div>});
@@ -192,6 +193,7 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
           {sortedObs.length > 3 && <button type="button" className="linkbtn" onClick={() => setAllRec(v => !v)}>{allRec ? '최근 3개만 보기' : `전체 ${sortedObs.length}개 보기`}</button>}</>
         : <p>아직 측정 기록이 없어요.</p>}
     </section>
+    <ShipCompareCard lot={lot} p={p} maxDay={hongro ? 120 : 300} />
     </div>
     <div className="dash-bottom">
     <section className="ma-target dash-card" aria-label="내 단단함 기준"><h2>내 기준</h2>

@@ -263,3 +263,21 @@ body:has(.app-header) .site-footer-bottom,body:has(.app-header) .site-footer-leg
 /* 체험 화면: 머리말·본문을 상단 로고와 같은 선에 맞춤 */
 .site.guest .page-hero-inner{width:100%!important;max-width:var(--hx-max)!important}
 .site.guest .try-simple{max-width:none!important;width:100%;margin:0!important;padding-left:0!important;padding-right:0!important}
+/* ===== 출하 조건 비교 ===== */
+.sc h2 small{font-weight:400}
+.sc-ref{font-size:12px;color:var(--hx-sub);margin:0 0 10px}
+.sc-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+.sc-field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#636366;min-width:0}
+.sc-field em{font-style:normal;color:#8A8A8E}
+.sc-in{display:flex;align-items:center;background:#F2F2F7;border-radius:10px;padding:0 10px}
+.sc-in input{flex:1;min-width:0;width:0;border:0;background:none;padding:9px 0;font:inherit;font-size:16px;color:#000;text-align:right;outline:none}
+.sc-in:focus-within{box-shadow:0 0 0 2px var(--hx-acc)}
+.sc-in i{font-style:normal;font-size:12px;color:#8A8A8E;margin-left:6px;white-space:nowrap}
+.sc-msg{font-size:13px;color:#636366;margin:10px 0 0}
+.sc-out{margin:12px 0 0;display:grid;gap:6px}
+.sc-out div{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:8px 0;border-top:1px solid #F2F2F7}
+.sc-out dt{font-size:13px;color:#636366}.sc-out dd{margin:0;font-weight:800;font-size:16px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.sc-out .key dd{font-size:19px}.sc-out .up dd{color:#1F7A3A}.sc-out .down dd{color:#C2410C}
+.sc-note{font-size:11px;color:#8A8A8E;margin:10px 0 0;line-height:1.5}
+@media (max-width:999.98px){.ma-dash .dash-ship,.lp-dash .dash-ship{order:8}}
+@media (max-width:420px){.sc-fields{grid-template-columns:1fr}}
