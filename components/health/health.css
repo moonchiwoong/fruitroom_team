@@ -214,3 +214,33 @@ body:has(.app-header) .site-footer-bottom,body:has(.app-header) .site-footer-leg
   .ma-dash .dash-act{order:5}.ma-dash>.dash-chart{order:6}.ma-dash .dash-3d{order:7}.ma-dash .dash-rec{order:8}
   .ma-dash>.dash-bottom{order:9}.ma-dash>.ma-foot{order:10}.ma-dash>.ma-manage{order:11}
 }
+/* ===== 요약 대시보드 ===== */
+.hs-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.hs-kpi{background:#fff;border-radius:14px;padding:10px 14px;display:flex;flex-direction:column;gap:2px}
+.hs-kpi span{font-size:12px;color:var(--hx-sub);font-weight:700}
+.hs-kpi b{font-size:26px}.hs-kpi b small{font-size:13px;color:var(--hx-sub);margin-left:2px}
+.hs-kpi.warn b{color:#C2410C}
+@media (max-width:720px){.hs-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.hs-kpi b{font-size:22px}}
+.hs-table-wrap{background:#fff;border-radius:14px;padding:6px 4px;overflow:hidden}
+.hs-table{width:100%;border-collapse:collapse;font-size:14px}
+.hs-table th{text-align:left;font-size:12px;color:var(--hx-sub);font-weight:700;padding:8px 10px;border-bottom:1px solid #EFEFF2}
+.hs-table td{padding:10px;border-bottom:1px solid #F4F4F7;vertical-align:middle}
+.hs-table tr:last-child td{border-bottom:0}
+.hs-table td b{display:block;font-weight:700}.hs-table td small{color:var(--hx-sub);font-size:12px}
+.hs-table tbody tr{cursor:pointer;transition:background-color .15s}
+.hs-table tbody tr:hover{background:#F7F7FA}
+.hs-table tbody tr.on{background:#FDECEC;box-shadow:inset 3px 0 0 var(--hx-acc)}
+.hs-table tbody tr:focus-visible{outline:2px solid var(--hx-acc);outline-offset:-2px}
+.hs-cell-spark{display:inline-flex;align-items:center;gap:8px}.hs-cell-spark b{display:inline}
+.hs-tag{display:inline-block;font-size:12px;font-weight:700;padding:3px 8px;border-radius:999px;white-space:nowrap}
+.hs-tag.ok{background:#E8F5EC;color:#1F7A3A}.hs-tag.warn{background:#FFF1E6;color:#C2410C}.hs-tag.muted{background:#F0F0F3;color:#6E6E73}
+@media (min-width:1000px){
+  .hs-dash{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}
+  .hs-today>.hs-sec:first-child{margin-top:0}
+  .hs-today .hs-grid{grid-template-columns:1fr 1fr}
+}
+@media (min-width:1000px){
+  .hs-today .hs-metric{grid-template-columns:1fr}
+  .hs-today .hs-val b{font-size:26px}
+  .hs-today .hs-spark{justify-self:end;margin-top:-6px}
+}
