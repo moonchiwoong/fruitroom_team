@@ -367,3 +367,6 @@ html{scroll-behavior:smooth}
 /* 글자 크게: 새 로그인 전 홈페이지 */
 html.big-text .lh-wrap>section,html.big-text .lx-stats,html.big-text .lx-sec,html.big-text .lx-cta,html.big-text .lx-zoom-msg,html.big-text .lh-foot,html.big-text .lh-nav{zoom:1.25}
 html.big-text .lh-wrap>section{max-width:calc(100vw / 1.25 - 32px)}
+/* 글자 크게(zoom 1.3)일 때 본문 폭이 머리말보다 넓어지지 않게: 확대 전 기준으로 폭·여백을 나눠 둠 */
+html.big-text .site-main,html.big-text .site-footer{--hx-max:830.77px;--hx-pad:18.46px}
+@media (max-width:720px){html.big-text .site-main,html.big-text .site-footer{--hx-pad:12.31px}}
