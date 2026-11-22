@@ -5,7 +5,8 @@ import {initialQualityRows} from './initial-quality-data';
 import {fujiStorageValue, FUJI_FORMULAS} from './quality-models';
 
 // 후지 초기 품질 회귀식이 있는 산지. 충주·군위·포천·화성은 2026-11-22 추가(회귀식(5).xlsx, 표본 원자료는 받지 않음).
-export type RegionId = 'cheongsong' | 'jangsu' | 'yeongju' | 'chungju' | 'gunwi' | 'pocheon' | 'hwaseong';
+import type {FujiRegionKey} from './regions';
+export type RegionId = FujiRegionKey;
 export type InputKey = 'rain9' | 'lc56' | 'lc78' | 'min4';
 export type MetricKey = 'weight' | 'diameter' | 'firmness' | 'brix' | 'acidity';
 export type Inputs = Record<InputKey, number>;

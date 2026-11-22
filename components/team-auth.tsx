@@ -1,4 +1,5 @@
 'use client';
+import {isRegionKey} from '@/lib/regions';
 import {createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode} from 'react';
 import dynamic from 'next/dynamic';
 import {Loader2} from 'lucide-react';
@@ -52,7 +53,7 @@ export default function TeamAuth({children}: {children: ReactNode}) {
     const meta = u.meta;
     setProfile(!p.error && p.data ? {...emptyProfile, ...p.data} : {
       name: String(meta.name ?? ''), affiliation: String(meta.affiliation ?? ''),
-      region: (['geochang', 'cheongsong', 'jangsu', 'yeongju', 'chungju', 'gunwi', 'pocheon', 'hwaseong'].includes(String(meta.region)) ? meta.region : '') as Profile['region'], default_inputs: null,
+      region: (isRegionKey(meta.region) ? meta.region : '') as Profile['region'], default_inputs: null,
     });
     setIsTeam(!t.error && !!t.data);
     setUser(u); setState(s => s === 'recovery' ? s : 'in');

@@ -1,3 +1,4 @@
+import {isRegionKey, isFujiRegionKey, isHongroRegionKey} from './regions';
 import {serverClient} from './supabase-server';
 import {InputError,numberOrNull,validDate,parseCsv,summarizeEnvironment,demoPrediction,endOfKoreanDay,restrictPredictionForVariety} from './lot-analysis';
 import {today,type Lot,type EnvRow,type Observation,type Photo} from './lot-types';
@@ -58,7 +59,7 @@ export function cleanDetails(v:unknown){
  if(Object.hasOwn(s,'initial_source')&&s.initial_source!==null){if(!['실측','날씨 기반 추정'].includes(s.initial_source))throw new InputError('초기 품질 출처를 확인해 주세요.');o.initial_source=s.initial_source;}
  if(Object.hasOwn(s,'archived_on'))o.archived_on=date(s.archived_on,'출하 완료일');
  if(Object.hasOwn(s,'firmness_target'))o.firmness_target=num(s.firmness_target,1,300,'내 단단함 기준 N');
- if(Object.hasOwn(s,'region'))o.region=['geochang','cheongsong','jangsu','yeongju','chungju','gunwi','pocheon','hwaseong'].includes(String(s.region))?String(s.region):null;
+ if(Object.hasOwn(s,'region'))o.region=isRegionKey(s.region)?s.region:null;
  if(Object.hasOwn(s,'quantity_unit')&&s.quantity_unit!==null){if(!['kg','상자'].includes(s.quantity_unit))throw new InputError('저장 수량 단위는 상자 또는 kg만 저장합니다.');o.quantity_unit=s.quantity_unit;}
  if(Object.hasOwn(s,'initial_observation_id'))o.initial_observation_id=s.initial_observation_id===null||s.initial_observation_id===''?null:short(s.initial_observation_id,'예측 기준 측정 기록',false,80);
  if(Object.hasOwn(s,'initial_history')){if(!Array.isArray(s.initial_history)||s.initial_history.length>20)throw new InputError('이전 초기 측정 이력 형식을 확인해 주세요.');o.initial_history=s.initial_history.map((h:any)=>{if(!h||typeof h!=='object')throw new InputError('이전 초기 측정 이력 형식을 확인해 주세요.');return {date:date(h.date,'이전 초기 측정일'),firmness:num(h.firmness,0,Number.MAX_VALUE,'이전 초기 경도'),brix:num(h.brix,0,Number.MAX_VALUE,'이전 초기 당도'),acidity:num(h.acidity,0,Number.MAX_VALUE,'이전 초기 산도'),sample_count:num(h.sample_count,1,10000,'이전 초기 표본 수'),observation_id:txt(h.observation_id,'이전 기준 기록',80),replaced_at:typeof h.replaced_at==='string'&&h.replaced_at.length<=40?h.replaced_at:null};});}
@@ -73,7 +74,7 @@ export function cleanDetails(v:unknown){
   const w=s.fuji_weather;
   if(w===null)o.fuji_weather=null;
   else{
-   if(typeof w!=='object'||Array.isArray(w)||!['cheongsong','jangsu','yeongju','chungju','gunwi','pocheon','hwaseong'].includes(w.region)||!w.inputs||typeof w.inputs!=='object')throw new InputError('후지 날씨 추정 정보를 확인해 주세요.');
+   if(typeof w!=='object'||Array.isArray(w)||!isFujiRegionKey(w.region)||!w.inputs||typeof w.inputs!=='object')throw new InputError('후지 날씨 추정 정보를 확인해 주세요.');
    const big=Number.MAX_VALUE,yr=num(w.year,2000,2100,'수확 연도');
    const e=w.estimate;if(e!==null&&e!==undefined&&(typeof e!=='object'||Array.isArray(e)))throw new InputError('후지 날씨 추정값 형식을 확인해 주세요.');
    o.fuji_weather={region:w.region,year:yr,inputs:{rain9:num(w.inputs.rain9,-big,big,'강수량'),lc56:num(w.inputs.lc56,-big,big,'5~6월 생장도일'),lc78:num(w.inputs.lc78,-big,big,'7~8월 생장도일'),min4:num(w.inputs.min4,-big,big,'4월 최저기온')},
@@ -82,7 +83,7 @@ export function cleanDetails(v:unknown){
  }
  if(s.hongro!==undefined&&s.hongro!==null){
   const h=s.hongro;
-  if(typeof h!=='object'||Array.isArray(h)||h.schemaVersion!==1||h.cultivar!=='hongro'||!['geochang','chungju','gunwi','pocheon','hwaseong','jangsu'].includes(h.region)||h.modelVersion!==HONGRO_MODEL_VERSION)throw new InputError('홍로 모델 정보(산지)를 확인해 주세요.');
+  if(typeof h!=='object'||Array.isArray(h)||h.schemaVersion!==1||h.cultivar!=='hongro'||!isHongroRegionKey(h.region)||h.modelVersion!==HONGRO_MODEL_VERSION)throw new InputError('홍로 모델 정보(산지)를 확인해 주세요.');
   if(h.mode!=='real')throw new InputError('예시 데이터는 실제 물량 기록으로 저장할 수 없습니다.');
   if(!['measured','weather'].includes(h.source))throw new InputError('홍로 초기품질 출처를 확인해 주세요.');
   if(!['cold0','cold4'].includes(h.storage))throw new InputError('홍로는 0℃ 또는 4℃ 저온저장만 지원합니다.');

@@ -397,7 +397,7 @@ html.big-text .site-main,html.big-text .site-footer{--hx-max:830.77px;--hx-pad:1
 .s3d-open b{font-size:16px}.s3d-open small{color:#6B7684;font-size:13px}
 html .hs .s3d{margin-top:16px}
 /* 선택지가 많을 때(산지 7곳 등) 좁은 화면·큰 글자에서 줄바꿈 */
-.qt3-seg.na-seg-wrap{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:6px;flex-wrap:wrap}
+.qt3-seg.na-seg-wrap{display:grid!important;grid-auto-flow:row!important;grid-auto-columns:auto!important;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:6px;flex-wrap:wrap}
 .qt3-seg.na-seg-wrap>label{min-width:0}
 .hs-ship-link{display:grid;gap:2px;width:100%;margin:10px 0 0;padding:14px 16px;border:1px solid #E5E8EB;border-radius:16px;background:#fff;text-align:left;font:inherit;cursor:pointer;color:#191F28}
 .hs-ship-link b{font-size:15px}.hs-ship-link b::after{content:' →';color:#E5322D}.hs-ship-link small{color:#6B7684;font-size:13px}
@@ -418,3 +418,4 @@ html .hs .s3d{margin-top:16px}
 @media (max-width:720px){.ma-days{flex-wrap:nowrap!important;gap:2px}.ma-days button{min-width:0!important;flex:1 1 0;padding:0 2px!important;white-space:nowrap;font-size:13px}}
 /* 휴대폰: 본문 왼쪽 줄을 머리말 로고와 맞춤(바깥 여백 18px + 안쪽 16px이 겹쳐 34px로 들어가 있던 것) */
 @media (max-width:720px){body:has(.app-header) .site-main{padding-left:0!important;padding-right:0!important}}
+.qt3-seg input{left:0;top:0}

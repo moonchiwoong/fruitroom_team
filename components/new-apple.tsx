@@ -2,6 +2,7 @@
 // ‘새 사과’: 농가용 간단 등록 화면. 품종 → 생산지 → 수확일 → 보관 → 처음 품질(자동/직접) 다섯 가지만 묻습니다.
 // 저장 형식과 검사는 기존 품질 예측 화면과 같은 lib/tracker-form(payloadFromForm·validateForm)을 그대로 씁니다.
 // 계산은 lib/lot-predict(기존 예측식)만 쓰고, 날씨 값이 다 없으면 계산하지 않습니다(값을 채우거나 추정하지 않음).
+import {FUJI_REGION_KEYS, HONGRO_REGION_KEYS} from '@/lib/regions';
 import {useEffect, useMemo, useState, type ReactNode} from 'react';
 import {josa} from '@/lib/josa';
 import {ArrowLeft, Check, Loader2} from 'lucide-react';
@@ -18,8 +19,8 @@ import '@/components/health/health.css';
 import type {HongroRegion} from '@/lib/hongro';
 
 // 품종별로 초기 품질 회귀식이 있는 산지. 관측지점·기간은 WEATHER_STATIONS 한 곳에서 관리합니다.
-const FUJI_REGIONS: FujiRegion[] = ['cheongsong', 'jangsu', 'yeongju', 'chungju', 'gunwi', 'pocheon', 'hwaseong'];
-const HONGRO_REGION_IDS: HongroRegion[] = ['geochang', 'chungju', 'gunwi', 'pocheon', 'hwaseong', 'jangsu'];
+const FUJI_REGIONS: FujiRegion[] = [...FUJI_REGION_KEYS];
+const HONGRO_REGION_IDS: HongroRegion[] = [...HONGRO_REGION_KEYS];
 const label = (id: keyof typeof WEATHER_STATIONS) => WEATHER_STATIONS[id].label;
 const SHORT: Record<string, string> = {firmness: '단단함', loss: '무게', brix: '단맛', acidity: '신맛'};
 

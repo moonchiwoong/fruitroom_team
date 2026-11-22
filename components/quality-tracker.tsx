@@ -1,4 +1,5 @@
 'use client';
+import {FUJI_REGION_KEYS, isFujiRegionKey} from '@/lib/regions';
 import {WEATHER_STATIONS} from '@/lib/rda-weather';
 import {Component, Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
 import dynamic from 'next/dynamic';
@@ -427,7 +428,7 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
   const quickToday = startOk && asOfDay > 0 && asOfDay <= (hongro ? 120 : 300) ? asOfDay : null;
   const quickDays = [...new Set([...(quickToday !== null ? [quickToday] : []), 30, 60, 90, 120, ...(hongro ? [] : [150, 200])])].sort((a, b) => a - b);
   const quickDay = quickPick !== null && quickDays.includes(quickPick) ? quickPick : quickToday ?? 60;
-  useEffect(() => { const r = session?.profile.region; if (firstInput && !hongro && form.fuji && !form.fuji.region && (r === 'cheongsong' || r === 'jangsu' || r === 'yeongju')) setForm(f => ({...f, fuji: {...(f.fuji ?? emptyFujiForm()), region: r}})); }, [firstInput, hongro, form.fuji, session?.profile.region, setForm]);
+  useEffect(() => { const r = session?.profile.region; if (firstInput && !hongro && form.fuji && !form.fuji.region && isFujiRegionKey(r)) setForm(f => ({...f, fuji: {...(f.fuji ?? emptyFujiForm()), region: r}})); }, [firstInput, hongro, form.fuji, session?.profile.region, setForm]);
   useEffect(() => { if (firstInput && fujiWeather && !form.initialSameStart) setForm(f => ({...f, initialSameStart: true})); }, [firstInput, fujiWeather, form.initialSameStart, setForm]);
   // 새 물량 화면은 예측식이 있는 조합만 고르게 합니다. 홍로는 일반 저온·1-MCP 미처리 한 가지라 그 조건으로 둡니다.
   useEffect(() => {
@@ -963,7 +964,7 @@ function MeasureInput({id, label, value, onValue, missing, onMissing, unit, err,
   </div>;
 }
 
-const FUJI_REGIONS: {id: FujiRegion; label: string; station: string}[] = (['cheongsong', 'jangsu', 'yeongju', 'chungju', 'gunwi', 'pocheon', 'hwaseong'] as FujiRegion[]).map(id => ({id, label: WEATHER_STATIONS[id].label, station: WEATHER_STATIONS[id].name}));
+const FUJI_REGIONS: {id: FujiRegion; label: string; station: string}[] = ([...FUJI_REGION_KEYS] as FujiRegion[]).map(id => ({id, label: WEATHER_STATIONS[id].label, station: WEATHER_STATIONS[id].name}));
 /** 후지 날씨 추정: 생산지와 수확일을 고르면 그 해 농업기상 일자료로 네 값을 계산해 지역 식으로 초기 품질을 추정합니다. */
 function FujiWeather({form, setForm, estimate}: {form: TrackerForm; setForm: (update: (f: TrackerForm) => TrackerForm) => void; estimate: Record<'weight' | 'diameter' | 'firmness' | 'brix' | 'acidity', number> | null}) {
   const fj = form.fuji ?? emptyFujiForm();

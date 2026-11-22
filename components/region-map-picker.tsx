@@ -5,19 +5,11 @@
 import {useEffect, useRef, useState} from 'react';
 import southKoreaRaw from '@svg-maps/south-korea';
 import {WEATHER_STATIONS} from '@/lib/rda-weather';
+import {REGION_KEYS, REGIONS, regionCultivars, type RegionKey} from '@/lib/regions';
 
 const southKorea = southKoreaRaw as unknown as {viewBox: string; locations: {id: string; name: string; path: string}[]};
-export type MapRegion = keyof typeof WEATHER_STATIONS;
-export const MAP_PINS: Record<MapRegion, {x: number; y: number; cultivars: ('후지' | '홍로')[]; left?: boolean}> = {
-  pocheon: {x: 172, y: 91, cultivars: ['후지', '홍로']},
-  hwaseong: {x: 138.5, y: 171, cultivars: ['후지', '홍로'], left: true},
-  chungju: {x: 238.5, y: 197, cultivars: ['후지', '홍로']},
-  yeongju: {x: 302, y: 219, cultivars: ['후지']},
-  cheongsong: {x: 342, y: 263, cultivars: ['후지']},
-  gunwi: {x: 297.5, y: 284.5, cultivars: ['후지', '홍로']},
-  jangsu: {x: 202, y: 352, cultivars: ['후지', '홍로'], left: true},
-  geochang: {x: 237, y: 348, cultivars: ['홍로']},
-};
+export type MapRegion = RegionKey;
+export const MAP_PINS = Object.fromEntries(REGION_KEYS.map(k => [k, {...REGIONS[k].map, cultivars: regionCultivars(k)}])) as Record<MapRegion, {x: number; y: number; cultivars: ('후지' | '홍로')[]; left?: boolean}>;
 const FULL = [0, 40, 524, 520];
 
 export default function RegionMapPicker({value, onPick}: {value: MapRegion | ''; onPick: (r: MapRegion) => void}) {

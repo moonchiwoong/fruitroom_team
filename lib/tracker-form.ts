@@ -1,4 +1,5 @@
 // 품질 변화 화면의 입력 양식 ↔ 물량 기록 변환, 초안(임시 저장) 관리.
+import {REGION_KEYS, REGIONS, type FujiRegionKey} from './regions';
 import type {Lot, LotDetails} from './lot-types';
 import {addDays, isDate, todayKST} from './tracker';
 import {parseOptionalNumber} from './quality-policy';
@@ -32,7 +33,7 @@ export type TrackerForm = {
   missing: {firmness: boolean; brix: boolean; acidity: boolean};
 };
 
-export type FujiRegion = 'cheongsong' | 'jangsu' | 'yeongju' | 'chungju' | 'gunwi' | 'pocheon' | 'hwaseong';
+export type FujiRegion = FujiRegionKey;
 export type FujiWeatherForm = {source: 'measured' | 'weather'; region: '' | FujiRegion; year: string; weather: {rain9: string; lc56: string; lc78: string; min4: string}};
 export const emptyFujiForm = (): FujiWeatherForm => ({source: 'measured', region: '', year: '', weather: {rain9: '', lc56: '', lc78: '', min4: ''}});
 /** 후지 날씨 추정: 지역 식(lib/initial-quality)으로 초기 품질 5개를 계산합니다. 네 값과 지역이 모두 있어야 합니다. */
@@ -49,7 +50,7 @@ export function firmnessToN(raw: string, unit: 'N' | 'kgf'): number | null {
   return unit === 'kgf' ? p.value * KGF_TO_N : p.value;
 }
 /** 자동 이름: ‘홍로 · 10월 27일 저장’, 저장 시작일이 없으면 ‘홍로 · 새 물량’. */
-const REGION_LABEL: Record<string, string> = {geochang: '거창', cheongsong: '청송', jangsu: '장수', yeongju: '영주', chungju: '충주', gunwi: '군위', pocheon: '포천', hwaseong: '화성'};
+const REGION_LABEL: Record<string, string> = Object.fromEntries(REGION_KEYS.map(k => [k, REGIONS[k].label]));
 /** 자동 이름: ‘품종 9/12 수확 · 생산지’. 수확일이 없으면 저장 시작일로 만듭니다. */
 export function suggestName(f: Pick<TrackerForm, 'variety' | 'sameStart' | 'intake_date' | 'storage_start_date'> & Partial<Pick<TrackerForm, 'harvest_date' | 'fuji' | 'hongro'>>): string {
   const hongro = isHongroVariety(f.variety), v = hongro ? '홍로' : (f.variety || '후지'), d = f.sameStart ? f.intake_date : f.storage_start_date;

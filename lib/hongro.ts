@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {HONGRO_REGION_KEYS, type HongroRegionKey} from './regions';
 import {predictQuality, HONGRO_FORMULAS, HONGRO_STORAGE_MODEL_VERSION, HONGRO_SOURCE, HONGRO_PAPER} from './quality-models';
 
 /** Separate Hongro model: none of the Fuji coefficients or storage models are used. */
@@ -62,8 +63,8 @@ export const HONGRO_REGRESSION = {
 /** 지역별 홍로 초기 품질 회귀식. 거창은 위 식, 나머지는 회귀식(5).xlsx 그대로 옮김(2026-11-22).
  *  chang_9rain: 그 지역의 강수 변수(충주·군위·포천·화성 8월, 거창·장수 9월). chang_min4: 충주·군위는 4~5월 평균.
  *  경도 단위는 N(작성자 확인, 원본 표의 ‘N/mm’ 표기는 오기). */
-export type HongroRegion = 'geochang'|'chungju'|'gunwi'|'pocheon'|'hwaseong'|'jangsu';
-export const HONGRO_REGIONS:HongroRegion[] = ['geochang','chungju','gunwi','pocheon','hwaseong','jangsu'];
+export type HongroRegion = HongroRegionKey;
+export const HONGRO_REGIONS:HongroRegion[] = [...HONGRO_REGION_KEYS];
 export const HONGRO_REGRESSIONS:Record<HongroRegion,Record<keyof typeof HONGRO_REGRESSION,{intercept:number;chang_LC56:number;chang_LC78:number;chang_9rain:number;chang_min4:number;r2:number}>> = {
   geochang:HONGRO_REGRESSION,
   chungju:{
@@ -112,7 +113,7 @@ export const hongroWeatherSchema = z.object({
   chang_min4:z.number().finite(),chang_LC56:z.number().finite(),chang_LC78:z.number().finite(),chang_9rain:z.number().finite(),
 }).strict();
 const common = {
-  cultivar:z.literal('hongro'),region:z.enum(['geochang','chungju','gunwi','pocheon','hwaseong','jangsu']),storage:z.enum(['cold0','cold4']),days:z.number().finite().min(0).max(120),
+  cultivar:z.literal('hongro'),region:z.enum(HONGRO_REGION_KEYS),storage:z.enum(['cold0','cold4']),days:z.number().finite().min(0).max(120),
 };
 export const hongroInputSchema = z.discriminatedUnion('source',[
   z.object({...common,source:z.literal('measured'),initial:hongroInitialSchema}).strict(),
