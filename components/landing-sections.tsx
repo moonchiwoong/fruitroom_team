@@ -13,13 +13,19 @@ import RegionMapPicker, {MAP_PINS, type MapRegion} from '@/components/region-map
 /** 화면에 들어오면 아래에서 떠오르게(움직임 줄이기 설정이면 바로 보임). */
 function Reveal({children, className = '', delay = 0}: {children: ReactNode; className?: string; delay?: number}) {
   const ref = useRef<HTMLDivElement>(null), [on, setOn] = useState(false);
-  useEffect(() => {
-    const el = ref.current; if (!el) return;
-    if (!('IntersectionObserver' in window)) { setOn(true); return; }
-    const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { setOn(true); io.disconnect(); } }, {threshold: 0.05, rootMargin: '0px 0px -8% 0px'});
-    io.observe(el); return () => io.disconnect();
-  }, []);
+  useEffect(() => onEnter(ref.current, 0.92, () => setOn(true)), []);
   return <div ref={ref} className={`lx-rev ${on ? 'in' : ''} ${className}`} style={{transitionDelay: `${delay}ms`}}>{children}</div>;
+}
+
+/** 요소 윗변이 화면 높이의 k 지점보다 위로 오면 한 번 실행. 글자 크게(zoom)에서도 맞도록 IntersectionObserver 대신 스크롤로 확인. */
+function onEnter(el: HTMLElement | null, k: number, fn: () => void) {
+  if (!el) return;
+  let raf = 0, done = false;
+  const check = () => { raf = 0; if (done) return; const r = el.getBoundingClientRect(); if (r.top < innerHeight * k && r.bottom > 0) { done = true; off(); fn(); } };
+  const on = () => { if (!raf) raf = requestAnimationFrame(check); };
+  const off = () => { removeEventListener('scroll', on); removeEventListener('resize', on); cancelAnimationFrame(raf); };
+  addEventListener('scroll', on, {passive: true}); addEventListener('resize', on); check();
+  return off;
 }
 
 /** 제목을 한 글자씩 떠오르게(부모 .lx-rev 가 .in 이 될 때). 줄은 배열로 나눔. */
@@ -53,11 +59,8 @@ function AppleZoom() {
 function Count({to, suffix = ''}: {to: number; suffix?: string}) {
   const ref = useRef<HTMLSpanElement>(null), [n, setN] = useState(0);
   useEffect(() => {
-    const el = ref.current; if (!el) return;
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) { setN(to); return; }
-    const io = new IntersectionObserver(es => { if (!es.some(e => e.isIntersecting)) return; io.disconnect();
-      const t0 = performance.now(); const tick = (t: number) => { const k = Math.min(1, (t - t0) / 900); setN(Math.round(to * (1 - (1 - k) ** 3))); if (k < 1) requestAnimationFrame(tick); }; requestAnimationFrame(tick); }, {threshold: 0.5});
-    io.observe(el); return () => io.disconnect();
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setN(to); return; }
+    return onEnter(ref.current, 0.85, () => { const t0 = performance.now(); const tick = (t: number) => { const k = Math.min(1, (t - t0) / 900); setN(Math.round(to * (1 - (1 - k) ** 3))); if (k < 1) requestAnimationFrame(tick); }; requestAnimationFrame(tick); });
   }, [to]);
   return <span ref={ref}>{n.toLocaleString('ko-KR')}{suffix}</span>;
 }

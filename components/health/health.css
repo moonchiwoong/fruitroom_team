@@ -364,3 +364,6 @@ html{scroll-behavior:smooth}
 .lx-map .rmp-prov{fill:#F4E4E2}
 .lx-map .rmp-pin text{stroke:#fff}
 @media (prefers-reduced-motion:reduce){.lx-zoom-frame{display:none}}
+/* 글자 크게: 새 로그인 전 홈페이지 */
+html.big-text .lh-wrap>section,html.big-text .lx-stats,html.big-text .lx-sec,html.big-text .lx-cta,html.big-text .lx-zoom-msg,html.big-text .lh-foot,html.big-text .lh-nav{zoom:1.25}
+html.big-text .lh-wrap>section{max-width:calc(100vw / 1.25 - 32px)}
