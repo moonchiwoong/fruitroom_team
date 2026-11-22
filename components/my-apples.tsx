@@ -5,7 +5,7 @@ import {useEffect, useMemo, useState} from 'react';
 import {josa} from '@/lib/josa';
 import {MetricIcon, METRIC_COLOR} from '@/components/health/metric-icons';
 import dynamic from 'next/dynamic';
-import {ArrowLeft, ArrowRight, Loader2, Pencil, Plus} from 'lucide-react';
+import {ArrowLeft, ArrowRight, Loader2, Pencil, Plus, CalendarPlus} from 'lucide-react';
 import type {Lot, Observation} from '@/lib/lot-types';
 import {requestJson} from '@/components/lot-forms';
 import {LotEditor, MeasurementForm} from '@/components/lot-dialogs';
@@ -17,6 +17,7 @@ import MiniCharts from '@/components/mini-charts';
 import ShipCompareCard from '@/components/ship-compare-card';
 import {weatherLabels, WEATHER_STATIONS} from '@/lib/rda-weather';
 import {lotRegionLabel} from '@/lib/lot-region';
+import {REMINDER_GAPS, nextMeasureDate, measureIcs, type ReminderGap} from '@/lib/measure-reminder';
 
 const NewApple = dynamic(() => import('@/components/new-apple'), {ssr: false, loading: () => <div className="loading-strip">여는 중…</div>});
 
@@ -192,6 +193,7 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
     <div className="ma-actions dash-act">
       <button type="button" className="ma-primary big" onClick={() => setMeasure(true)}><Plus size={18} aria-hidden="true" />측정 추가</button>
     </div>
+    {!lot.details?.archived_on && <MeasureReminder lot={lot} obs={obs} />}
     {msg && <div key={msg} className="ma-toast" role="status">✓ {msg}</div>}
     <section className="ma-records dash-rec" aria-label="최근 측정 기록"><h2>최근 측정</h2>
       {obs === null ? <div aria-label="불러오는 중" style={{display: 'grid', gap: 8}}><span className="ma-sk" style={{height: 18}} /><span className="ma-sk" style={{height: 18, width: '70%'}} /></div> : err ? <p className="error-box">{err}</p>
@@ -244,4 +246,31 @@ function SameDay({lot, obs, p, sel, hongro}: {lot: Lot; obs: Observation[]; p: R
   }
   if (date > today) return <p className="ma-sameday" role="note">{md2(date)}은 앞으로의 계산값이에요{last ? ` · 기준 측정일 ${md2(last.date)}` : ' · 아직 직접 잰 기록이 없어요'}</p>;
   return <p className="ma-sameday" role="note">{md2(date)}에는 잰 값이 없어 차이를 표시하지 않아요{last ? ` · 최근 측정 ${md2(last.date)}` : ''}</p>;
+}
+
+/** 다음 측정일을 휴대폰·PC 캘린더에 넣는 카드. 간격은 이 기기에만 기억합니다(서버 저장 없음). */
+function MeasureReminder({lot, obs}: {lot: Lot; obs: Observation[] | null}) {
+  const [gap, setGap] = useState<ReminderGap>(21), [done, setDone] = useState('');
+  useEffect(() => { try { const g = Number(localStorage.getItem('appletrack:remind-gap')); if ((REMINDER_GAPS as readonly number[]).includes(g)) setGap(g as ReminderGap); } catch { /* 기본 21일 */ } }, []);
+  const today = todayKST();
+  const measured = (obs ?? []).filter(o => o.date <= today).map(o => o.date).sort().at(-1) ?? (lot.initial_measured_on && !weatherInitial(lot) ? lot.initial_measured_on : null);
+  const base = measured ?? storageStart(lot) ?? null;
+  const next = nextMeasureDate(base, gap, today);
+  if (!next) return null;
+  const md2 = (d: string) => `${+d.slice(5, 7)}월 ${+d.slice(8, 10)}일`;
+  const add = () => {
+    const ics = measureIcs({lotId: lot.id, lotName: lot.name || lot.variety, date: next.date, url: location.origin});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([ics], {type: 'text/calendar;charset=utf-8'})); a.download = `사과측정_${(lot.name || lot.variety).replace(/[\\/:*?"<>|]/g, '')}_${next.date}.ics`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    setDone(`${md2(next.date)} 오전 9시 일정 파일을 만들었어요. 열어서 캘린더에 추가해 주세요.`);
+  };
+  return <section className="ma-remind dash-card" aria-label="다음 측정 알림">
+    <h2>다음 측정 알림</h2>
+    <p>{measured ? `마지막으로 잰 날 ${md2(measured)}` : `저장 시작 ${md2(base!)} · 아직 잰 기록 없음`} 기준</p>
+    <div className="ma-remind-gaps" role="radiogroup" aria-label="측정 간격">{REMINDER_GAPS.map(g => <button key={g} type="button" role="radio" aria-checked={gap === g} className={gap === g ? 'on' : ''} onClick={() => { setGap(g); setDone(''); try { localStorage.setItem('appletrack:remind-gap', String(g)); } catch { /* 이번만 */ } }}>{g}일마다</button>)}</div>
+    <p className="ma-remind-date"><b>{md2(next.date)}</b>{next.overdue ? ' · 권장 날짜가 지나 내일로 잡았어요' : ''}</p>
+    <button type="button" className="ma-remind-btn" onClick={add}><CalendarPlus size={17} aria-hidden="true" />캘린더에 추가</button>
+    {done && <p className="ma-remind-done" role="status">{done}</p>}
+    <small>휴대폰 기본 캘린더가 오전 9시에 알려 줘요. 애플트랙 서버는 알림을 보내지 않아요.</small>
+  </section>;
 }
