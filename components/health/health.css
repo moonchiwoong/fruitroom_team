@@ -393,3 +393,6 @@ html.big-text .site-main,html.big-text .site-footer{--hx-max:830.77px;--hx-pad:1
   .s3d-panel,.s3d-hint{position:static;width:auto;margin-top:8px;background:#fff;border:1px solid #E5E8EB}
   .s3d-legend{position:static;margin-top:6px;color:#6B7684;padding:0 2px}
 }
+.s3d-open{display:grid;gap:2px;width:100%;margin:16px 0 0;padding:14px 16px;border:1px solid #E5E8EB;border-radius:16px;background:#fff;text-align:left;font:inherit;cursor:pointer;color:#191F28}
+.s3d-open b{font-size:16px}.s3d-open small{color:#6B7684;font-size:13px}
+html .hs .s3d{margin-top:16px}

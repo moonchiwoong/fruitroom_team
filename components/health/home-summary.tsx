@@ -25,6 +25,12 @@ function use3D() {
   return ok;
 }
 
+function useWide() {
+  const [w, setW] = useState(false);
+  useEffect(() => { const m = matchMedia('(min-width: 1001px)'); const f = () => setW(m.matches); f(); m.addEventListener('change', f); return () => m.removeEventListener('change', f); }, []);
+  return w;
+}
+
 const UNIT = (m: MetricId) => m === 'firmness' ? 'N' : metricMeta[m].unit;
 const ORDER: MetricId[] = ['firmness', 'brix', 'acidity', 'loss'];
 const dateLabel = () => new Date().toLocaleDateString('ko-KR', {timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', weekday: 'long'});
@@ -51,6 +57,8 @@ export default function HomeSummary({lots, loaded, error, retry, openLot, newLot
   }), [active]);
   const lot = active.find(l => l.id === selId) ?? active[0] ?? null;
   const can3d = use3D();
+  // PC(넓은 화면)는 맨 위에 바로, 휴대폰은 오늘 품질 카드 아래에서 버튼을 눌렀을 때만 3D를 불러옵니다.
+  const wide = useWide(), [open3d, setOpen3d] = useState(false);
   const items3d = useMemo<StorageItem[]>(() => infos.map(x => ({id: x.l.id, name: x.l.name || x.l.variety, variety: x.l.variety, hongro: isHongroVariety(x.l.variety), day: x.day, tone: x.tone as StorageItem['tone'], status: x.status, temp: x.l.details?.storage_temperature ?? null, qty: x.l.quantity ?? null, unit: x.l.details?.quantity_unit ?? null})), [infos]);
   return <div className="hs">
     <header className="hs-top"><div><p className="hs-date">{dateLabel()}</p><h1>요약</h1></div><button type="button" className="hs-avatar" aria-label="내 정보" onClick={openAccount}>{name.slice(0, 1) || '나'}</button></header>
@@ -60,7 +68,7 @@ export default function HomeSummary({lots, loaded, error, retry, openLot, newLot
       : !active.length ? <div className="hs-card hs-empty"><b>아직 보관 중인 사과가 없어요.</b><p>저장을 시작한 사과를 등록하면 오늘 상태를 여기서 볼 수 있어요.</p><button type="button" className="hs-btn" onClick={newLot}>+ 저장 시작</button></div>
       : <>
         <Kpis infos={infos} />
-        {can3d && <Storage3D items={items3d} onOpen={openLot} />}
+        {can3d && wide && <Storage3D items={items3d} onOpen={openLot} />}
         <div className="hs-dash">
         <section className="hs-table-wrap only-pc" aria-label="보관 중인 사과 한눈에"><table className="hs-table">
           <thead><tr><th>사과</th><th>저장</th><th>무게 감소 (오늘)</th><th>마지막 측정</th><th>상태</th></tr></thead>
@@ -74,6 +82,7 @@ export default function HomeSummary({lots, loaded, error, retry, openLot, newLot
           <img src={applePhoto(l.id)} alt="" loading="lazy" /><b>{l.name || l.variety}</b><small><DayCount lot={l} /></small></button>)}</div></div>
         <div className="hs-today">{lot && <LotToday key={lot.id} lot={lot} openLot={openLot} />}</div>
         </div>
+        {can3d && !wide && (open3d ? <Storage3D items={items3d} onOpen={openLot} /> : <button type="button" className="s3d-open" onClick={() => setOpen3d(true)}><b>내 저장고 3D로 보기</b><small>보관 중인 사과를 저장고 모습으로 봐요</small></button>)}
       </>}
   </div>;
 }
