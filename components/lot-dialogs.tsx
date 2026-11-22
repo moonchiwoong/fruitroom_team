@@ -1,6 +1,7 @@
 'use client';
 // 물량 관리 안에서 쓰는 입력 창: 새 물량 등록·정보 수정, 측정 기록 추가·수정.
 // 서버 검증(lib/lot-server.ts)과 같은 규칙을 쓰며, 빈칸은 미측정·미입력으로 보내고 0이나 예시값으로 바꾸지 않습니다.
+import {lotRegionLabel} from '@/lib/lot-region';
 import {useEffect, useRef, useState, type ReactNode} from 'react';
 import {Info, Loader2, Save, Undo2} from 'lucide-react';
 import {Dialog, DialogContent, DialogDescription, DialogTitle} from '@/components/ui/dialog';
@@ -90,7 +91,7 @@ export function LotEditor({open, lot, onClose, onSaved}: {open: boolean; lot?: L
       {variety === '홍로' && (f.temperature === '' || f.temperature === '0' || f.temperature === '4')
         ? <Field id="le-temp" label="저장고 온도"><select id="le-temp" value={f.temperature} onChange={e => set('temperature', e.target.value)}><option value="">선택</option><option value="0">0℃</option><option value="4">4℃</option></select></Field>
         : <Field id="le-temp" label={<>실제 저장고 온도 <small>℃ · 선택</small></>} hint="기록한 온도를 지원 온도로 바꾸지 않아요."><input id="le-temp" type="number" inputMode="decimal" step="any" value={f.temperature} placeholder="예: 0" onChange={e => set('temperature', e.target.value)} /></Field>}
-      {lot && (lot.details?.fuji_weather || lot.details?.hongro?.source === 'weather') && <p className="ld-hint ld-wide">생산지: {({cheongsong: '청송', jangsu: '장수', yeongju: '영주'} as Record<string, string>)[lot.details?.fuji_weather?.region ?? ''] ?? '거창'} · 처음 품질은 수확한 해 날씨로 추정했어요. 생산지나 추정 방식을 바꾸려면 새 사과로 등록해 주세요.</p>}
+      {lot && (lot.details?.fuji_weather || lot.details?.hongro?.source === 'weather') && <p className="ld-hint ld-wide">생산지: {lotRegionLabel(lot) ?? '—'} · 처음 품질은 수확한 해 날씨로 추정했어요. 생산지나 추정 방식을 바꾸려면 새 사과로 등록해 주세요.</p>}
       {session?.isTeam && <Field id="le-share" label="공유 범위" hint={!session?.isTeam ? '팀 계정에서만 팀과 공유할 수 있어요.' : !owner ? '공유 범위는 사과를 등록한 사람만 바꿀 수 있어요.' : '팀과 공유하면 팀원이 기록을 보고 추가·수정할 수 있어요.'}>
         <select id="le-share" value={f.team ? 'team' : 'me'} disabled={!canShare} onChange={e => set('team', e.target.value === 'team')}><option value="me">나만 보기</option><option value="team">팀과 공유</option></select></Field>}
     </div>
