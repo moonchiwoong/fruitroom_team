@@ -103,6 +103,7 @@ function LotToday({lot, openLot}: {lot: Lot; openLot: (id: string) => void}) {
   return <>
     <div className="hs-sec"><h2>{lot.name || lot.variety} · {p.todayDay !== null && p.todayDay > maxDay ? `${maxDay}일째(계산 끝)` : '오늘'}</h2><button type="button" className="hs-link" onClick={() => openLot(lot.id)}>자세히</button></div>
     <div className="hs-grid">{ORDER.map(m => <MetricCard key={m} m={m} p={p} day={today} maxDay={maxDay} onOpen={() => openLot(lot.id)} />)}</div>
+    <button type="button" className="hs-ship-link" onClick={() => { try { sessionStorage.setItem('appletrack:jump', 'ship'); } catch { /* 이동만 */ } openLot(lot.id); }}><b>이 사과 출하 비교</b><small>지금 팔 때와 30일 더 저장할 때를 넣은 값으로 비교해요</small></button>
     {f.ok && <><div className="hs-sec"><h2>한 줄 요약</h2></div>
       <div className="hs-card hs-hl"><span className="hs-lab" style={{color: METRIC_COLOR.firmness}}><MetricIcon m="firmness" />{METRIC_LABEL.firmness}</span>
         <p>{josa(lot.name || lot.variety, '은는')} 저장 {today}일째, {easyChange('firmness', f.value, f.first, p.weather)}.</p>

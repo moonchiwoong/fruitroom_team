@@ -25,7 +25,7 @@ const SHORT: Record<string, string> = {firmness: '단단함', loss: '무게', br
 
 function Seg<T extends string>({name, legend, value, options, onChange}: {name: string; legend: ReactNode; value: T | ''; options: {value: T; label: string; disabled?: boolean; tag?: string}[]; onChange: (v: T) => void}) {
   return <fieldset className="qt3-q na-q"><legend className="qt3-q-head">{legend}</legend>
-    <div className="qt3-seg">{options.map(o => <label key={o.value} className={(value === o.value ? 'active' : '') + (o.disabled ? ' disabled' : '')}>
+    <div className={'qt3-seg' + (options.length > 3 ? ' na-seg-wrap' : '')}>{options.map(o => <label key={o.value} className={(value === o.value ? 'active' : '') + (o.disabled ? ' disabled' : '')}>
       <input type="radio" name={name} value={o.value} checked={value === o.value} disabled={o.disabled} onChange={() => onChange(o.value)} />
       <span>{value === o.value && <Check size={15} aria-hidden="true" />}{o.label}{o.tag && <small className="seg-tag">{o.tag}</small>}</span></label>)}</div>
   </fieldset>;

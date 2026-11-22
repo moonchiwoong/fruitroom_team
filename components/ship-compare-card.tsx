@@ -21,7 +21,7 @@ export default function ShipCompareCard({lot, p, maxDay}: {lot: Lot; p: ReturnTy
   const q = (m: 'firmness' | 'brix') => { if (later === null || later > maxDay) return '계산 범위 밖'; const x = p.at(m, later); return x.ok ? `${fmtNum(x.value, metricMeta[m].digits)} ${UNIT(m)}` : '계산 없음'; };
   const field = (k: keyof ShipInput, label: string, unit: string, opt = false) =>
     <label className="sc-field"><span>{label}{opt && <em> (선택)</em>}</span><span className="sc-in"><input inputMode="decimal" value={v[k]} onChange={set(k)} placeholder={opt ? '넣으면 수입 차이' : ''} /><i>{unit}</i></span></label>;
-  return <section className="sc dash-card dash-ship" aria-label="출하 조건 비교">
+  return <section id="ship-compare" className="sc dash-card dash-ship" aria-label="출하 조건 비교">
     <h2>출하 조건 비교 <small>지금 vs 30일 더 저장</small></h2>
     <p className="sc-ref">{later === null ? '저장 시작일이 있어야 30일 뒤 품질을 함께 보여 줘요.' : `30일 뒤(저장 ${later}일째) 계산값 · ${METRIC_LABEL.firmness} ${q('firmness')} · ${METRIC_LABEL.brix} ${q('brix')}`}</p>
     <div className="sc-fields">

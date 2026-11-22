@@ -81,6 +81,13 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
     requestJson<{observations: Observation[]}>(`/api/lots/${lot.id}/analysis?asOf=${todayKST()}`).then(r => { if (live) setObs(r.observations ?? []); }).catch(e => { if (live) { setObs([]); setErr((e as Error).message); } });
     return () => { live = false; };
   }, [lot.id, n]);
+  // 요약의 ‘이 사과 출하 비교’로 들어왔으면 출하 비교 카드로 바로 이동합니다(한 번만).
+  useEffect(() => {
+    if (obs === null) return;
+    let jump = false; try { jump = sessionStorage.getItem('appletrack:jump') === 'ship'; if (jump) sessionStorage.removeItem('appletrack:jump'); } catch { /* 무시 */ }
+    if (!jump) return;
+    requestAnimationFrame(() => { const el = document.getElementById('ship-compare'); if (!el) return; el.scrollIntoView({block: 'start'}); el.querySelector<HTMLInputElement>('input')?.focus({preventScroll: true}); });
+  }, [obs]);
   // 날씨 값이 비어 있던 물량(9월 수확 직후 저장 등): 9월이 끝났으면 그 해 자료를 받아 화면에서 추정합니다. 끝나기 전에는 측정을 안내합니다.
   const pend = useMemo(() => weatherPending(lot), [lot]);
   const waitSept = !!pend && todayKST() < `${pend.year}-10-01`;
@@ -176,6 +183,7 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
     {obs === null ? <div className="ma-rows" aria-label="측정 기록을 불러와 계산하는 중" role="status"><span className="ma-sk" style={{height: 18}} /><span className="ma-sk" style={{height: 18, width: '80%'}} /><span className="ma-sk" style={{height: 18, width: '60%'}} /></div> : <div className="ma-rows">{EASY_METRICS.map(m => { const r = p.at(m, sel);
       const boxes = m === 'loss' && r.ok && typeof lot.quantity === 'number' && quantityUnit(lot) === '상자' && lot.quantity > 0 ? ` · ${lot.quantity}상자 기준 약 ${fmtNum(lot.quantity * r.value / 100, 1)}상자 무게만큼` : '';
       return <div key={m + ':' + sel} className="ma-row"><span className="ma-row-lab" style={{color: METRIC_COLOR[m]}}><MetricIcon m={m} />{SHORT[m]}</span><div>{r.ok ? <><b>{easyChange(m, r.value, r.first, p.weather)}</b><small>{fmtNum(r.value, metricMeta[m].digits)} {unit(m, hongro)}{m === 'firmness' && kgUser ? ` (${asKg(r.value)})` : ''}{boxes}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div></div>; })}</div>}
+    {obs !== null && p.start && <SameDay lot={lot} obs={obs} p={p} sel={sel} hongro={hongro} />}
     </div>
     <div className="dash-chart only-mobile"><AppleGraph p={p} p0={p0} obs={obs ?? []} sel={sel} maxDay={hongro ? 120 : 200} /></div>
     <section className="dash-chart only-pc" aria-label="저장 일수별 변화"><h2>저장 일수별 변화 <small>선: 계산값 · 동그라미: 내가 잰 값 · 세로선: 고른 날</small></h2><MiniCharts p={p} obs={obs ?? []} sel={sel} maxDay={hongro ? 120 : 200} /></section>
@@ -217,4 +225,23 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
     <div className="ma-manage"><button type="button" className="ma-ghost" disabled={busy} onClick={() => void archive(!lot.details?.archived_on)}>{lot.details?.archived_on ? '저장 중 목록으로 되돌리기' : '출하 완료로 옮기기'}</button><button type="button" className="ma-ghost" onClick={exportCsv}>기록 내려받기 (CSV · 엑셀에서 열림)</button><button type="button" className="linkbtn ma-danger" disabled={busy} onClick={() => void remove()}>이 사과 지우기</button></div>
     {edit && <LotEditor open lot={lot} onClose={() => setEdit(false)} onSaved={() => { setEdit(false); setMsg('사과 정보를 저장했어요.'); void reload(); }} />}
   </div>;
+}
+
+/** 고른 날의 실측 비교. 같은 날 잰 값이 있을 때만 계산값과의 차이를 보여 주고, 없으면 차이를 만들지 않습니다. */
+function SameDay({lot, obs, p, sel, hongro}: {lot: Lot; obs: Observation[]; p: ReturnType<typeof lotPredictor>; sel: number; hongro: boolean}) {
+  if (!p.start) return null;
+  const date = addDays(p.start, sel), today = todayKST();
+  const past = obs.filter(o => o.date <= today).sort((a, b) => a.date.localeCompare(b.date));
+  const last = past.at(-1) ?? null, same = obs.filter(o => o.date === date).at(-1) ?? null;
+  const md2 = (d: string) => `${+d.slice(5, 7)}월 ${+d.slice(8, 10)}일`;
+  if (same) {
+    // 비교할 계산값은 그날 잰 값을 넣기 전(그 전날까지의 기록) 계산입니다. 그날 값을 넣은 계산은 잰 값과 같아져 비교가 되지 않습니다.
+    let before: ReturnType<typeof lotPredictor> | null = null; try { before = lotPredictor(lot, obs.filter(o => o.date < date)); } catch { before = null; }
+    const rows = (['firmness', 'brix', 'acidity'] as const).flatMap(m => { const v = same[m]; const r = before?.at(m, sel); if (typeof v !== 'number' || !r || !r.ok) return [];
+      const dg = metricMeta[m].digits, diff = Number((v - r.value).toFixed(dg)), u = unit(m, hongro);
+      return [<li key={m}><b style={{color: METRIC_COLOR[m]}}>{SHORT[m]}</b> 이날 잰 값 {fmtNum(v, dg)} {u} · 그 전까지 기록으로 계산 {fmtNum(r.value, dg)} {u} · {diff === 0 ? '같음' : `잰 값이 ${fmtNum(Math.abs(diff), dg)} ${u} ${diff > 0 ? '높음' : '낮음'}`}</li>]; });
+    return <div className="ma-sameday" role="note"><p><b>{md2(date)}에 잰 값이 있어요</b></p>{rows.length ? <ul>{rows}</ul> : <p>이날 기록에 단단함·단맛·신맛 값은 없어요.</p>}</div>;
+  }
+  if (date > today) return <p className="ma-sameday" role="note">{md2(date)}은 앞으로의 계산값이에요{last ? ` · 기준 측정일 ${md2(last.date)}` : ' · 아직 직접 잰 기록이 없어요'}</p>;
+  return <p className="ma-sameday" role="note">{md2(date)}에는 잰 값이 없어 차이를 표시하지 않아요{last ? ` · 최근 측정 ${md2(last.date)}` : ''}</p>;
 }
