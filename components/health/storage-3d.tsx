@@ -124,11 +124,17 @@ export default function Storage3D({items, onOpen}: {items: StorageItem[]; onOpen
     const resize = () => { r.setSize(W(), H()); cam.aspect = W() / H(); cam.updateProjectionMatrix(); }; addEventListener('resize', resize);
     let visible = true; const io = new IntersectionObserver(es => { visible = es[0]?.isIntersecting ?? true; }); io.observe(host);
     const tagEls = Array.from(lb.children) as HTMLElement[];
+    const pos: {x: number; y: number; z: number}[] = items.map(() => ({x: 0, y: 0, z: 0}));
     const loop = () => { if (!alive) return; raf = requestAnimationFrame(loop); if (!visible || document.hidden) return; const tt = (performance.now() - t0) / 1000;
       cam.position.set(tgt.x + Math.sin(yaw) * Math.cos(pitch) * R, 1.55 + Math.sin(pitch) * R, tgt.z + Math.cos(yaw) * Math.cos(pitch) * R); cam.lookAt(tgt);
       fans.forEach(f => { f.rotation.z = tt * 9; });
       groups.forEach((g, i) => { g.position.y = items[i].id === selRef.current ? .04 : 0; const ring = g.userData.ring as THREE.Mesh | undefined; if (ring) (ring.material as THREE.MeshBasicMaterial).opacity = .5 + .35 * Math.sin(tt * 3);
-        v.set(g.position.x, tops[i], g.position.z).project(cam); const el = tagEls[i]; if (el) { el.style.left = `${(v.x + 1) / 2 * 100}%`; el.style.top = `${(1 - v.y) / 2 * 100}%`; } });
+        v.set(g.position.x, tops[i], g.position.z).project(cam); pos[i] = {x: (v.x + 1) / 2 * W(), y: (1 - v.y) / 2 * H(), z: v.z}; });
+      // 이름표가 겹치면 뒤쪽(먼) 이름표를 위로 올립니다.
+      const order = pos.map((_, i) => i).sort((a, b) => pos[a].z - pos[b].z), placed: {x: number; y: number; w: number; h: number}[] = [];
+      order.forEach(i => { const el = tagEls[i]; if (!el) return; const w = el.offsetWidth || 60, h = (el.offsetHeight || 22) + 3; let y = pos[i].y;
+        for (let guard = 0; guard < 8; guard++) { const hit = placed.find(p => Math.abs(p.x - pos[i].x) < (p.w + w) / 2 && Math.abs(p.y - y) < h); if (!hit) break; y = hit.y - h; }
+        placed.push({x: pos[i].x, y, w, h}); el.style.left = `${pos[i].x}px`; el.style.top = `${y}px`; });
       r.render(sc, cam); };
     loop();
     return () => { alive = false; cancelAnimationFrame(raf); io.disconnect(); removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('resize', resize); r.domElement.removeEventListener('pointerdown', down);
