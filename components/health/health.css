@@ -419,3 +419,12 @@ html .hs .s3d{margin-top:16px}
 /* 휴대폰: 본문 왼쪽 줄을 머리말 로고와 맞춤(바깥 여백 18px + 안쪽 16px이 겹쳐 34px로 들어가 있던 것) */
 @media (max-width:720px){body:has(.app-header) .site-main{padding-left:0!important;padding-right:0!important}}
 .qt3-seg input{left:0;top:0}
+/* 움직임 줄이기(윈도우 '애니메이션 효과' 끔 등)일 때도 과수원 사진과 문구는 보이게: 확대 없이 고정 카드로 */
+@media (prefers-reduced-motion:reduce){
+  .lx-zoom{height:auto;background:#FFF1F0;padding:clamp(24px,5vw,56px) 0 8px}
+  .lx-zoom-pin{position:relative;height:auto;display:block;overflow:visible}
+  .lx-zoom-bg{display:none}
+  .lx-zoom-frame{display:block!important;position:relative;inset:auto;height:clamp(240px,52vh,520px);max-width:1180px;margin:0 auto;width:calc(100% - 2*clamp(16px,5vw,56px));border-radius:28px;clip-path:none;opacity:1!important}
+  .lx-zoom-photo{display:block!important;transform:none!important;opacity:1!important}
+  .lx-zoom-msg{padding:clamp(28px,5vw,48px) 24px 0}
+}
