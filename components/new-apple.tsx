@@ -3,6 +3,7 @@
 // 저장 형식과 검사는 기존 품질 예측 화면과 같은 lib/tracker-form(payloadFromForm·validateForm)을 그대로 씁니다.
 // 계산은 lib/lot-predict(기존 예측식)만 쓰고, 날씨 값이 다 없으면 계산하지 않습니다(값을 채우거나 추정하지 않음).
 import {FUJI_REGION_KEYS, HONGRO_REGION_KEYS} from '@/lib/regions';
+import {harvestMonthError} from '@/lib/harvest-window';
 import {useEffect, useMemo, useState, type ReactNode} from 'react';
 import {josa} from '@/lib/josa';
 import {ArrowLeft, Check, Loader2} from 'lucide-react';
@@ -109,6 +110,7 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
     try { const p = lotPredictor(fake), day = 60; return {day, rows: EASY_METRICS.map(k => ({k, r: p.at(k, day)})), weather: p.weather, lot: fake}; } catch { return null; }
   }, [form, startDate]);
 
+  const harvestErr = harvestMonthError(cultivar, harvest);
   const missing = [!harvest && '수확일', !same && !start && '저장 시작일', hongro && !temp && '저장고 온도', !hongro && !mcp && '1-MCP 처리 여부', source === 'weather' && !wRegion && '생산지', source === 'measured' && !m.brix.trim() && !m.firmness.trim() && !m.acidity.trim() && '잰 값(하나 이상)'].filter(Boolean) as string[];
   // 체험 안내는 지금 화면에 보이는 단계·입력란에 맞춥니다(산지를 고르기 전에는 품종별 저장 조건을 묻지 않음).
   const shownMissing = missing.map(x => x === '1-MCP 처리 여부' ? '보관 방식·1-MCP 처리' : x);
@@ -117,6 +119,7 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
   async function save() {
     setErr('');
     if (missing.length) { setErr(`${josa(missing.join(', '), '을를')} 골라 주세요.`); return; }
+    if (harvestErr) { setErr(harvestErr); return; }
     const e = Object.values(validateForm(form, true)).filter(Boolean) as string[];
     if (e.length) { setErr(e[0]); return; }
     setSaving(true);
@@ -153,7 +156,8 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
 
     {(path === 'measured' || mapRegion) && <>
     <section className="na-card"><h2><span>3</span>수확일</h2>
-      <label className="na-field"><span>수확일</span><input id="na-harvest" type="date" max={today} value={harvest} onChange={e => { setHarvest(e.target.value); setWx({state: 'idle'}); }} /></label>
+      <label className="na-field"><span>수확일</span><input id="na-harvest" type="date" max={today} value={harvest} aria-invalid={!!harvestErr} aria-describedby={harvestErr ? 'na-harvest-err' : undefined} onChange={e => { setHarvest(e.target.value); setWx({state: 'idle'}); }} /></label>
+      {harvestErr && <p id="na-harvest-err" className="na-err" role="alert">{harvestErr}</p>}
       <label className="new-date-check"><input type="checkbox" checked={same} onChange={e => setSame(e.target.checked)} /><span>수확 당일 바로 저장고에 넣었어요</span></label>
       {!same && <label className="na-field"><span>저장 시작일</span><input id="na-start" type="date" min={harvest || undefined} max={today} value={start} onChange={e => setStart(e.target.value)} /></label>}</section>
 
@@ -186,7 +190,7 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
 
     </>}
     {guest && guestHint && <p className="ma-hint muted na-guest-hint" aria-live="polite">{guestHint}</p>}
-    {guest && preview && missing.length === 0 && <section id="na-result" className="na-card na-result" aria-label="결과"><h2>결과</h2><LotPreview lot={preview.lot} /><p className="ma-sub">시연용 계산 · 출하·안전 판정 아님</p>
+    {guest && preview && missing.length === 0 && !harvestErr && <section id="na-result" className="na-card na-result" aria-label="결과"><h2>결과</h2><LotPreview lot={preview.lot} /><p className="ma-sub">시연용 계산 · 출하·안전 판정 아님</p>
       <button type="button" className="linkbtn na-save-link" onClick={onLogin}>이 사과를 계속 기록하려면 가입하기 →</button></section>}
     {!guest && preview && <section className="na-card na-preview" aria-label="미리보기"><h2>저장 {preview.day}일 뒤 (미리보기)</h2>
       <div className="ma-rows">{preview.rows.map(({k, r}) => <div key={k} className="ma-row"><span>{SHORT[k]}</span><div>{r.ok ? <><b>{easyChange(k, r.value, r.first, preview.weather)}</b><small>{fmtNum(r.value, metricMeta[k].digits)} {k === 'firmness' ? 'N' : metricMeta[k].unit}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div></div>)}</div>

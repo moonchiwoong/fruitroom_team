@@ -4,6 +4,7 @@ import {InputError,numberOrNull,validDate,parseCsv,summarizeEnvironment,demoPred
 import {today,type Lot,type EnvRow,type Observation,type Photo} from './lot-types';
 import {restrictLegacyLoss} from './quality-policy';
 import {HONGRO_DEDICATED_REASON,isHongroVariety} from './cultivar';
+import {harvestMonthError} from './harvest-window';
 import {HONGRO_MODEL_VERSION,HONGRO_UNITS} from './hongro';
 async function clientUser(){const c=await serverClient();const {data,error}=await c.auth.getUser();if(error||!data.user)throw new InputError('로그인이 필요합니다.');return {c,user:data.user};}
 async function client(){const c=await serverClient();const {data,error}=await c.auth.getUser();if(error||!data.user)throw new InputError('로그인이 필요합니다.');return c;}
@@ -108,9 +109,11 @@ function checkLotModel(l:Record<string,unknown>){
   if((l[metric]??null)!==(expected??null))throw new InputError('홍로 초기품질은 선택한 출처의 입력값과 함께 저장해 주세요. 기상 추정값은 실측값으로 저장할 수 없습니다.');
  }
 }
+/** 품종별 수확 달 밖의 수확일은 저장하지 않습니다(이미 저장된 기록은 수확일·품종을 바꿀 때만 다시 확인). */
+function checkHarvestMonth(l:Record<string,unknown>){const e=harvestMonthError(l.variety,l.harvest_date);if(e)throw new InputError(e);}
 function checkLotDates(l:Record<string,unknown>){const start=l.storage_start_date||l.intake_date;if(typeof start==='string'&&typeof l.initial_measured_on==='string'&&l.initial_measured_on<start)throw new InputError('초기 측정일이 저장 시작일보다 빠릅니다.');if(typeof l.harvest_date==='string'&&typeof l.intake_date==='string'&&l.harvest_date>l.intake_date)throw new InputError('수확일은 입고일보다 늦을 수 없습니다.');}
 export async function createLot(req:Request){checkOrigin(req);const p=await payload(req);
- const f=lotFields(p,false);checkLotDates(f);checkLotModel(f);const id=crypto.randomUUID();
+ const f=lotFields(p,false);checkLotDates(f);checkHarvestMonth(f);checkLotModel(f);const id=crypto.randomUUID();
  const lot={id,...f,created_at:new Date().toISOString(),team_shared:p.team_shared===true||p.team_shared==='on'||p.team_shared==='true'};
  const c=await client();const count=await c.from('lots').select('id',{count:'exact',head:true});if(count.error)throw count.error;if((count.count||0)>=100)throw new InputError('최대 100개 물량까지 등록할 수 있습니다.');
  checked(await c.from('lots').insert(lot));return json({lot:checked(await c.from('lots').select('*').eq('id',id).single())},201);}
@@ -134,6 +137,7 @@ export async function updateLot(id:string,req:Request){checkOrigin(req);const ex
   f.details=merged;
  }
  checkLotDates({...existing,...f});checkLotModel({...existing,...f});
+ if(('harvest_date' in f&&f.harvest_date!==existing.harvest_date)||('variety' in f&&f.variety!==existing.variety))checkHarvestMonth({...existing,...f});
  checked(await c.from('lots').update(f).eq('id',id));return json({lot:await getLot(id)});}
 type ObsRow={id:string;lot_id:string;date:string;firmness:number|null;brix:number|null;acidity:number|null;weight:number|null;tracked_weight:number|null;sample_count:number|null;details?:{measure?:unknown}|null};
 /** 측정 기록 한 건을 예측 기준 초기 측정으로 지정합니다. 기존 측정 기록은 그대로 두고, 이전 기준값은 이력에 남깁니다. */

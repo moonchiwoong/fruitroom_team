@@ -4,6 +4,7 @@ import type {Lot, LotDetails} from './lot-types';
 import {addDays, isDate, todayKST} from './tracker';
 import {parseOptionalNumber} from './quality-policy';
 import {isHongroVariety} from './cultivar';
+import {harvestMonthError} from './harvest-window';
 import {predictAll} from './initial-quality';
 import {HONGRO_MODEL_VERSION, HONGRO_UNITS} from './hongro';
 import {emptyHongroForm, validateHongroForm, type HongroTrackerForm} from './hongro-tracker';
@@ -217,6 +218,7 @@ export function validateForm(f: TrackerForm, forSave: boolean): Partial<Record<s
   const measuredOn = effectiveInitialMeasuredOn(f);
   if(isHongro&&!start&&forSave)e.storage_start_date='홍로 계산에 사용할 실제 저장 시작일을 입력해 주세요.';
   if (f.harvest_date && f.intake_date && f.harvest_date > f.intake_date) e.harvest_date = '수확일이 입고일보다 늦습니다.';
+  if (forSave && !e.harvest_date) { const h = harvestMonthError(f.variety, f.harvest_date); if (h) e.harvest_date = h; }
   for (const [k, v] of [['harvest_date', f.harvest_date], ['intake_date', f.intake_date], ['storage_start_date', start], ['initial_measured_on', measuredOn]] as const) if (v) { if (!isDate(v)) e[k] = '유효한 날짜를 입력해 주세요.'; else if (v > today && !e[k]) e[k] = '오늘 이후 날짜는 입력할 수 없습니다.'; }
   if (start && measuredOn && measuredOn < start) e.initial_measured_on = '측정일이 저장 시작일보다 빠릅니다.';
   if (forSave) {

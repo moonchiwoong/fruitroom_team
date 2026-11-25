@@ -11,6 +11,7 @@ import {today, type Lot, type Observation} from '@/lib/lot-types';
 import {KGF_TO_N} from '@/lib/tracker-form';
 import {lotReadiness, quantityUnit, storageStart, hasInitialValues, weatherInitial} from '@/lib/lot-readiness';
 import {isDate} from '@/lib/tracker';
+import {harvestMonthError} from '@/lib/harvest-window';
 
 const VARIETIES = ['후지', '홍로', '감홍'] as const;
 const str = (v: unknown) => v === null || v === undefined ? '' : String(v);
@@ -54,6 +55,8 @@ export function LotEditor({open, lot, onClose, onSaved}: {open: boolean; lot?: L
   const owner = !lot || !lot.owner_id || lot.owner_id === session?.userId;
   const canShare = !!session?.isTeam && owner;
   const intake = f.sameIntake ? f.start : f.intake;
+  // 수확일·품종을 새로 정하거나 바꿀 때만 품종별 수확 달을 확인합니다(서버와 같은 규칙).
+  const harvestErr = !lot || f.harvest !== str(lot.harvest_date) || variety !== lot.variety ? harvestMonthError(variety, f.harvest) : null;
   // 화면 미리보기용: 입력한 조건으로 예측 가능 여부를 계산 엔진 규칙 그대로 확인합니다.
   const preview = lotReadiness({...(lot ?? {} as Lot), id: lot?.id ?? 'new', name: f.name, variety, storage: f.storage, mcp: f.mcp, intake_date: intake, storage_start_date: f.start,
     firmness: lot?.firmness ?? null, brix: lot?.brix ?? null, acidity: lot?.acidity ?? null, initial_measured_on: lot?.initial_measured_on ?? null,
@@ -64,6 +67,7 @@ export function LotEditor({open, lot, onClose, onSaved}: {open: boolean; lot?: L
     if (!variety) return setError('품종을 입력해 주세요.');
     if (!isDate(f.start)) return setError('저장 시작일을 입력해 주세요.');
     if (!isDate(intake)) return setError('입고일을 입력하거나 ‘저장 시작일과 같은 날 입고’를 선택해 주세요.');
+    if (harvestErr) return setError(harvestErr);
     const body: Record<string, unknown> = {name: f.name.trim(), variety, location: f.location.trim() || null, quantity: f.quantity.trim() || null, storage_start_date: f.start, intake_date: intake,
       storage: f.storage, mcp: f.mcp, harvest_date: f.harvest || null, packaging: f.packaging.trim() || null, sensor_id: f.sensor.trim() || null,
       details: {storage_temperature: f.temperature.trim() === '' ? null : f.temperature, quantity_unit: f.unit}};
@@ -101,7 +105,7 @@ export function LotEditor({open, lot, onClose, onSaved}: {open: boolean; lot?: L
       <div className="ld-grid">
         <div className="ld-field wide"><label className="ld-check"><input type="checkbox" checked={f.sameIntake} onChange={e => setF(x => ({...x, sameIntake: e.target.checked, intake: e.target.checked ? x.intake : (x.intake || x.start)}))} />저장 시작일과 같은 날 입고했어요</label></div>
         {!f.sameIntake && <Field id="le-intake" label="입고일"><input id="le-intake" type="date" max={f.start || today()} value={f.intake} onChange={e => set('intake', e.target.value)} /></Field>}
-        <Field id="le-harvest" label="수확일"><input id="le-harvest" type="date" max={intake || today()} value={f.harvest} onChange={e => set('harvest', e.target.value)} /></Field>
+        <Field id="le-harvest" label="수확일" hint={harvestErr ? <span className="ld-err" role="alert">{harvestErr}</span> : undefined}><input id="le-harvest" type="date" max={intake || today()} value={f.harvest} aria-invalid={!!harvestErr} onChange={e => set('harvest', e.target.value)} /></Field>
       </div>
     </details>
     {error && <p className="error-box" role="alert">{error}</p>}
