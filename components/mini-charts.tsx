@@ -1,6 +1,7 @@
 'use client';
 // PC 사과 대시보드: 네 항목을 각자 자기 단위의 작은 그래프로 나란히 그립니다(단위를 섞지 않음).
 // 선은 lotPredictor(기존 예측식) 계산값만, 동그라미는 내가 잰 값. 계산 못 한 날은 선을 끊습니다.
+import {firmnessReach, reachText} from '@/lib/target-reach';
 import {useMemo} from 'react';
 import type {Observation} from '@/lib/lot-types';
 import type {lotPredictor} from '@/lib/lot-predict';
@@ -13,14 +14,15 @@ import {EASY_METRICS} from '@/lib/lot-predict';
 const ORDER = EASY_METRICS as readonly MetricId[]; // 위 타일과 같은 순서
 const W = 300, H = 120, L = 34, R = 8, T = 10, B = 20;
 
-export default function MiniCharts({p, obs, sel, maxDay}: {p: P; obs: Observation[]; sel: number; maxDay: number}) {
-  return <div className="mc-grid">{ORDER.map(m => <Mini key={m} m={m} p={p} obs={obs} sel={sel} maxDay={maxDay} />)}</div>;
+export default function MiniCharts({p, obs, sel, maxDay, target = null}: {p: P; obs: Observation[]; sel: number; maxDay: number; target?: number | null}) {
+  return <div className="mc-grid">{ORDER.map(m => <Mini key={m} m={m} p={p} obs={obs} sel={sel} maxDay={maxDay} target={m === 'firmness' ? target : null} />)}</div>;
 }
 
-function Mini({m, p, obs, sel, maxDay}: {m: MetricId; p: P; obs: Observation[]; sel: number; maxDay: number}) {
+function Mini({m, p, obs, sel, maxDay, target}: {m: MetricId; p: P; obs: Observation[]; sel: number; maxDay: number; target: number | null}) {
   const data = useMemo(() => { const a: {d: number; v: number | null}[] = []; for (let d = 0; d <= maxDay; d += 2) { const r = p.at(m, d); a.push({d, v: r.ok ? r.value : null}); } return a; }, [p, m, maxDay]);
   const meas = m === 'loss' || !p.start ? [] : obs.filter(o => o[m] != null && isDate(o.date)).map(o => ({d: daysBetween(p.start!, o.date), v: o[m] as number})).filter(x => x.d >= 0 && x.d <= maxDay);
-  const vals = [...data.filter(x => x.v !== null).map(x => x.v as number), ...meas.map(x => x.v)];
+  const reach = target ? firmnessReach(p, target, maxDay) : null, rt = reach && target ? reachText(reach, target) : null;
+  const vals = [...data.filter(x => x.v !== null).map(x => x.v as number), ...meas.map(x => x.v), ...(target ? [target] : [])];
   const now = p.at(m, sel);
   if (!vals.length) return <figure className="mc"><figcaption><span style={{color: METRIC_COLOR[m]}}><MetricIcon m={m} />{METRIC_LABEL[m]}</span></figcaption><p className="mc-na">{now.ok ? '' : now.reason}</p></figure>;
   let lo = Math.min(...vals), hi = Math.max(...vals); if (hi - lo < 1e-9) { lo -= 1; hi += 1; } const pad = (hi - lo) * 0.12; lo -= pad; hi += pad;
@@ -32,10 +34,12 @@ function Mini({m, p, obs, sel, maxDay}: {m: MetricId; p: P; obs: Observation[]; 
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${METRIC_LABEL[m]} 저장 일수별 계산값`}>
       {[lo + pad, (lo + hi) / 2, hi - pad].map((v, i) => <g key={i}><line x1={L} x2={W - R} y1={Y(v)} y2={Y(v)} className="mc-grid-line" /><text x={L - 4} y={Y(v) + 3} textAnchor="end" className="mc-ax">{fmtNum(v, tickDg)}</text></g>)}
       <path d={path} fill="none" stroke={METRIC_COLOR[m]} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" className="mc-line" />
+      {target && <g><line x1={L} x2={W - R} y1={Y(target)} y2={Y(target)} className="mc-target" /><text x={W - R} y={Y(target) - 4} textAnchor="end" className="mc-target-t">내 기준 {target} N</text>{reach?.kind === 'at' && <circle cx={X(reach.day)} cy={Y(target)} r="4" className="mc-target-dot" />}</g>}
       <line x1={X(sel)} x2={X(sel)} y1={T} y2={H - B} className="mc-today" />
       {now.ok && <circle cx={X(sel)} cy={Y(now.value)} r="4" fill={METRIC_COLOR[m]} stroke="#fff" strokeWidth="2" />}
       {meas.map((x, i) => <circle key={i} cx={X(x.d)} cy={Y(x.v)} r="4" fill="#fff" stroke="#1c1c1e" strokeWidth="1.6" />)}
       {[0, Math.round(maxDay / 2), maxDay].map(d => <text key={d} x={X(d)} y={H - 5} textAnchor={d === 0 ? 'start' : d === maxDay ? 'end' : 'middle'} className="mc-ax">{d}일</text>)}
     </svg>
+    {rt && <p className={'mc-reach' + (reach?.kind === 'at' || reach?.kind === 'already' ? ' hit' : '')}>{rt}</p>}
   </figure>;
 }

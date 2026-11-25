@@ -190,8 +190,8 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
     {obs !== null && p.start && <SameDay lot={lot} obs={obs} p={p} sel={sel} hongro={hongro} />}
     </div>
     {obs === null ? <p className="dash-chart ma-loading" role="status">측정 기록 확인 중…</p> : <>
-    <div className="dash-chart only-mobile"><AppleGraph p={p} p0={p0} obs={obs} sel={sel} maxDay={hongro ? 120 : 200} /></div>
-    <section className="dash-chart only-pc" aria-label="저장 일수별 변화"><h2>저장 일수별 변화 <small>선: 계산값 · 동그라미: 내가 잰 값 · 세로선: 고른 날</small></h2><MiniCharts p={p} obs={obs ?? []} sel={sel} maxDay={hongro ? 120 : 200} /></section></>}
+    <div className="dash-chart only-mobile"><AppleGraph p={p} p0={p0} obs={obs} sel={sel} maxDay={hongro ? 120 : 200} target={lot.details?.firmness_target ?? null} /></div>
+    <section className="dash-chart only-pc" aria-label="저장 일수별 변화"><h2>저장 일수별 변화 <small>선: 계산값 · 동그라미: 내가 잰 값 · 세로선: 고른 날</small></h2><MiniCharts p={p} obs={obs ?? []} sel={sel} maxDay={hongro ? 120 : 200}  target={lot.details?.firmness_target ?? null} /></section></>}
     <div className="dash-side">
     {obs !== null && <div className="dash-3d"><Apple3D p={p} sel={sel} cultivar={lot.variety || ''} /></div>}
     <div className="ma-actions dash-act">
