@@ -13,22 +13,25 @@ const UNIT = (m: 'firmness' | 'brix') => m === 'firmness' ? 'N' : metricMeta[m].
 
 export default function ShipCompareCard({lot, p, maxDay}: {lot: Lot; p: ReturnType<typeof lotPredictor>; maxDay: number}) {
   const kg = lot.details?.quantity_unit === 'kg' && typeof lot.quantity === 'number' && lot.quantity > 0 ? String(lot.quantity) : '';
-  const [v, setV] = useState<ShipInput>({nowKg: kg, nowPrice: '', laterKg: '', cost: '', laterPrice: ''});
+  // 지금 물량·가격은 두 기간이 함께 쓰고, 미래 물량·저장비·판매가는 30일·60일 따로 기억합니다(처음 여는 기간은 빈칸).
+  const [now, setNow] = useState({nowKg: kg, nowPrice: ''});
+  const [later, setLater] = useState<Record<30 | 60, {laterKg: string; cost: string; laterPrice: string}>>({30: {laterKg: '', cost: '', laterPrice: ''}, 60: {laterKg: '', cost: '', laterPrice: ''}});
   const [gap, setGap] = useState<30 | 60>(30);
+  const v: ShipInput = {...now, ...later[gap]};
   const r = compareShipping(v, gap);
-  const set = (k: keyof ShipInput) => (e: ChangeEvent<HTMLInputElement>) => setV(x => ({...x, [k]: e.target.value}));
-  const today = p.todayDay !== null && p.todayDay >= 0 ? p.todayDay : null, later = today === null ? null : today + gap;
+  const set = (k: keyof ShipInput) => (e: ChangeEvent<HTMLInputElement>) => { const val = e.target.value; if (k === 'nowKg' || k === 'nowPrice') setNow(x => ({...x, [k]: val})); else setLater(x => ({...x, [gap]: {...x[gap], [k]: val}})); };
+  const today = p.todayDay !== null && p.todayDay >= 0 ? p.todayDay : null, laterDay = today === null ? null : today + gap;
   const laterDate = addDays(todayKST(), gap), md = (d: string) => `${+d.slice(5, 7)}월 ${+d.slice(8, 10)}일`;
-  const when = `오늘부터 ${gap}일 후 · ${md(laterDate)}${later !== null ? ` · 저장 ${later}일째` : ''}`;
+  const when = `오늘부터 ${gap}일 후 · ${md(laterDate)}${laterDay !== null ? ` · 저장 ${laterDay}일째` : ''}`;
   // 참고: N일 뒤 품질(기존 식 계산값). 계산 범위를 넘으면 보여 주지 않습니다.
-  const q = (m: 'firmness' | 'brix') => { if (later === null || later > maxDay) return '계산 범위 밖'; const x = p.at(m, later); return x.ok ? `${fmtNum(x.value, metricMeta[m].digits)} ${UNIT(m)}` : '계산 없음'; };
+  const q = (m: 'firmness' | 'brix') => { if (laterDay === null || laterDay > maxDay) return '계산 범위 밖'; const x = p.at(m, laterDay); return x.ok ? `${fmtNum(x.value, metricMeta[m].digits)} ${UNIT(m)}` : '계산 없음'; };
   const field = (k: keyof ShipInput, label: string, unit: string, opt = false) =>
     <label className="sc-field"><span>{label}{opt && <em> (선택)</em>}</span><span className="sc-in"><input inputMode="decimal" value={v[k]} onChange={set(k)} placeholder={opt ? '넣으면 수입 차이' : ''} /><i>{unit}</i></span></label>;
   return <section id="ship-compare" className="sc dash-card dash-ship" aria-label="출하 조건 비교">
     <h2>출하 조건 비교 <small>지금 vs {gap}일 더 저장</small></h2>
     <div className="sc-gap" role="radiogroup" aria-label="더 저장할 기간">{([30, 60] as const).map(g => <button key={g} type="button" role="radio" aria-checked={gap === g} className={gap === g ? 'on' : ''} onClick={() => setGap(g)}>{g}일 더 저장</button>)}</div>
     <p className="sc-when">{when}</p>
-    <p className="sc-ref">{later === null ? `저장 시작일이 있어야 ${gap}일 뒤 품질을 함께 보여 줘요.` : `그날 계산값 · ${METRIC_LABEL.firmness} ${q('firmness')} · ${METRIC_LABEL.brix} ${q('brix')}`}</p>
+    <p className="sc-ref">{laterDay === null ? `저장 시작일이 있어야 ${gap}일 뒤 품질을 함께 보여 줘요.` : `그날 계산값 · ${METRIC_LABEL.firmness} ${q('firmness')} · ${METRIC_LABEL.brix} ${q('brix')}`}</p>
     <div className="sc-fields">
       {field('nowKg', '지금 팔 수 있는 물량', 'kg')}{field('nowPrice', '지금 가격', '원/kg')}
       {field('laterKg', `${gap}일 뒤 팔 수 있는 물량`, 'kg')}{field('cost', `추가 저장비 (${gap}일 합계)`, '원')}

@@ -36,3 +36,11 @@ test('60일 비교: 식은 같고 안내 문구만 기간을 따른다', () => {
   const z = compareShipping({nowKg: '1000', nowPrice: '3000', laterKg: '0', cost: '0', laterPrice: ''}, 60);
   assert.ok(!z.ok && /60일 뒤/.test(z.reason ?? ''));
 });
+
+test('요청서 검산: 30일·60일 예시(손익분기 원 단위 올림)', () => {
+  const r30 = compareShipping({nowKg: '1000', nowPrice: '3000', laterKg: '1000', cost: '186000', laterPrice: '3297'}, 30);
+  const r60 = compareShipping({nowKg: '1000', nowPrice: '3000', laterKg: '960', cost: '240000', laterPrice: '3500'}, 60);
+  assert.ok(r30.ok && r60.ok);
+  if (r30.ok) { assert.equal(r30.breakEven, 3186); assert.equal(r30.diff, 111000); }
+  if (r60.ok) { assert.equal(r60.breakEven, 3375); assert.equal(r60.diff, 120000); }
+});

@@ -9,7 +9,7 @@ import {ArrowLeft, ArrowRight, Loader2, Pencil, Plus, CalendarPlus} from 'lucide
 import type {Lot, Observation} from '@/lib/lot-types';
 import {requestJson} from '@/components/lot-forms';
 import {LotEditor, MeasurementForm} from '@/components/lot-dialogs';
-import {lotPredictor, easyChange, EASY_LABEL, EASY_METRICS, weatherPending, type WeatherValues} from '@/lib/lot-predict';
+import {latestObservation, lotPredictor, easyChange, EASY_LABEL, EASY_METRICS, weatherPending, type WeatherValues} from '@/lib/lot-predict';
 import {lotReadiness, baselineObservation, storageStart, quantityUnit, weatherInitial} from '@/lib/lot-readiness';
 import {fmtNum, metricMeta, todayKST, addDays, daysBetween, isDate} from '@/lib/tracker';
 import {AppleGraph, Apple3D} from '@/components/apple-graph';
@@ -39,9 +39,19 @@ export default function MyApples({lots, loadError, reload, openTracker, focus, o
   const all = useMemo(() => [...lots].sort((a, b) => (storageStart(a) || '').localeCompare(storageStart(b) || '')), [lots]);
   const done = all.filter(l => l.details?.archived_on), viewDone = showDone && done.length > 0, sorted = viewDone ? done : all.filter(l => !l.details?.archived_on);
   const lot = lots.find(l => l.id === openId) ?? null;
+  // 상세를 열면 주소를 #lot/<id>로(뒤로 가기로 목록), 목록이면 #lots로 맞춥니다.
+  useEffect(() => {
+    const want = lot ? `#lot/${encodeURIComponent(lot.id)}` : '#lots';
+    if (window.location.hash === want || creating) return;
+    if (lot && window.location.hash !== want) history.pushState(null, '', '/' + want);
+    else if (!lot && !openId && window.location.hash.startsWith('#lot/')) history.replaceState(null, '', '/#lots');
+  }, [lot, openId, creating]);
+  // 주소의 기록이 내 목록에 없으면(없는 기록이거나 열 권한이 없음) 목록에서 알려 줍니다. 목록은 서버 권한 검사(본인 기록만)를 거친 결과입니다.
+  const missing = !!openId && !lot && !creating && !loadError;
   if (creating) return <NewApple onBack={() => setCreating(false)} onSaved={async l => { await reload(); setCreating(false); setCreated(l.id); setOpenId(l.id); }} />;
-  if (lot) return <AppleDetail key={lot.id} lot={lot} firstMsg={created === lot.id ? `‘${josa(lot.name, '을를').replace(lot.name, lot.name + '’')} 등록했어요.` : ''} onBack={() => { setOpenId(null); setCreated(''); }} reload={reload} openTracker={openTracker} openModel={openModel} />;
+  if (lot) return <AppleDetail key={lot.id} lot={lot} firstMsg={created === lot.id ? `‘${josa(lot.name, '을를').replace(lot.name, lot.name + '’')} 등록했어요.` : ''} onBack={() => { setOpenId(null); setCreated(''); history.replaceState(null, '', '/#lots'); }} reload={reload} openTracker={openTracker} openModel={openModel} />;
   return <div className="ma">
+    {missing && <p className="ma-hint warn" role="alert">주소의 사과 기록을 찾을 수 없어요. 지워졌거나 이 계정으로 열 수 없는 기록이에요.</p>}
     <div className="ma-head"><h1>내 사과</h1>{all.length > 0 && <button type="button" className="ma-primary" onClick={() => setCreating(true)}><Plus size={18} aria-hidden="true" />새 사과</button>}</div>
     {loadError && <p className="error-box" role="alert">목록을 불러오지 못했어요. {loadError} <button type="button" className="linkbtn" onClick={() => void reload()}>다시 불러오기</button></p>}
     {viewDone && <p className="ma-hint muted">출하 완료로 옮긴 사과예요. 눌러서 다시 목록으로 옮길 수 있어요.</p>}
@@ -78,8 +88,9 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
   const [obs, setObs] = useState<Observation[] | null>(null), [err, setErr] = useState(''), [n, setN] = useState(0);
   const [measure, setMeasure] = useState(false), [edit, setEdit] = useState(false), [msg, setMsg] = useState(firstMsg);
   useEffect(() => {
-    let live = true; setErr('');
-    requestJson<{observations: Observation[]}>(`/api/lots/${lot.id}/analysis?asOf=${todayKST()}`).then(r => { if (live) setObs(r.observations ?? []); }).catch(e => { if (live) { setObs([]); setErr((e as Error).message); } });
+    // 다시 불러오는 동안에는 이전 기록으로 계산한 값을 보여 주지 않습니다(측정 추가·수정·삭제 뒤 포함). 늦게 온 이전 요청은 무시합니다.
+    let live = true; setErr(''); setObs(null);
+    requestJson<{observations: Observation[]}>(`/api/lots/${lot.id}/analysis?asOf=${todayKST()}`).then(r => { if (live) setObs(r.observations ?? []); }).catch(e => { if (live) { setObs([]); setErr((e as Error).message || '측정 기록을 불러오지 못했어요.'); } });
     return () => { live = false; };
   }, [lot.id, n]);
   // 요약의 ‘이 사과 출하 비교’로 들어왔으면 출하 비교 카드로 바로 이동합니다(한 번만).
@@ -169,7 +180,7 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
   }
   // 숫자 옆 출처: 고른 날 잰 값 / 측정값에서 계산 / 날씨 추정에서 계산 / 계산
   const selDate = p.start ? addDays(p.start, sel) : null;
-  const rowSrc = (m: string, from: string) => { const o = selDate ? (obs ?? []).find(x => x.date === selDate) : undefined; return o && typeof (o as Record<string, unknown>)[m] === 'number' ? '이날 실측' : from === 'measured' ? '측정값부터 계산' : from === 'weather' ? '날씨 추정에서 계산' : '계산'; };
+  const rowSrc = (m: string, from: string) => { const o = selDate && m !== 'loss' && from === 'measured' && !err ? latestObservation(obs ?? [], m as 'firmness', selDate) : null; return o ? '이날 실측' : from === 'measured' ? '측정값부터 계산' : from === 'weather' ? '날씨 추정에서 계산' : '계산'; };
   const fromMeasured = EASY_METRICS.some(m => { const r = p.at(m, sel); return r.ok && r.from === 'measured'; });
   useEffect(() => { if (!msg) return; const t = setTimeout(() => setMsg(''), 2400); return () => clearTimeout(t); }, [msg]);
   return <div className="ma ma-detail ma-dash">
@@ -182,11 +193,12 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
     {over && <p className="ma-hint warn">오늘은 저장 {p.todayDay}일째라 계산 범위({limit}일)를 넘었어요. 아래 날짜 버튼은 범위 안 날짜의 계산값이에요. 지금 상태는 직접 측정해 확인해 주세요.</p>}
     </div>
     <div className="dash-days"><div className="ma-days" role="group" aria-label="저장 일수">{days.map(d => <button key={d} type="button" aria-pressed={sel === d} className={sel === d ? 'active' : ''} onClick={() => setDay(d)}>{d === p.todayDay ? '오늘' : `${d}일`}</button>)}</div>
-    <p className="ma-date">{p.start ? `${md(addDays(p.start, sel))} 기준 (저장 ${sel}일째)` : ''}</p></div>
+    <p className="ma-date">{p.start ? `${md(addDays(p.start, sel))} 기준 (저장 ${sel}일째)` : ''}</p>{p.start && <p className="ma-sub ma-daybasis">버튼의 일수는 저장 시작일({md(p.start)})부터 센 날이에요. 출하 조건 비교의 30·60일은 오늘부터예요.</p>}</div>
     <div className="dash-tiles">
-    {obs === null ? <div className="ma-rows" aria-label="측정 기록을 불러와 계산하는 중" role="status"><span className="ma-sk" style={{height: 18}} /><span className="ma-sk" style={{height: 18, width: '80%'}} /><span className="ma-sk" style={{height: 18, width: '60%'}} /></div> : <div className="ma-rows">{EASY_METRICS.map(m => { const r = p.at(m, sel);
+    {obs === null ? <div className="ma-rows" aria-label="측정 기록을 불러와 계산하는 중" role="status"><p className="ma-sub">측정 기록 확인 중…</p><span className="ma-sk" style={{height: 18}} /><span className="ma-sk" style={{height: 18, width: '80%'}} /><span className="ma-sk" style={{height: 18, width: '60%'}} /></div> : <div className="ma-rows">{EASY_METRICS.map(m => { const r = p.at(m, sel);
       const boxes = m === 'loss' && r.ok && typeof lot.quantity === 'number' && quantityUnit(lot) === '상자' && lot.quantity > 0 ? ` · ${lot.quantity}상자 기준 약 ${fmtNum(lot.quantity * r.value / 100, 1)}상자 무게만큼` : '';
       return <div key={m + ':' + sel} className="ma-row"><span className="ma-row-lab" style={{color: METRIC_COLOR[m]}}><MetricIcon m={m} />{SHORT[m]}</span><div>{r.ok ? <><b>{easyChange(m, r.value, r.first, p.weather)}</b><small>{fmtNum(r.value, metricMeta[m].digits)} {unit(m, hongro)}{m === 'firmness' && kgUser ? ` (${asKg(r.value)})` : ''}{boxes}</small><i className="ma-from">{rowSrc(m, r.from)}</i></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div></div>; })}</div>}
+    {err && <p className="ma-hint warn" role="alert">측정 기록을 불러오지 못해 실측을 반영하지 않은 계산값이에요({err}). 새로고침해 주세요.</p>}
     {obs !== null && p.start && <SameDay lot={lot} obs={obs} p={p} sel={sel} hongro={hongro} />}
     </div>
     {obs === null ? <p className="dash-chart ma-loading" role="status">측정 기록 확인 중…</p> : <>

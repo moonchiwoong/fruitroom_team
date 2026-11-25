@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import type {StorageItem} from '@/components/health/storage-3d';
 import {josa} from '@/lib/josa';
 import type {Lot, Observation} from '@/lib/lot-types';
-import {lotPredictor, easyChange} from '@/lib/lot-predict';
+import {lotPredictor, easyChange, latestObservation} from '@/lib/lot-predict';
 import {isHongroVariety} from '@/lib/cultivar';
 import {fmtNum, metricMeta, todayKST, type MetricId} from '@/lib/tracker';
 import {storageStart, lotReadiness, weatherInitial} from '@/lib/lot-readiness';
@@ -32,7 +32,7 @@ function useWide() {
 }
 
 /** 숫자의 출처: 오늘 잰 값 / 최근 측정값에서 계산 / 날씨 추정에서 계산 / 처음 값에서 계산 */
-const srcLabel = (from: string, measuredToday: boolean) => measuredToday ? '오늘 실측' : from === 'measured' ? '측정값부터 계산' : from === 'weather' ? '날씨 추정에서 계산' : '계산';
+const srcLabel = (from: string, measuredToday: boolean) => measuredToday && from === 'measured' ? '오늘 실측' : from === 'measured' ? '측정값부터 계산' : from === 'weather' ? '날씨 추정에서 계산' : '계산';
 
 const UNIT = (m: MetricId) => m === 'firmness' ? 'N' : metricMeta[m].unit;
 const ORDER: MetricId[] = ['firmness', 'brix', 'acidity', 'loss'];
@@ -98,10 +98,15 @@ function DayCount({lot}: {lot: Lot}) {
 }
 
 function LotToday({lot, openLot}: {lot: Lot; openLot: (id: string) => void}) {
-  const [obs, setObs] = useState<Observation[] | null>(null);
-  useEffect(() => { let live = true; requestJson<{observations: Observation[]}>(`/api/lots/${lot.id}/analysis?asOf=${todayKST()}`).then(r => { if (live) setObs(r.observations ?? []); }).catch(() => { if (live) setObs([]); }); return () => { live = false; }; }, [lot.id]);
+  const [obs, setObs] = useState<Observation[] | null>(null), [obsErr, setObsErr] = useState(false);
+  useEffect(() => {
+    // 사과가 바뀌면 이전 사과의 기록을 지우고, 늦게 도착한 이전 요청은 무시합니다.
+    let live = true; setObs(null); setObsErr(false);
+    requestJson<{observations: Observation[]}>(`/api/lots/${lot.id}/analysis?asOf=${todayKST()}`).then(r => { if (live) setObs(r.observations ?? []); }).catch(() => { if (live) { setObs([]); setObsErr(true); } });
+    return () => { live = false; };
+  }, [lot.id, lot.latest_observation?.date, lot.latest_observation?.firmness]);
   const p = useMemo(() => { if (obs === null) return null; try { return lotPredictor(lot, obs); } catch { return null; } }, [lot, obs]);
-  const todayObs = useMemo(() => (obs ?? []).find(o => o.date === todayKST()) ?? null, [obs]);
+  
   const maxDay = isHongroVariety(lot.variety || '') ? 120 : 200;
   if (obs === null) return <p className="hs-note" role="status">측정 기록 확인 중…</p>;
   if (!p) return <p className="hs-note">이 사과는 계산할 수 없어요.</p>;
@@ -109,14 +114,15 @@ function LotToday({lot, openLot}: {lot: Lot; openLot: (id: string) => void}) {
   const f = p.at('firmness', today);
   return <>
     <div className="hs-sec"><h2>{lot.name || lot.variety} · {p.todayDay !== null && p.todayDay > maxDay ? `${maxDay}일째(계산 끝)` : '오늘'}</h2><button type="button" className="hs-link" onClick={() => openLot(lot.id)}>자세히</button></div>
-    <div className="hs-grid">{ORDER.map(m => <MetricCard key={m} m={m} p={p} day={today} maxDay={maxDay} measuredToday={today === p.todayDay && typeof todayObs?.[m as 'firmness'] === 'number'} onOpen={() => openLot(lot.id)} />)}</div>
+    <div className="hs-grid">{ORDER.map(m => <MetricCard key={m} m={m} p={p} day={today} maxDay={maxDay} measuredToday={m !== 'loss' && today === p.todayDay && !obsErr && !!latestObservation(obs, m, todayKST())} onOpen={() => openLot(lot.id)} />)}</div>
+    {obsErr && <p className="hs-note warn" role="alert">측정 기록을 불러오지 못해 실측을 반영하지 않은 계산값이에요. 잠시 뒤 다시 열어 주세요.</p>}
     <button type="button" className="hs-ship-link" onClick={() => { try { sessionStorage.setItem('appletrack:jump', 'ship'); } catch { /* 이동만 */ } openLot(lot.id); }}><b>이 사과 출하 비교</b><small>지금 팔 때와 30일 더 저장할 때를 넣은 값으로 비교해요</small></button>
     {f.ok && <><div className="hs-sec"><h2>한 줄 요약</h2></div>
       <div className="hs-card hs-hl"><span className="hs-lab" style={{color: METRIC_COLOR.firmness}}><MetricIcon m="firmness" />{METRIC_LABEL.firmness}</span>
         <p>{josa(lot.name || lot.variety, '은는')} 저장 {today}일째, {easyChange('firmness', f.value, f.first, p.weather)}.</p>
         {f.first !== null && <div className="hs-bars">
           <Bar label={p.weather ? '수확 때(추정)' : '처음'} v={f.first} max={Math.max(f.first, f.value)} color={METRIC_COLOR.firmness} />
-          <Bar label={today === p.todayDay && typeof todayObs?.firmness === 'number' ? '오늘 실측' : f.from === 'measured' ? '오늘(측정값부터 계산)' : '오늘(계산)'} v={f.value} max={Math.max(f.first, f.value)} color="#C7C7CC" />
+          <Bar label={f.from === 'measured' && today === p.todayDay && latestObservation(obs, 'firmness', todayKST()) ? '오늘 실측' : f.from === 'measured' ? '오늘(측정값부터 계산)' : '오늘(계산)'} v={f.value} max={Math.max(f.first, f.value)} color="#C7C7CC" />
         </div>}
       </div></>}
     <p className="hs-src">기존 팀 계산식 결과 · 정확도 검증 전 · 출하·안전 판정 아님</p>

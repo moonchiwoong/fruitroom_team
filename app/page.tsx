@@ -60,10 +60,15 @@ export default function Home() {
     setTabState(p); setMenu(false); history.replaceState(null, '', '/#' + p); requestAnimationFrame(() => window.scrollTo({top: back}));
   }, []);
   const openTracker = useCallback((mode: 'real' | 'example', lotId?: string) => { setTrackReq(r => ({mode, lotId, n: (r?.n ?? 0) + 1})); setTab('track'); }, [setTab]);
-  useEffect(() => {
-    const h = window.location.hash.slice(1); const p = (legacy[h] ?? h) as Page;
-    if (pages.some(x => x.id === p)) { if (p === 'track') setTrackerVisited(true); if (p === 'lots') setLotsVisited(true); tabRef.current = p; setTabState(p); }
-  }, [openTracker]);
+  // 주소: 화면은 #home·#lots 등, 사과 상세는 #lot/<기록 id>. 새로고침·직접 열기·뒤로 가기 모두 주소를 기준으로 화면을 맞춥니다.
+  const applyHash = useCallback(() => {
+    const h = window.location.hash.slice(1);
+    const lotId = h.startsWith('lot/') ? decodeURIComponent(h.slice(4)) : null;
+    if (lotId) { setLotsVisited(true); tabRef.current = 'lots'; setTabState('lots'); setLotFocus(lotId); return; }
+    const p = (legacy[h] ?? h) as Page;
+    if (pages.some(x => x.id === p)) { if (p === 'track') setTrackerVisited(true); if (p === 'lots') { setLotsVisited(true); setLotFocus(null); } tabRef.current = p; setTabState(p); }
+  }, [setLotFocus]);
+  useEffect(() => { applyHash(); window.addEventListener('popstate', applyHash); return () => window.removeEventListener('popstate', applyHash); }, [applyHash]);
   // 소개·체험 화면에서 ‘실측값 입력’·‘예시로 체험’을 누르고 로그인한 경우
   const sessionUser = session?.userId;
   // 로그인한 농가는 홈 대신 바로 ‘내 사과’ 목록에서 시작합니다(주소에 다른 화면이 지정된 경우는 그대로).
@@ -108,10 +113,11 @@ function Brand({onClick}: {onClick: () => void}) {
 }
 
 function ProjectGuide() {
-  return <Dialog><DialogTrigger asChild><button className="nav-util"><Info size={16} /><span>안내</span></button></DialogTrigger>
+  return <Dialog><DialogTrigger asChild><button type="button" className="nav-util" aria-label="안내"><Info size={16} aria-hidden="true" /><span>안내</span></button></DialogTrigger>
     <DialogContent className="record-dialog guide-dialog"><DialogHeader><DialogTitle>애플트랙 사용 안내</DialogTitle><DialogDescription>수확일만 넣으면 저장 중 변화까지 — 사과 품질 예측·저장 관리</DialogDescription></DialogHeader>
       <div className="guide-body">
-        <h3>이렇게 써요</h3><p>① ‘내 사과’에서 <b>새 사과</b>를 눌러 품종·생산지·수확일과 저장 조건(후지는 저장 방식·1-MCP 처리 여부, 홍로는 저장고 온도 0℃·4℃)을 넣어요. 처음 품질은 그 해 농업기상 자료로 자동 추정해요. → ② 사과를 누르면 오늘·30·60·90·120일 뒤 단단함·무게·단맛·신맛을 쉬운 말로 보여줘요. → ③ 당도나 단단함을 재면 <b>측정 추가</b>로 넣어요. 그 값에서 다시 이어 계산하고, 예측과 실제의 차이도 보여줘요.</p>
+        <h3>이렇게 써요</h3><p>① ‘내 사과’에서 <b>새 사과</b>를 눌러 품종·생산지·수확일과 저장 조건(후지는 저장 방식·1-MCP 처리 여부, 홍로는 저장고 온도 0℃·4℃)을 넣어요. 처음 품질은 그 해 농업기상 자료로 자동 추정해요. → ② 사과를 누르면 오늘과 <b>저장 시작일부터 센</b> 30·60·90·120일째의 단단함·무게·단맛·신맛을 쉬운 말로 보여줘요(버튼 아래에 그날 날짜와 ‘저장 ○일째’가 함께 나와요). → ③ 당도나 단단함을 재면 <b>측정 추가</b>로 넣어요. 그 값에서 다시 이어 계산하고, 예측과 실제의 차이도 보여줘요.</p>
+        <h3>날짜 기준이 두 가지예요</h3><p>품질 화면의 30·60·90·120일은 <b>저장 시작일부터</b> 센 날이고, 출하 조건 비교의 30일·60일은 <b>오늘부터</b> 30일·60일 뒤예요. 출하 비교에는 그날의 실제 날짜와 ‘저장 ○일째’를 함께 보여 줘요.</p>
         <h3>내 기준</h3><p>사과 상세에서 단단함 기준을 넣으면 계산상 언제쯤 닿는지 ‘○월 중순쯤’으로 보여줘요. 출하 판정이 아니라 계산이에요.</p>
         <h3>값의 출처를 구분해요</h3><p>직접 잰 값(실측), 날씨로 추정한 값, 계산값을 섞지 않고 표시해요.</p>
         <h3>계산은 아직 ‘시연용’이에요</h3><p>예측식의 정확도는 아직 검증되지 않았어요. 출하·안전 여부를 판정하지 않아요.</p>

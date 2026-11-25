@@ -110,6 +110,10 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
   }, [form, startDate]);
 
   const missing = [!harvest && '수확일', !same && !start && '저장 시작일', hongro && !temp && '저장고 온도', !hongro && !mcp && '1-MCP 처리 여부', source === 'weather' && !wRegion && '생산지', source === 'measured' && !m.brix.trim() && !m.firmness.trim() && !m.acidity.trim() && '잰 값(하나 이상)'].filter(Boolean) as string[];
+  // 체험 안내는 지금 화면에 보이는 단계·입력란에 맞춥니다(산지를 고르기 전에는 품종별 저장 조건을 묻지 않음).
+  const shownMissing = missing.map(x => x === '1-MCP 처리 여부' ? '보관 방식·1-MCP 처리' : x);
+  const guestHint = path === null ? '' : path === 'region' && !mapRegion ? '지도에서 생산지를 먼저 골라 주세요. 고른 산지에 예측식이 있는 품종과 그 품종의 저장 조건을 이어서 물어봐요.'
+    : shownMissing.length ? `${josa(shownMissing.join(', '), '을를')} 고르면 아래에 바로 결과가 나와요. ${hongro ? '홍로는 저장고 온도(0℃·4℃)를' : '후지는 보관 방식(일반 저온·CA)과 1-MCP 처리를'} 물어봐요. 가입하지 않아도 돼요.` : '';
   async function save() {
     setErr('');
     if (missing.length) { setErr(`${josa(missing.join(', '), '을를')} 골라 주세요.`); return; }
@@ -181,7 +185,7 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
       <p className="ma-sub">상자 수를 넣으면 무게가 줄어든 만큼을 ‘몇 상자 무게’로도 보여 줘요.</p></details>
 
     </>}
-    {guest && missing.length > 0 && <p className="ma-hint muted na-guest-hint">{josa(missing.join(', '), '을를')} 고르면 아래에 바로 결과가 나와요. 가입하지 않아도 돼요.</p>}
+    {guest && guestHint && <p className="ma-hint muted na-guest-hint" aria-live="polite">{guestHint}</p>}
     {guest && preview && missing.length === 0 && <section id="na-result" className="na-card na-result" aria-label="결과"><h2>결과</h2><LotPreview lot={preview.lot} /><p className="ma-sub">시연용 계산 · 출하·안전 판정 아님</p>
       <button type="button" className="linkbtn na-save-link" onClick={onLogin}>이 사과를 계속 기록하려면 가입하기 →</button></section>}
     {!guest && preview && <section className="na-card na-preview" aria-label="미리보기"><h2>저장 {preview.day}일 뒤 (미리보기)</h2>

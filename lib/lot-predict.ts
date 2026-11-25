@@ -41,6 +41,12 @@ export function weatherPending(lot: Lot): {region: string; year: number} | null 
   return null;
 }
 
+/** 지표 m을 잰 가장 최근 측정. 같은 날 기록이 여럿이면 목록·API와 같은 규칙(날짜, 그다음 id 순서의 마지막)으로 하나를 고릅니다. */
+export function latestObservation(observations: Observation[], m: 'firmness' | 'brix' | 'acidity', onDate?: string): Observation | null {
+  return [...observations].filter(o => typeof o[m] === 'number' && isDate(o.date) && (!onDate || o.date === onDate))
+    .sort((a, b) => a.date.localeCompare(b.date) || String(a.id).localeCompare(String(b.id))).pop() ?? null;
+}
+
 /** 9월이 끝난 뒤 받은 날씨 값(override)이 있으면, 저장된 빈 값 대신 그 값으로 처음 품질을 추정합니다(기존 식 그대로). */
 export function lotPredictor(lot: Lot, observations: Observation[] = [], override?: WeatherValues | null) {
   const form = formFromLot(lot);
@@ -61,9 +67,10 @@ export function lotPredictor(lot: Lot, observations: Observation[] = [], overrid
   if (fujiOverride) initial = {firmness: fujiOverride.firmness, brix: fujiOverride.brix, acidity: fujiOverride.acidity};
   const t0 = !isDate(start) ? null : weather || fujiOverride ? 0 : isDate(measuredOn) ? daysBetween(start, measuredOn) : null;
   const baseDate = weather || fujiOverride ? start : measuredOn;
-  const latest = (m: 'firmness' | 'brix' | 'acidity') => [...observations]
-    .filter(o => o[m] !== null && o[m] !== undefined && isDate(o.date) && (!isDate(baseDate) || o.date > baseDate))
-    .sort((a, b) => a.date.localeCompare(b.date)).pop() ?? null;
+  // 출발점이 될 최신 측정: 처음 값 날짜(또는 날씨 추정의 저장 시작일)와 ‘같은 날’ 측정도 포함합니다(그날 잰 값이 처음 값보다 우선).
+  // 처음 값으로 지정된 측정 기록(initial_observation_id)은 처음 값과 같은 기록이라 빼고, 처음 값보다 이른 날은 쓰지 않습니다.
+  const initialObsId = lot.details?.initial_observation_id ?? null;
+  const latest = (m: 'firmness' | 'brix' | 'acidity') => latestObservation(observations.filter(o => o.id !== initialObsId && (!isDate(baseDate) || o.date >= baseDate)), m);
   const todayDay = isDate(start) ? daysBetween(start, todayKST()) : null;
 
   function at(m: MetricId, day: number): LotPoint {
