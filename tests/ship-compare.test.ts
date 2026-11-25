@@ -29,3 +29,10 @@ test('제안서 표기: +114,000원 유리 / −33,000원 불리 (원 단위)', 
   assert.ok(up.ok && down.ok);
   if (up.ok && down.ok) { assert.equal(Math.round(Math.abs(up.diff!)).toLocaleString('ko-KR') + '원 ' + (up.diff! > 0 ? '유리' : '불리'), '114,000원 유리'); assert.equal(Math.round(Math.abs(down.diff!)).toLocaleString('ko-KR') + '원 ' + (down.diff! > 0 ? '유리' : '불리'), '33,000원 불리'); }
 });
+
+test('60일 비교: 식은 같고 안내 문구만 기간을 따른다', () => {
+  const r = compareShipping({nowKg: '1000', nowPrice: '3000', laterKg: '980', cost: '120000', laterPrice: '3300'}, 60);
+  assert.ok(r.ok); if (r.ok) { assert.equal(r.breakEven, 3184); assert.equal(r.diff, 114000); }
+  const z = compareShipping({nowKg: '1000', nowPrice: '3000', laterKg: '0', cost: '0', laterPrice: ''}, 60);
+  assert.ok(!z.ok && /60일 뒤/.test(z.reason ?? ''));
+});

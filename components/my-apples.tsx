@@ -167,6 +167,9 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
     if (!window.confirm('정말 지울까요? 다 판 사과라면 ‘출하 완료’로 옮겨 두는 걸 추천해요.')) return;
     setBusy(true); try { await post('delete', {}); await reload(); onBack(); } catch (e) { window.alert((e as Error).message); } finally { setBusy(false); }
   }
+  // 숫자 옆 출처: 고른 날 잰 값 / 측정값에서 계산 / 날씨 추정에서 계산 / 계산
+  const selDate = p.start ? addDays(p.start, sel) : null;
+  const rowSrc = (m: string, from: string) => { const o = selDate ? (obs ?? []).find(x => x.date === selDate) : undefined; return o && typeof (o as Record<string, unknown>)[m] === 'number' ? '이날 실측' : from === 'measured' ? '측정값부터 계산' : from === 'weather' ? '날씨 추정에서 계산' : '계산'; };
   const fromMeasured = EASY_METRICS.some(m => { const r = p.at(m, sel); return r.ok && r.from === 'measured'; });
   useEffect(() => { if (!msg) return; const t = setTimeout(() => setMsg(''), 2400); return () => clearTimeout(t); }, [msg]);
   return <div className="ma ma-detail ma-dash">
@@ -183,13 +186,14 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
     <div className="dash-tiles">
     {obs === null ? <div className="ma-rows" aria-label="측정 기록을 불러와 계산하는 중" role="status"><span className="ma-sk" style={{height: 18}} /><span className="ma-sk" style={{height: 18, width: '80%'}} /><span className="ma-sk" style={{height: 18, width: '60%'}} /></div> : <div className="ma-rows">{EASY_METRICS.map(m => { const r = p.at(m, sel);
       const boxes = m === 'loss' && r.ok && typeof lot.quantity === 'number' && quantityUnit(lot) === '상자' && lot.quantity > 0 ? ` · ${lot.quantity}상자 기준 약 ${fmtNum(lot.quantity * r.value / 100, 1)}상자 무게만큼` : '';
-      return <div key={m + ':' + sel} className="ma-row"><span className="ma-row-lab" style={{color: METRIC_COLOR[m]}}><MetricIcon m={m} />{SHORT[m]}</span><div>{r.ok ? <><b>{easyChange(m, r.value, r.first, p.weather)}</b><small>{fmtNum(r.value, metricMeta[m].digits)} {unit(m, hongro)}{m === 'firmness' && kgUser ? ` (${asKg(r.value)})` : ''}{boxes}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div></div>; })}</div>}
+      return <div key={m + ':' + sel} className="ma-row"><span className="ma-row-lab" style={{color: METRIC_COLOR[m]}}><MetricIcon m={m} />{SHORT[m]}</span><div>{r.ok ? <><b>{easyChange(m, r.value, r.first, p.weather)}</b><small>{fmtNum(r.value, metricMeta[m].digits)} {unit(m, hongro)}{m === 'firmness' && kgUser ? ` (${asKg(r.value)})` : ''}{boxes}</small><i className="ma-from">{rowSrc(m, r.from)}</i></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div></div>; })}</div>}
     {obs !== null && p.start && <SameDay lot={lot} obs={obs} p={p} sel={sel} hongro={hongro} />}
     </div>
-    <div className="dash-chart only-mobile"><AppleGraph p={p} p0={p0} obs={obs ?? []} sel={sel} maxDay={hongro ? 120 : 200} /></div>
-    <section className="dash-chart only-pc" aria-label="저장 일수별 변화"><h2>저장 일수별 변화 <small>선: 계산값 · 동그라미: 내가 잰 값 · 세로선: 고른 날</small></h2><MiniCharts p={p} obs={obs ?? []} sel={sel} maxDay={hongro ? 120 : 200} /></section>
+    {obs === null ? <p className="dash-chart ma-loading" role="status">측정 기록 확인 중…</p> : <>
+    <div className="dash-chart only-mobile"><AppleGraph p={p} p0={p0} obs={obs} sel={sel} maxDay={hongro ? 120 : 200} /></div>
+    <section className="dash-chart only-pc" aria-label="저장 일수별 변화"><h2>저장 일수별 변화 <small>선: 계산값 · 동그라미: 내가 잰 값 · 세로선: 고른 날</small></h2><MiniCharts p={p} obs={obs ?? []} sel={sel} maxDay={hongro ? 120 : 200} /></section></>}
     <div className="dash-side">
-    <div className="dash-3d"><Apple3D p={p} sel={sel} cultivar={lot.variety || ''} /></div>
+    {obs !== null && <div className="dash-3d"><Apple3D p={p} sel={sel} cultivar={lot.variety || ''} /></div>}
     <div className="ma-actions dash-act">
       <button type="button" className="ma-primary big" onClick={() => setMeasure(true)}><Plus size={18} aria-hidden="true" />측정 추가</button>
     </div>
@@ -203,7 +207,7 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
           {sortedObs.length > 3 && <button type="button" className="linkbtn" onClick={() => setAllRec(v => !v)}>{allRec ? '최근 3개만 보기' : `전체 ${sortedObs.length}개 보기`}</button>}</>
         : <p>아직 측정 기록이 없어요.</p>}
     </section>
-    <ShipCompareCard lot={lot} p={p} maxDay={hongro ? 120 : 300} />
+    {obs !== null && <ShipCompareCard lot={lot} p={p} maxDay={hongro ? 120 : 300} />}
     </div>
     <div className="dash-bottom">
     <section className="ma-target dash-card" aria-label="내 단단함 기준"><h2>내 기준</h2>

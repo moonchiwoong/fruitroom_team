@@ -75,7 +75,7 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
       <section aria-labelledby="lh-title">
         <p className="lh-kicker lh-up lh-d1">사과 저장 품질 기록</p>
         <h1 id="lh-title" className="lh-up lh-d2">저장고 속 사과,<br />오늘은 어떨까요?</h1>
-        <p className="lh-lead lh-up lh-d3">{handoff ? '로그인하면 체험 화면에서 입력하던 내용으로 돌아가 이어서 저장할 수 있어요.' : '수확 때 잰 값과 저장 온도로 단단함·단맛·신맛 변화를 계산해 보여 드려요.'}</p>
+        <p className="lh-lead lh-up lh-d3">{handoff ? '로그인하면 체험 화면에서 입력하던 내용으로 돌아가 이어서 저장할 수 있어요.' : '수확 때 잰 값(또는 그 해 날씨)과 저장 조건으로 단단함·단맛·신맛 변화를 계산해 보여 드려요.'}</p>
         <div id="join" className="lh-up lh-d4"><AuthCard mode={mode} setMode={setMode} onRecovered={onRecovered} /></div>
       </section>
       <div className="lh-stage" aria-hidden="true" onPointerMove={tilt} onPointerLeave={untilt}>

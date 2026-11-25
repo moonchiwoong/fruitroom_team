@@ -31,6 +31,9 @@ function useWide() {
   return w;
 }
 
+/** 숫자의 출처: 오늘 잰 값 / 최근 측정값에서 계산 / 날씨 추정에서 계산 / 처음 값에서 계산 */
+const srcLabel = (from: string, measuredToday: boolean) => measuredToday ? '오늘 실측' : from === 'measured' ? '측정값부터 계산' : from === 'weather' ? '날씨 추정에서 계산' : '계산';
+
 const UNIT = (m: MetricId) => m === 'firmness' ? 'N' : metricMeta[m].unit;
 const ORDER: MetricId[] = ['firmness', 'brix', 'acidity', 'loss'];
 const dateLabel = () => new Date().toLocaleDateString('ko-KR', {timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', weekday: 'long'});
@@ -50,8 +53,10 @@ export default function HomeSummary({lots, loaded, error, retry, openLot, newLot
     const last = l.latest_observation?.date ?? l.initial_measured_on ?? storageStart(l) ?? null;
     const since = last && isDate(last) ? daysBetween(last, todayKST()) : null;
     const prep = ready.status === 'unsupported' || ready.status === 'conditions';
-    const status = prep ? '예측 준비 중' : ready.status === 'needs-initial' ? '처음 값 필요' : since !== null && since >= 21 ? '한 번 재 주세요' : '이상 없음';
-    const tone = prep ? 'muted' : status === '이상 없음' ? 'ok' : 'warn';
+    // 상태는 ‘측정 주기’만 봅니다: 마지막 측정(없으면 저장 시작)부터 21일이 지나면 ‘한 번 재 주세요’. 품질의 좋고 나쁨은 판정하지 않습니다.
+    const due = since !== null && since >= 21;
+    const status = prep ? '예측 준비 중' : ready.status === 'needs-initial' ? '처음 값 필요' : due ? '한 번 재 주세요' : since === null ? '측정 주기 확인 불가' : measured ? `최근 측정 ${since}일 전` : `측정 전 · ${since}일째`;
+    const tone = prep ? 'muted' : ready.status === 'needs-initial' || due ? 'warn' : 'ok';
     const rid = (l.details?.hongro?.source === 'weather' ? l.details.hongro.region ?? 'geochang' : l.details?.fuji_weather?.region ?? l.details?.region ?? '') as keyof typeof WEATHER_STATIONS;
     return {l, day, loss, since, measured, status, tone, region: WEATHER_STATIONS[rid]?.label ?? null};
   }), [active]);
@@ -93,23 +98,25 @@ function DayCount({lot}: {lot: Lot}) {
 }
 
 function LotToday({lot, openLot}: {lot: Lot; openLot: (id: string) => void}) {
-  const [obs, setObs] = useState<Observation[]>([]);
+  const [obs, setObs] = useState<Observation[] | null>(null);
   useEffect(() => { let live = true; requestJson<{observations: Observation[]}>(`/api/lots/${lot.id}/analysis?asOf=${todayKST()}`).then(r => { if (live) setObs(r.observations ?? []); }).catch(() => { if (live) setObs([]); }); return () => { live = false; }; }, [lot.id]);
-  const p = useMemo(() => { try { return lotPredictor(lot, obs); } catch { return null; } }, [lot, obs]);
+  const p = useMemo(() => { if (obs === null) return null; try { return lotPredictor(lot, obs); } catch { return null; } }, [lot, obs]);
+  const todayObs = useMemo(() => (obs ?? []).find(o => o.date === todayKST()) ?? null, [obs]);
   const maxDay = isHongroVariety(lot.variety || '') ? 120 : 200;
+  if (obs === null) return <p className="hs-note" role="status">측정 기록 확인 중…</p>;
   if (!p) return <p className="hs-note">이 사과는 계산할 수 없어요.</p>;
   const today = p.todayDay !== null && p.todayDay >= 0 ? Math.min(p.todayDay, maxDay) : 0;
   const f = p.at('firmness', today);
   return <>
     <div className="hs-sec"><h2>{lot.name || lot.variety} · {p.todayDay !== null && p.todayDay > maxDay ? `${maxDay}일째(계산 끝)` : '오늘'}</h2><button type="button" className="hs-link" onClick={() => openLot(lot.id)}>자세히</button></div>
-    <div className="hs-grid">{ORDER.map(m => <MetricCard key={m} m={m} p={p} day={today} maxDay={maxDay} onOpen={() => openLot(lot.id)} />)}</div>
+    <div className="hs-grid">{ORDER.map(m => <MetricCard key={m} m={m} p={p} day={today} maxDay={maxDay} measuredToday={today === p.todayDay && typeof todayObs?.[m as 'firmness'] === 'number'} onOpen={() => openLot(lot.id)} />)}</div>
     <button type="button" className="hs-ship-link" onClick={() => { try { sessionStorage.setItem('appletrack:jump', 'ship'); } catch { /* 이동만 */ } openLot(lot.id); }}><b>이 사과 출하 비교</b><small>지금 팔 때와 30일 더 저장할 때를 넣은 값으로 비교해요</small></button>
     {f.ok && <><div className="hs-sec"><h2>한 줄 요약</h2></div>
       <div className="hs-card hs-hl"><span className="hs-lab" style={{color: METRIC_COLOR.firmness}}><MetricIcon m="firmness" />{METRIC_LABEL.firmness}</span>
         <p>{josa(lot.name || lot.variety, '은는')} 저장 {today}일째, {easyChange('firmness', f.value, f.first, p.weather)}.</p>
         {f.first !== null && <div className="hs-bars">
           <Bar label={p.weather ? '수확 때(추정)' : '처음'} v={f.first} max={Math.max(f.first, f.value)} color={METRIC_COLOR.firmness} />
-          <Bar label="오늘(계산)" v={f.value} max={Math.max(f.first, f.value)} color="#C7C7CC" />
+          <Bar label={today === p.todayDay && typeof todayObs?.firmness === 'number' ? '오늘 실측' : f.from === 'measured' ? '오늘(측정값부터 계산)' : '오늘(계산)'} v={f.value} max={Math.max(f.first, f.value)} color="#C7C7CC" />
         </div>}
       </div></>}
     <p className="hs-src">기존 팀 계산식 결과 · 정확도 검증 전 · 출하·안전 판정 아님</p>
@@ -120,7 +127,7 @@ function Bar({label, v, max, color}: {label: string; v: number; max: number; col
   return <div className="hs-bar"><span className="hs-num">{fmtNum(v, 1)}</span><div><i style={{width: `${Math.max(4, v / max * 100)}%`, background: color}} /><small>{label}</small></div></div>;
 }
 
-function MetricCard({m, p, day, maxDay, onOpen}: {m: MetricId; p: NonNullable<ReturnType<typeof lotPredictor>>; day: number; maxDay: number; onOpen: () => void}) {
+function MetricCard({m, p, day, maxDay, measuredToday, onOpen}: {m: MetricId; p: NonNullable<ReturnType<typeof lotPredictor>>; day: number; maxDay: number; measuredToday: boolean; onOpen: () => void}) {
   const r = p.at(m, day);
   const pts = useMemo(() => { const a: {d: number; v: number}[] = []; for (let d = 0; d <= maxDay; d += 5) { const x = p.at(m, d); if (x.ok) a.push({d, v: x.value}); } return a; }, [p, m, maxDay]);
   const W = 92, H = 40;
@@ -129,7 +136,7 @@ function MetricCard({m, p, day, maxDay, onOpen}: {m: MetricId; p: NonNullable<Re
   const path = pts.map((x, i) => `${i && pts[i - 1].d === x.d - 5 ? 'L' : 'M'}${X(x.d).toFixed(1)},${Y(x.v).toFixed(1)}`).join('');
   return <button type="button" className="hs-card hs-metric" onClick={onOpen}>
     <span className="hs-lab" style={{color: METRIC_COLOR[m]}}><MetricIcon m={m} />{METRIC_LABEL[m]}<em>오늘 ›</em></span>
-    <span className={'hs-val' + (r.ok ? '' : ' na')}>{r.ok ? <><b className="hs-num">{fmtNum(r.value, metricMeta[m].digits)}</b><small>{UNIT(m)}</small></> : <><b className="hs-na">계산 없음</b><small title={r.reason}>{r.reason}</small></>}</span>
+    <span className={'hs-val' + (r.ok ? '' : ' na')}>{r.ok ? <><b className="hs-num">{fmtNum(r.value, metricMeta[m].digits)}</b><small>{UNIT(m)}</small><i className="hs-from">{srcLabel(r.from, measuredToday)}</i></> : <><b className="hs-na">계산 없음</b><small title={r.reason}>{r.reason}</small></>}</span>
     {pts.length > 1 && <svg className="hs-spark" width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-hidden="true"><path d={path} fill="none" stroke={METRIC_COLOR[m]} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />{r.ok && <circle cx={X(day)} cy={Y(r.value)} r="4" fill={METRIC_COLOR[m]} stroke="#fff" strokeWidth="2" />}</svg>}
   </button>;
 }
