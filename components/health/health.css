@@ -263,24 +263,6 @@ body:has(.app-header) .site-footer-bottom,body:has(.app-header) .site-footer-leg
 /* 체험 화면: 머리말·본문을 상단 로고와 같은 선에 맞춤 */
 .site.guest .page-hero-inner{width:100%!important;max-width:var(--hx-max)!important}
 .site.guest .try-simple{max-width:none!important;width:100%;margin:0!important;padding-left:0!important;padding-right:0!important}
-/* ===== 출하 조건 비교 ===== */
-.sc h2 small{font-weight:400}
-.sc-ref{font-size:12px;color:var(--hx-sub);margin:0 0 10px}
-.sc-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
-.sc-field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#636366;min-width:0}
-.sc-field em{font-style:normal;color:#8A8A8E}
-.sc-in{display:flex;align-items:center;background:#F2F2F7;border-radius:10px;padding:0 10px}
-.sc-in input{flex:1;min-width:0;width:0;border:0;background:none;padding:9px 0;font:inherit;font-size:16px;color:#000;text-align:right;outline:none}
-.sc-in:focus-within{box-shadow:0 0 0 2px var(--hx-acc)}
-.sc-in i{font-style:normal;font-size:12px;color:#8A8A8E;margin-left:6px;white-space:nowrap}
-.sc-msg{font-size:13px;color:#636366;margin:10px 0 0}
-.sc-out{margin:12px 0 0;display:grid;gap:6px}
-.sc-out div{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:8px 0;border-top:1px solid #F2F2F7}
-.sc-out dt{font-size:13px;color:#636366}.sc-out dd{margin:0;font-weight:800;font-size:16px;white-space:nowrap;font-variant-numeric:tabular-nums}
-.sc-out .key dd{font-size:19px}.sc-out .up dd{color:#1F7A3A}.sc-out .down dd{color:#C2410C}
-.sc-note{font-size:11px;color:#8A8A8E;margin:10px 0 0;line-height:1.5}
-@media (max-width:999.98px){.ma-dash .dash-ship,.lp-dash .dash-ship{order:8}}
-@media (max-width:420px){.sc-fields{grid-template-columns:1fr}}
 /* ===== 로그인 전 홈페이지 소개 구역 ===== */
 html{scroll-behavior:smooth}
 .lh-nav{display:flex;gap:18px;margin-left:24px}
@@ -312,11 +294,6 @@ html{scroll-behavior:smooth}
 .lx-region dt{color:#8B95A1}.lx-region dd{margin:0;font-weight:700}
 .lx-map .rmp svg{height:min(60vh,460px)}
 .lx-dash{background:#F2F2F7;border-radius:22px;padding:16px}
-.lx-ship{background:#F7F8FA;border-radius:22px;padding:26px}
-.lx-ship-in{font-size:14px;margin:0 0 14px}
-.lx-ship-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:14px 0;border-top:1px solid #E5E8EB}
-.lx-ship-row b{font-family:'Nunito',ui-rounded,system-ui,sans-serif;font-size:clamp(22px,2.6vw,30px);font-weight:800}
-.lx-ship-row.up b{color:#1F7A3A}
 .lx-trust{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:20px}
 .lx-card{background:#F7F8FA;border-radius:20px;padding:24px}
 .lx-card b{font-size:18px}.lx-card p{font-size:15px;margin:8px 0}
@@ -341,8 +318,7 @@ html{scroll-behavior:smooth}
 .lx-sec{min-height:78vh;display:flex;flex-direction:column;justify-content:center}
 .lx-sec.lx-split{display:grid}
 .lx-stats{padding-top:56px}
-.lx-stat,.lx-step,.lx-card,.lx-ship,.lx-dash{background:#fff}
-.lx-region div{border-bottom-color:#F5D9D6}
+.lx-stat,.lx-step,.lx-card,.lx-region div{border-bottom-color:#F5D9D6}
 @media (prefers-reduced-motion:reduce){.lx-zoom{height:auto}.lx-zoom-pin{position:relative;height:70vh}.lx-zoom-apple{display:none}.lx-zoom-bg{opacity:1}.lx-chars .ch,.lx-zoom-msg p{opacity:1;transform:none;transition:none}}
 @media (max-width:860px){.lx-sec{min-height:auto}.lx-zoom{height:200vh}.lx-zoom-apple{width:62vw}}
 /* 과수원 사진 → 사과로 확대 (사과 중심: 사진 가로 64.2%, 세로 45.9%) */
@@ -399,9 +375,7 @@ html .hs .s3d{margin-top:16px}
 /* 선택지가 많을 때(산지 7곳 등) 좁은 화면·큰 글자에서 줄바꿈 */
 .qt3-seg.na-seg-wrap{display:grid!important;grid-auto-flow:row!important;grid-auto-columns:auto!important;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:6px;flex-wrap:wrap}
 .qt3-seg.na-seg-wrap>label{min-width:0}
-.hs-ship-link{display:grid;gap:2px;width:100%;margin:10px 0 0;padding:14px 16px;border:1px solid #E5E8EB;border-radius:16px;background:#fff;text-align:left;font:inherit;cursor:pointer;color:#191F28}
-.hs-ship-link b{font-size:15px}.hs-ship-link b::after{content:' →';color:#E5322D}.hs-ship-link small{color:#6B7684;font-size:13px}
-#ship-compare{scroll-margin-top:80px}
+
 .ma-sameday{margin:8px 0 0;padding:10px 12px;border-radius:12px;background:#F7F8FA;font-size:13px;color:#4E5968;line-height:1.6}
 .ma-sameday p{margin:0}.ma-sameday ul{margin:4px 0 0;padding-left:0;list-style:none;display:grid;gap:2px}
 /* 다음 측정 알림(캘린더) */
@@ -428,13 +402,9 @@ html .hs .s3d{margin-top:16px}
   .lx-zoom-photo{display:block!important;transform:none!important;opacity:1!important}
   .lx-zoom-msg{padding:clamp(28px,5vw,48px) 24px 0}
 }
-/* 숫자 출처 표시, 출하 비교 기간 */
+/* 숫자 출처 표시 */
 .hs-from,.ma-from{display:block;font-style:normal;font-size:11.5px;color:#8B95A1;margin-top:2px;font-weight:500}
 .ma-loading{padding:18px;color:#6B7684;font-size:14px}
-.sc-gap{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:6px 0}
-.sc-gap button{border:1px solid #D1D6DB;background:#fff;border-radius:10px;padding:8px 0;font:inherit;font-size:14px;cursor:pointer;color:#191F28}
-.sc-gap button.on{border:2px solid #E5322D;background:#FDECEC;font-weight:700}
-.sc-when{margin:0 0 4px;font-weight:700;color:#191F28;font-size:14px}
 /* 그래프: 내 기준 가로 점선 + 닿는 날 */
 .mc-target,.ag-target{stroke:#E5322D;stroke-width:1.6;stroke-dasharray:6 5}
 .mc-target-t{font-size:10px;fill:#E5322D;font-weight:700}.ag-target-t{fill:#E5322D!important;font-weight:700}

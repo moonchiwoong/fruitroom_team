@@ -70,7 +70,7 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
   const untilt = (e: React.PointerEvent<HTMLDivElement>) => { e.currentTarget.style.setProperty('--rx', '0deg'); e.currentTarget.style.setProperty('--ry', '0deg'); };
   const cards: [MetricId, string][] = [['firmness', '저장 일수별 단단함'], ['brix', '단맛 변화'], ['acidity', '신맛 변화'], ['loss', '무게가 줄어든 정도']];
   return <div ref={rootRef} className="lh">
-    <header className="lh-top lh-up"><img src="/assets/appletrack-logo.svg" alt="애플트랙" width={152} height={34} /><nav className="lh-nav" aria-label="소개"><a href="#how">사용법</a><a href="#regions">산지</a><a href="#dashboard">대시보드</a><a href="#ship">출하 비교</a></nav><a href="/try">로그인 없이 체험하기</a><BigTextToggle /></header>
+    <header className="lh-top lh-up"><img src="/assets/appletrack-logo.svg" alt="애플트랙" width={152} height={34} /><nav className="lh-nav" aria-label="소개"><a href="#how">사용법</a><a href="#regions">산지</a><a href="#dashboard">대시보드</a></nav><a href="/try">로그인 없이 체험하기</a><BigTextToggle /></header>
     <div className="lh-wrap">
       <section aria-labelledby="lh-title">
         <p className="lh-kicker lh-up lh-d1">사과 저장 품질 기록</p>

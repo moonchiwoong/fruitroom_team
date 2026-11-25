@@ -1,5 +1,5 @@
 // 6개 수정 회귀 검증(가상 기록만 사용, 모든 데이터 요청은 fixture가 가로챔).
-// 1 같은 날 실측·로딩·오류·늦은 응답 / 2 출하 비교 기간별 입력 / 3 날짜 기준 / 4 체험 안내 / 5 안내 버튼 이름 / 6 상세 주소
+// 1 같은 날 실측·로딩·오류·늦은 응답 / (2 출하 비교는 기능 삭제로 제외) / 3 날짜 기준 / 4 체험 안내 / 5 안내 버튼 이름 / 6 상세 주소
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {writeFile} from 'node:fs/promises';
@@ -45,34 +45,22 @@ try {
       assert.match(card, /55\.0/); assert.match(card, /오늘 실측/);
       show('요약 카드', card);
       ok(`${tag} 1 요약: 로딩 중 임시값 없음 → 55.0 N 오늘 실측`);
-      await page.getByRole('button', {name: /이 사과 출하 비교/}).click();
+      await page.locator('.hs-sec .hs-link').filter({hasText: '자세히'}).first().click();
       await page.waitForURL(new RegExp(`#lot/${T0.id}`));
       await page.getByText('측정 기록 확인 중…').first().waitFor();
       assert.ok(!(await bodyHas(page, /60\.0\s*N|59\.6/)), '상세 로딩 중 임시 60.0/59.6');
       show('상세 로딩 중 숫자 검색(60.0 N|59.6)', (await page.locator('main').innerText()).match(/60\.0\s*N|59\.6/) ?? '없음');
-      await page.locator('#ship-compare').waitFor({timeout: 10000});
+      await page.locator('.ma-row').filter({hasText: '이날 실측'}).first().waitFor({timeout: 10000});
       const row = await page.locator('.ma-row').first().innerText();
       assert.match(row, /55\.0 N/); assert.match(row, /이날 실측/);
-      const ref = await page.locator('.sc-ref').innerText(); assert.match(ref, /54\.6 N/);
-      assert.match(await page.locator('.sc-when').innerText(), new RegExp(`오늘부터 30일 후 · ${md(shift(today, 30))} · 저장 30일째`));
       const brixRow = await page.locator('.ma-row').filter({hasText: '단맛'}).innerText(); assert.ok(!/실측/.test(brixRow), '단맛은 실측 아님');
-      show('상세 단단함 행', row); show('출하 비교 기준', ref); show('출하 비교 날짜', await page.locator('.sc-when').innerText()); show('단맛 행', brixRow);
-      ok(`${tag} 1 상세: 55.0 N 이날 실측 · 출하 비교 30일 54.6 N · 단맛 출처 계산`);
-      // ---- 2. 기간별 입력: 30 입력 → 60 빈칸 → 60 입력 → 30 복원
-      const fill = async vals => { const ins = page.locator('#ship-compare .sc-field input'); for (const [i, v] of vals) await ins.nth(i).fill(v); };
-      await fill([[0, '1000'], [1, '3000'], [2, '1000'], [3, '186000'], [4, '3297']]);
-      let out = await page.locator('#ship-compare .sc-out').innerText(); show('30일 결과', out); assert.match(out, /3,186/); assert.match(out, /111,000원 유리/);
-      await page.getByRole('radio', {name: '60일 더 저장'}).click();
-      const vals60 = await page.locator('#ship-compare .sc-field input').evaluateAll(a => a.map(i => i.value));
-      show('60일 전환 직후 입력칸', JSON.stringify(vals60)); assert.deepEqual(vals60, ['1000', '3000', '', '', '']);
-      await fill([[2, '960'], [3, '240000'], [4, '3500']]);
-      out = await page.locator('#ship-compare .sc-out').innerText(); show('60일 결과', out); assert.match(out, /3,375/); assert.match(out, /120,000원 유리/);
-      assert.match(await page.locator('.sc-when').innerText(), new RegExp(`오늘부터 60일 후 · ${md(shift(today, 60))} · 저장 60일째`));
-      await page.getByRole('radio', {name: '30일 더 저장'}).click();
-      const back30 = await page.locator('#ship-compare .sc-field input').evaluateAll(a => a.map(i => i.value));
-      show('30일 복귀 입력칸', JSON.stringify(back30)); show('30일 복귀 결과', await page.locator('#ship-compare .sc-out').innerText());
-      assert.deepEqual(back30, ['1000', '3000', '1000', '186000', '3297']);
-      ok(`${tag} 2 상세: 30일 입력 → 60일 빈칸 → 60일 계산(3,375·120,000) → 30일 복원(3,186·111,000)`);
+      show('상세 단단함 행', row); show('단맛 행', brixRow);
+      await page.locator('.ma-days button').filter({hasText: /^30일$/}).click();
+      const row30 = await page.locator('.ma-row').first().innerText(); show('30일째 단단함 행', row30);
+      assert.match(row30, /54\.6 N/);
+      ok(`${tag} 1 상세: 55.0 N 이날 실측 · 30일째 54.6 N · 단맛 출처 계산`);
+      const shipLeft = (await page.locator('#ship-compare').count()) + ((await page.locator('main').innerText()).match(/출하 조건 비교|원\/kg/g)?.length ?? 0);
+      show('상세의 출하 비교 흔적 수', shipLeft); assert.equal(shipLeft, 0);
       // ---- 6. 새로고침·뒤로 가기·직접 열기
       const urlBefore = page.url(); await page.reload(); await page.locator('.ma-detail h1').waitFor();
       show('새로고침 전/후 주소', `${new URL(urlBefore).hash} → ${new URL(page.url()).hash}`); show('새로고침 후 제목', await page.locator('.ma-detail h1').innerText());
@@ -116,13 +104,12 @@ try {
     // ---- 3. 저장 시작일 ≠ 오늘(기존 예시: 28일 전 시작)
     {
       const {context, page} = await ctxFor(width);
-      await page.goto(`${base}/#lot/${lots[0].id}`); await page.locator('#ship-compare').waitFor();
+      await page.goto(`${base}/#lot/${lots[0].id}`); await page.locator('.ma-days').first().waitFor();
       const start = shift(today, -28);
-      assert.match(await page.locator('.sc-when').innerText(), new RegExp(`오늘부터 30일 후 · ${md(shift(today, 30))} · 저장 58일째`));
       await page.locator('.ma-days button').filter({hasText: /^30일$/}).click();
       assert.match(await page.locator('.ma-date').innerText(), new RegExp(`${mds(shift(start, 30))} 기준 \\(저장 30일째\\)`));
       assert.match(await page.locator('.ma-daybasis').innerText(), new RegExp(`저장 시작일\\(${mds(start)}\\)부터`));
-      ok(`${tag} 3 시작일≠오늘: 품질 30일=${md(shift(start, 30))}(저장 30일째), 출하 30일=${md(shift(today, 30))}(저장 58일째)`);
+      ok(`${tag} 3 시작일≠오늘: 품질 30일=${md(shift(start, 30))}(저장 30일째), 버튼 기준 안내`);
       // ---- 5. 안내 버튼 접근성 이름 + 키보드 열고 닫기
       const guide = page.getByRole('button', {name: '안내', exact: true}).first();
       show('안내 버튼 접근성 이름', await guide.getAttribute('aria-label'));
@@ -139,6 +126,7 @@ try {
       await context.route('https://review.supabase.co/**', r => r.fulfill({status: 401, contentType: 'application/json', body: '{}'}));
       const page = await context.newPage(); page.on('pageerror', e => errors.push(e.message));
       await page.goto(`${base}/try`);
+      show('체험 화면 출하 비교 흔적 수', await page.locator('#ship-compare').count()); assert.equal(await page.locator('#ship-compare').count(), 0);
       await page.getByRole('tab', {name: '내 사과로 해 보기'}).click();
       await page.getByText('지역으로 시작').first().click();
       const hint = page.locator('.na-guest-hint');
@@ -151,14 +139,6 @@ try {
       show('거창 선택 후 안내', await hint.innerText());
       assert.match(await hint.innerText(), /저장고 온도/); assert.ok(!/1-MCP/.test(await hint.innerText()));
       ok(`${tag} 4 체험 안내: 산지 전 → 청송(후지: 보관 방식·1-MCP) → 거창(홍로: 저장고 온도)`);
-      // 2. 체험 예시 사과의 출하 비교도 기간별 입력
-      await page.getByRole('tab', {name: /예시 사과/}).click();
-      const sc = page.locator('#ship-compare'); await sc.waitFor();
-      const ins = sc.locator('.sc-field input');
-      await ins.nth(2).fill('1000'); await page.getByRole('radio', {name: '60일 더 저장'}).click();
-      assert.equal(await ins.nth(2).inputValue(), ''); await page.getByRole('radio', {name: '30일 더 저장'}).click();
-      assert.equal(await ins.nth(2).inputValue(), '1000');
-      ok(`${tag} 2 체험 예시: 기간별 입력 분리·복원`);
       await context.close();
     }
   }

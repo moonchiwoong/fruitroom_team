@@ -14,7 +14,6 @@ import {lotReadiness, baselineObservation, storageStart, quantityUnit, weatherIn
 import {fmtNum, metricMeta, todayKST, addDays, daysBetween, isDate} from '@/lib/tracker';
 import {AppleGraph, Apple3D} from '@/components/apple-graph';
 import MiniCharts from '@/components/mini-charts';
-import ShipCompareCard from '@/components/ship-compare-card';
 import {weatherLabels, WEATHER_STATIONS} from '@/lib/rda-weather';
 import {lotRegionLabel} from '@/lib/lot-region';
 import {REMINDER_GAPS, nextMeasureDate, measureIcs, type ReminderGap} from '@/lib/measure-reminder';
@@ -93,13 +92,6 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
     requestJson<{observations: Observation[]}>(`/api/lots/${lot.id}/analysis?asOf=${todayKST()}`).then(r => { if (live) setObs(r.observations ?? []); }).catch(e => { if (live) { setObs([]); setErr((e as Error).message || '측정 기록을 불러오지 못했어요.'); } });
     return () => { live = false; };
   }, [lot.id, n]);
-  // 요약의 ‘이 사과 출하 비교’로 들어왔으면 출하 비교 카드로 바로 이동합니다(한 번만).
-  useEffect(() => {
-    if (obs === null) return;
-    let jump = false; try { jump = sessionStorage.getItem('appletrack:jump') === 'ship'; if (jump) sessionStorage.removeItem('appletrack:jump'); } catch { /* 무시 */ }
-    if (!jump) return;
-    requestAnimationFrame(() => { const el = document.getElementById('ship-compare'); if (!el) return; el.scrollIntoView({block: 'start'}); el.querySelector<HTMLInputElement>('input')?.focus({preventScroll: true}); });
-  }, [obs]);
   // 날씨 값이 비어 있던 물량(9월 수확 직후 저장 등): 9월이 끝났으면 그 해 자료를 받아 화면에서 추정합니다. 끝나기 전에는 측정을 안내합니다.
   const pend = useMemo(() => weatherPending(lot), [lot]);
   const waitSept = !!pend && todayKST() < `${pend.year}-10-01`;
@@ -193,7 +185,7 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
     {over && <p className="ma-hint warn">오늘은 저장 {p.todayDay}일째라 계산 범위({limit}일)를 넘었어요. 아래 날짜 버튼은 범위 안 날짜의 계산값이에요. 지금 상태는 직접 측정해 확인해 주세요.</p>}
     </div>
     <div className="dash-days"><div className="ma-days" role="group" aria-label="저장 일수">{days.map(d => <button key={d} type="button" aria-pressed={sel === d} className={sel === d ? 'active' : ''} onClick={() => setDay(d)}>{d === p.todayDay ? '오늘' : `${d}일`}</button>)}</div>
-    <p className="ma-date">{p.start ? `${md(addDays(p.start, sel))} 기준 (저장 ${sel}일째)` : ''}</p>{p.start && <p className="ma-sub ma-daybasis">버튼의 일수는 저장 시작일({md(p.start)})부터 센 날이에요. 출하 조건 비교의 30·60일은 오늘부터예요.</p>}</div>
+    <p className="ma-date">{p.start ? `${md(addDays(p.start, sel))} 기준 (저장 ${sel}일째)` : ''}</p>{p.start && <p className="ma-sub ma-daybasis">버튼의 일수는 저장 시작일({md(p.start)})부터 센 날이에요.</p>}</div>
     <div className="dash-tiles">
     {obs === null ? <div className="ma-rows" aria-label="측정 기록을 불러와 계산하는 중" role="status"><p className="ma-sub">측정 기록 확인 중…</p><span className="ma-sk" style={{height: 18}} /><span className="ma-sk" style={{height: 18, width: '80%'}} /><span className="ma-sk" style={{height: 18, width: '60%'}} /></div> : <div className="ma-rows">{EASY_METRICS.map(m => { const r = p.at(m, sel);
       const boxes = m === 'loss' && r.ok && typeof lot.quantity === 'number' && quantityUnit(lot) === '상자' && lot.quantity > 0 ? ` · ${lot.quantity}상자 기준 약 ${fmtNum(lot.quantity * r.value / 100, 1)}상자 무게만큼` : '';
@@ -219,7 +211,6 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
           {sortedObs.length > 3 && <button type="button" className="linkbtn" onClick={() => setAllRec(v => !v)}>{allRec ? '최근 3개만 보기' : `전체 ${sortedObs.length}개 보기`}</button>}</>
         : <p>아직 측정 기록이 없어요.</p>}
     </section>
-    {obs !== null && <ShipCompareCard lot={lot} p={p} maxDay={hongro ? 120 : 300} />}
     </div>
     <div className="dash-bottom">
     <section className="ma-target dash-card" aria-label="내 단단함 기준"><h2>내 기준</h2>

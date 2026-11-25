@@ -5,7 +5,6 @@ import {useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
 import {exampleForm, payloadFromForm} from '@/lib/tracker-form';
 import {lotPredictor} from '@/lib/lot-predict';
 import type {Lot} from '@/lib/lot-types';
-import {compareShipping} from '@/lib/ship-compare';
 import {WEATHER_STATIONS} from '@/lib/rda-weather';
 import MiniCharts from '@/components/mini-charts';
 import RegionMapPicker, {MAP_PINS, type MapRegion} from '@/components/region-map-picker';
@@ -75,7 +74,6 @@ export default function LandingSections({onStart}: {onStart: () => void}) {
   const example = useMemo(() => {
     try { const lot = {id: 'example', ...payloadFromForm(exampleForm(), 'real'), latest_observation: null} as unknown as Lot; return {p: lotPredictor(lot, []), lot}; } catch { return null; }
   }, []);
-  const ship = compareShipping({nowKg: '1000', nowPrice: '3000', laterKg: '980', cost: '120000', laterPrice: '3300'});
   const [region, setRegion] = useState<MapRegion | ''>('gunwi');
   const regionCount = Object.keys(MAP_PINS).length;
   return <div className="lx-outer"><AppleZoom /><div className="lx">
@@ -99,15 +97,6 @@ export default function LandingSections({onStart}: {onStart: () => void}) {
     {example && <section className="lx-sec" id="dashboard"><Reveal><p className="lx-kick">한눈에 보는 대시보드</p><h2><Chars lines={['항목마다 자기 단위로,', '저장 일수별 변화']} /></h2>
       <p className="lx-sub">아래는 <b>예시 데이터(후지)</b>로 기존 계산식을 그대로 돌린 화면이에요. 실제 기록이 아니에요.</p></Reveal>
       <Reveal delay={120} className="lx-dash"><MiniCharts p={example.p} obs={[]} sel={60} maxDay={200} /></Reveal>
-    </section>}
-
-    {ship.ok && <section className="lx-sec lx-split" id="ship">
-      <Reveal className="lx-copy"><p className="lx-kick">출하 조건 비교</p><h2><Chars lines={['지금 팔까,', '30일 더 저장할까']} /></h2>
-        <p>지금 물량·가격과 30일 뒤 물량·저장비를 넣으면, 30일 뒤 kg당 얼마에 팔아야 같은 수입이 되는지 계산해요. 시세는 예측하지 않고 넣은 값으로만 계산해요.</p></Reveal>
-      <Reveal delay={120} className="lx-ship"><p className="lx-ship-in">예시 · 1,000kg × 3,000원 · 30일 뒤 980kg · 저장비 12만 원</p>
-        <div className="lx-ship-row"><span>30일 뒤 기준 가격</span><b><Count to={ship.breakEven} />원/kg</b></div>
-        {ship.diff !== null && <div className="lx-ship-row up"><span>30일 뒤 3,300원에 팔면</span><b>{ship.diff.toLocaleString('ko-KR')}원 유리</b></div>}
-      </Reveal>
     </section>}
 
     <section className="lx-sec" id="trust"><Reveal><p className="lx-kick">숨기지 않아요</p><h2><Chars lines={['근거와 한계를', '같이 보여 줘요']} /></h2></Reveal>
