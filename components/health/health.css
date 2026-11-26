@@ -612,7 +612,7 @@ html .hs .s3d{margin-top:16px}
 @media (max-width:599.98px){
   .hs-sec{align-items:flex-start;gap:10px}
   .hs-sec h2{font-size:18px;line-height:1.35;min-width:0;word-break:keep-all}
-  .hs-more{min-height:36px;padding:0 8px 0 12px;font-size:13px;flex:none}
+  .hs-more{min-height:40px;padding:0 8px 0 12px;font-size:13px;flex:none}
   .cc .cc-rows li{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"lab tag" "val val";row-gap:4px}
   .cc .cc-rows li .cc-lab2{grid-area:lab}.cc .cc-rows li .cc-tag{grid-area:tag}.cc .cc-rows li .cc-val{grid-area:val;white-space:normal;overflow:visible}
   .cc .cc-rows li .cc-na{grid-area:val}
