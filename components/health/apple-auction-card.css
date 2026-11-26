@@ -259,3 +259,9 @@
   .gk-why-btns,.gk-why{grid-column:2}
   .gk-why-btns{margin-top:8px}
 }
+/* ⓘ 연도: 검은 포커스 틀 대신 연한 빨간 띠로 선택 표시 */
+.gk-pt{outline:none}
+.gk-pt .gk-hit{fill:transparent;transition:fill .15s}
+.gk-pt:hover .gk-hit{fill:rgba(229,50,45,.06)}
+.gk-pt.on .gk-hit{fill:rgba(229,50,45,.12)}
+.gk-pt:focus-visible .gk-hit{fill:rgba(229,50,45,.12);stroke:#E5322D;stroke-width:1.5}
