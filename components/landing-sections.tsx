@@ -95,7 +95,7 @@ export default function LandingSections({onStart}: {onStart: () => void}) {
     </section>
 
     {example && <section className="lx-sec" id="dashboard"><Reveal><p className="lx-kick">한눈에 보는 대시보드</p><h2><Chars lines={['항목마다 자기 단위로,', '저장 일수별 변화']} /></h2>
-      <p className="lx-sub">아래는 <b>예시 데이터(후지)</b>로 기존 계산식을 그대로 돌린 화면이에요. 실제 기록이 아니에요.</p></Reveal>
+      <p className="lx-sub">예시 데이터 · 후지</p></Reveal>
       <Reveal delay={120} className="lx-dash"><MiniCharts p={example.p} obs={[]} sel={60} maxDay={200} /></Reveal>
     </section>}
 
