@@ -30,11 +30,12 @@ async function loadDay(source: MarketAuctionSource, date: string, marketCode?: s
   if (!serviceKey) throw new Error('Missing auction source configuration');
   const geochangHall = source === 'origin-hall' && marketCode === ORIGIN_HALLS.geochang;
   const signal = AbortSignal.timeout(source === 'origin-hall' ? 8500 : 18000);
-  const query = {source, date, serviceKey, marketCode, signal, unfilteredHall: geochangHall};
+  const options = {date, serviceKey, marketCode, signal};
+  const query = source === 'origin-hall' ? {...options, source, unfilteredHall: geochangHall} : {...options, source};
   let day = await fetchMarketAuctionDay(query);
   // 거창사과원예농협 본점과 청과물종합처리장 사업자 번호를 순서대로 확인합니다.
   // 동일 공판장 자료가 두 번호에 연결되어도 한 번만 집계합니다.
-  if (geochangHall && !day.trades.length && !day.incompleteOrigins.length) {
+  if (query.source === 'origin-hall' && geochangHall && !day.trades.length && !day.incompleteOrigins.length) {
     day = await fetchMarketAuctionDay({...query, marketCode: '6118204840'});
   }
   const {trades, incompleteOrigins} = day;
