@@ -1,5 +1,6 @@
 [build]
-  command = "npm run build"
+  # Drop older compiler caches and pass the auction credentials only to the deployed server.
+  command = "rm -rf .next/cache/turbopack .netlify/.next/cache/turbopack && env -u AT_ORIGIN_AUCTION_SERVICE_KEY -u AT_WHOLESALE_AUCTION_SERVICE_KEY npm run build"
   publish = ".next"
 [build.environment]
   NODE_VERSION = "22"

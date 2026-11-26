@@ -1,0 +1,179 @@
+.apple-auction {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin-top: 18px;
+  padding: 14px;
+  color: #1c1c1e;
+}
+
+.apple-auction__heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(82px, 110px);
+  align-items: center;
+  gap: 12px;
+}
+
+.apple-auction__heading h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.apple-auction__filter {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #4d5058;
+}
+
+.apple-auction__filter select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid #ced0d6;
+  border-radius: 9px;
+  background: #fff;
+  color: #1c1c1e;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+}
+
+.apple-auction__filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+@media (max-width: 380px) {
+  .apple-auction__filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.apple-auction__market-filter {
+  margin-top: 12px;
+}
+
+.apple-auction__venue {
+  margin: 14px 0 3px;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+
+.apple-auction__meta,
+.apple-auction__note,
+.apple-auction__notice {
+  margin: 0;
+  color: #5e6068;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.apple-auction__note {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.apple-auction__note a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.apple-auction__notice {
+  margin-top: 10px;
+}
+
+.apple-auction__retry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 12px;
+}
+
+.apple-auction__retry button {
+  min-height: 44px;
+}
+
+.apple-auction__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: #f5f5f7;
+  overflow-wrap: anywhere;
+}
+
+.apple-auction__metrics dt {
+  color: #5e6068;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.apple-auction__metrics dd {
+  margin: 2px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.apple-auction__metrics strong {
+  font-size: clamp(17px, 4.2vw, 21px);
+  line-height: 1.25;
+}
+
+.apple-auction__metrics small,
+.apple-auction__history th small {
+  display: block;
+  color: #5e6068;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.apple-auction__history {
+  margin-top: 8px;
+  border-bottom: 1px solid #e5e5ea;
+}
+
+.apple-auction__history summary {
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 11px 0;
+  color: #26262a;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.apple-auction__history table {
+  width: 100%;
+  margin-bottom: 8px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.apple-auction__history td,
+.apple-auction__history th {
+  padding: 6px 3px;
+  border-top: 1px solid #e5e5ea;
+  text-align: right;
+}
+
+.apple-auction__history td:first-child,
+.apple-auction__history th:first-child {
+  width: 36%;
+  text-align: left;
+}
