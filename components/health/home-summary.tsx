@@ -15,6 +15,8 @@ import {WEATHER_STATIONS} from '@/lib/rda-weather';
 import {applePhoto} from '@/lib/photos';
 import {requestJson} from '@/components/lot-forms';
 import {MetricIcon, METRIC_COLOR, METRIC_LABEL} from '@/components/health/metric-icons';
+import AppleAuctionCard from '@/components/health/apple-auction-card';
+import {lotRegionId} from '@/lib/lot-region';
 
 // 3D 저장고는 요약 화면에서만 따로 불러옵니다(서버 렌더링 없음).
 const Storage3D = dynamic(() => import('@/components/health/storage-3d'), {ssr: false});
@@ -87,8 +89,9 @@ export default function HomeSummary({lots, loaded, error, retry, openLot, newLot
           <img src={applePhoto(l.id)} alt="" loading="lazy" /><b>{l.name || l.variety}</b><small><DayCount lot={l} /></small></button>)}</div></div>
         <div className="hs-today">{lot && <LotToday key={lot.id} lot={lot} openLot={openLot} />}</div>
         </div>
-        {can3d && !wide && (open3d ? <Storage3D items={items3d} onOpen={openLot} /> : <button type="button" className="s3d-open" onClick={() => setOpen3d(true)}><b>내 저장고 3D로 보기</b><small>보관 중인 사과를 저장고 모습으로 봐요</small></button>)}
       </>}
+    {loaded && <AppleAuctionCard region={lot ? lotRegionId(lot) : null} variety={lot?.variety} />}
+    {loaded && !error && active.length > 0 && can3d && !wide && (open3d ? <Storage3D items={items3d} onOpen={openLot} /> : <button type="button" className="s3d-open" onClick={() => setOpen3d(true)}><b>내 저장고 3D로 보기</b><small>보관 중인 사과를 저장고 모습으로 봐요</small></button>)}
   </div>;
 }
 
