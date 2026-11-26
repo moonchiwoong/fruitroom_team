@@ -61,6 +61,10 @@ try {
       ok(`${tag} 1 상세: 55.0 N 이날 실측 · 30일째 54.6 N · 단맛 출처 계산`);
       const shipLeft = (await page.locator('#ship-compare').count()) + ((await page.locator('main').innerText()).match(/출하 조건 비교|원\/kg/g)?.length ?? 0);
       show('상세의 출하 비교 흔적 수', shipLeft); assert.equal(shipLeft, 0);
+      assert.equal(await page.getByRole('button', {name: '캘린더에 추가', exact: true}).count(), 0);
+      assert.ok(await page.getByRole('region', {name: '다음 권장 측정일'}).isVisible());
+      assert.ok(await page.getByRole('button', {name: '측정 추가', exact: true}).isVisible());
+      ok(`${tag} 캘린더 버튼 제거 · 권장 측정일과 측정 추가 표시`);
       // ---- 6. 새로고침·뒤로 가기·직접 열기
       const urlBefore = page.url(); await page.reload(); await page.locator('.ma-detail h1').waitFor();
       show('새로고침 전/후 주소', `${new URL(urlBefore).hash} → ${new URL(page.url()).hash}`); show('새로고침 후 제목', await page.locator('.ma-detail h1').innerText());
