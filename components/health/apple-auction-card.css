@@ -263,3 +263,11 @@
 .gk-pt{outline:none;-webkit-tap-highlight-color:transparent}
 .gk-pt .gk-hit{fill:transparent}
 .gk-pt:focus-visible circle{stroke-width:3.5}
+/* 시세 타일 3칸 대칭: 이름·날짜 2줄 고정, 값과 ‘원’은 한 줄, 값은 칸 바닥에 맞춤 */
+.gk-head{flex-wrap:nowrap}.gk-head h3{min-width:0}.gk-head h3 span{display:inline-block}.gk-seg{flex:none}
+.gk-tile{display:flex;flex-direction:column}
+.gk-tile dt{flex-direction:column;flex-wrap:nowrap;justify-content:flex-start;gap:2px}
+.gk-tile dt small{display:block;min-height:1.3em;white-space:nowrap}
+.gk-tile dd{margin-top:auto;padding-top:6px;white-space:nowrap;overflow-wrap:normal}
+.gk-tile dd b{font-size:clamp(15px,4.6vw,20px);letter-spacing:-.3px}
+@media (max-width:380px){.gk-tile dd b{font-size:clamp(14px,4.4vw,17px)}}

@@ -8,13 +8,16 @@ const garak = {status: 'ready', variety: '후지', today: {date: '2026-11-26', p
 const browser = await chromium.launch({headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE_PATH, args: ['--no-sandbox']});
 const calls = [];
 try {
-  for (const [w, zoom] of [[1366, 1.1], [390, 1]]) {
+  for (const [w, zoom] of [[1366, 1.1], [390, 1], [360, 1]]) {
     const context = await browser.newContext({viewport: {width: Math.round(w / zoom), height: 900}, deviceScaleFactor: zoom, locale: 'ko-KR', timezoneId: 'Asia/Seoul', reducedMotion: 'reduce'});
     await installFixtures(context, {initialLots: lots});
     await context.route('**/api/market/**', r => { calls.push(new URL(r.request().url()).pathname); return r.request().url().includes('/garak') ? r.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify(garak)}) : r.fulfill({status: 404, body: '{}'}); });
     const page = await context.newPage(); await page.goto('http://127.0.0.1:3000/#home');
     const card = page.locator('section.apple-auction'); await card.locator('.gk-chart').waitFor({timeout: 30000});
     assert.equal(await card.getByText('내 산지 경매가').count(), 0);
+    const tops = await card.locator('.gk-tile dd').evaluateAll(es => es.map(e => [Math.round(e.getBoundingClientRect().top), Math.round(e.getBoundingClientRect().height)]));
+    assert.equal(new Set(tops.map(t => t[0])).size, 1, `시세 값 높이 맞춤 ${JSON.stringify(tops)}`);
+    assert.ok(tops.every(t => t[1] < 42), `값과 ‘원’ 한 줄 ${JSON.stringify(tops)}`);
     const box = await card.locator('.gk-chart svg').boundingBox();
     assert.ok(box.width <= 481 && box.height <= 211, `그래프 크기 ${box.width}x${box.height}`);
     assert.equal(await card.evaluate(e => e.scrollWidth > e.clientWidth + 1), false);
