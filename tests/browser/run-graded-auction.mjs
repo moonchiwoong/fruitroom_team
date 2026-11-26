@@ -1,0 +1,40 @@
+// 요약 화면 경매가 카드: 실시간(오늘) + 정산정보 등급별 정산가. 실제 aT API를 로컬 서버가 호출합니다(키는 환경변수).
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import {installFixtures, lots} from '../fixtures/browser-fixtures.mjs';
+const require = createRequire(import.meta.url), {chromium} = require('playwright');
+const base = 'http://127.0.0.1:3000';
+const browser = await chromium.launch({headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE_PATH, args: ['--no-sandbox']});
+const show = (label, text) => console.log(`    └ ${label}: ${String(text).replace(/\s+/g, ' ').trim().slice(0, 400)}`);
+const errors = [];
+try {
+  for (const width of [388, 1366]) {
+    const context = await browser.newContext({viewport: {width, height: 1000}, locale: 'ko-KR', timezoneId: 'Asia/Seoul', reducedMotion: 'reduce', deviceScaleFactor: 2});
+    await installFixtures(context, {initialLots: lots});
+    const market = [];
+    await context.route('**/api/market/**', r => { market.push(new URL(r.request().url()).pathname + new URL(r.request().url()).search.replace(/asOf=[^&]*&?/, '')); return r.continue(); });
+    const page = await context.newPage(); page.on('pageerror', e => errors.push(e.message));
+    const timing = [];
+    page.on('request', r => { if (r.url().includes('/graded?')) timing.push({start: Date.now()}); });
+    page.on('response', r => { if (r.url().includes('/graded?')) { const t = timing.at(-1); if (t) { t.ms = Date.now() - t.start; t.status = r.status(); } } });
+    const t0 = Date.now();
+    await page.goto(`${base}/#home`);
+    const card = page.locator('section.apple-auction');
+    await card.waitFor({timeout: 30000});
+    const graded = card.locator('.apple-auction__graded');
+    await graded.waitFor({timeout: 120000});
+    await graded.locator('table, .apple-auction__notice:not(:has-text("확인하고 있어요"))').first().waitFor({timeout: 120000});
+    show(`${width}px 카드까지 걸린 시간`, `${Math.round((Date.now() - t0) / 1000)}초`);
+    show('카드 내용', await card.innerText());
+    show('호출한 우리 서버 주소', market.filter(p => p.includes('graded')).join(' | '));
+    const rows = await graded.locator('table tbody tr').count();
+    show('등급 줄 수', rows); show('등급 자료 응답 시간', timing.map(t => `${t.status} ${t.ms}ms`).join(', '));
+    await card.scrollIntoViewIfNeeded();
+    await card.screenshot({path: `tests/browser/artifacts/graded-auction-${width}.png`});
+    const overflow = await card.evaluate(el => el.scrollWidth > el.clientWidth + 1);
+    assert.equal(overflow, false, '카드가 가로로 넘침');
+    console.log(`✓ ${width}px 경매가 카드: 실시간 + 등급별 정산가 표시, 가로 넘침 없음`);
+    await context.close();
+  }
+  assert.deepEqual(errors, []);
+} finally { await browser.close(); }

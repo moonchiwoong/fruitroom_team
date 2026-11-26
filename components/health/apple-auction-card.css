@@ -177,3 +177,16 @@
   width: 36%;
   text-align: left;
 }
+
+.apple-auction__part{margin:14px 0 2px;font-size:15px;font-weight:700;color:#191F28;display:flex;align-items:center;gap:6px}
+.apple-auction__part span{font-size:12px;font-weight:600;color:#4E5968;background:#F2F4F6;border-radius:999px;padding:2px 8px}
+.apple-auction__graded{margin-top:6px;border-top:1px solid #E5E8EB;padding-top:4px;display:grid;gap:8px;min-width:0}
+.apple-auction__grades{width:100%;border-collapse:collapse;table-layout:fixed;font-size:14px}
+.apple-auction__grades th,.apple-auction__grades td{padding:8px 4px;border-bottom:1px solid #F2F4F6;text-align:right;overflow-wrap:anywhere;vertical-align:top}
+.apple-auction__grades th:first-child{text-align:left;width:26%}
+.apple-auction__grades thead th{font-size:12px;font-weight:600;color:#6B7684}
+.apple-auction__grades small{display:block;font-size:11px;font-weight:400;color:#6B7684}
+.apple-auction__grades tbody th{font-weight:700;color:#191F28}
+.apple-auction__grades strong{color:#191F28}
+.apple-auction__range span{display:block;white-space:nowrap}
+@media (min-width:600px){.apple-auction__range span{display:inline}}
