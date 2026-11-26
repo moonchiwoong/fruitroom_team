@@ -20,12 +20,11 @@ export type MarketAuctionTrade = {
 export type MarketAuctionDay = {trades: MarketAuctionTrade[]; incompleteOrigins: string[]};
 
 type DayQuery = {
-  source: MarketAuctionSource;
   date: string;
   serviceKey: string;
   marketCode?: string;
   signal?: AbortSignal;
-};
+} & ({source: 'origin-hall'; unfilteredHall?: boolean} | {source: 'wholesale'; unfilteredHall?: never});
 
 type RecordFields = Record<string, unknown>;
 type AuctionPage = {rows: RecordFields[]; total: number; pageSize: number};
@@ -165,6 +164,18 @@ function fieldNames(row?: RecordFields | null): string[] | undefined {
   return row ? Object.keys(row).filter(key => /^[a-z][a-z0-9_]{0,39}$/.test(key)).slice(0, 48) : undefined;
 }
 
+function safeMarketCode(query: DayQuery): string | undefined {
+  return query.marketCode && /^\d{10}$/.test(query.marketCode) ? query.marketCode : undefined;
+}
+
+function logSourceSummary(query: DayQuery, rows: RecordFields[], apples: number, recognized: number, valid: number, methods: Set<string>) {
+  console.info('aT auction source summary', {
+    source: query.source, date: query.date, marketCode: safeMarketCode(query),
+    unfilteredHall: query.unfilteredHall === true, rows: rows.length, apples, recognized, valid,
+    methods: [...methods].sort(), fields: fieldNames(rows[0]),
+  });
+}
+
 function parsePage(content: unknown, page: number, httpStatus: number): AuctionPage {
   const envelope = record(content);
   const wrapped = record(envelope?.response);
@@ -201,8 +212,10 @@ function endpoint(query: DayQuery): URL {
   url.searchParams.set('serviceKey', /%[\da-f]{2}/i.test(key) ? decodeURIComponent(key) : key);
   url.searchParams.set('returnType', 'json');
   url.searchParams.set('numOfRows', String(PAGE_SIZE));
-  url.searchParams.set('cond[gds_lclsf_cd::EQ]', '06');
-  url.searchParams.set('cond[gds_mclsf_cd::EQ]', '01');
+  if (!query.unfilteredHall) {
+    url.searchParams.set('cond[gds_lclsf_cd::EQ]', '06');
+    url.searchParams.set('cond[gds_mclsf_cd::EQ]', '01');
+  }
   url.searchParams.set(`cond[${source.dateField}::EQ]`, query.source === 'origin-hall' ? query.date.replaceAll('-', '') : query.date);
   if (query.marketCode) url.searchParams.set(`cond[${source.marketField}::EQ]`, query.marketCode);
   if (query.source === 'wholesale') url.searchParams.set('selectable', WHOLESALE_FIELDS);
@@ -259,15 +272,19 @@ async function loadMarketAuctionDay(query: DayQuery): Promise<MarketAuctionDay> 
     }
   }
   if (rows.length !== first.total) throw new MarketAuctionSourceError({stage: 'pagination'});
-  if (rows.length === 0) return {trades: [], incompleteOrigins: []};
-
   const apples = rows.filter(isApple);
+  const methods = new Set<string>();
+  if (!rows.length || (query.unfilteredHall && !apples.length)) {
+    logSourceSummary(query, rows, 0, 0, 0, methods);
+    return {trades: [], incompleteOrigins: []};
+  }
   if (!apples.length || apples.every(row => !text(row.trd_se))) throw new MarketAuctionSourceError({stage: 'normalization', page: 1, fields: fieldNames(rows[0])});
   const trades: MarketAuctionTrade[] = [];
   const incompleteOrigins = new Set<string>();
   let auctionRows = 0;
   for (const row of apples) {
     const method = text(row.trd_se);
+    if (methods.size < 20 && (/^\d{1,2}$/.test(method) || (/^[가-힣() /·-]{1,22}$/.test(method) && /경매|경락|입찰|정가|수의|거래|자기계산|예약/.test(method)))) methods.add(method);
     if (!method) incompleteOrigins.add(cleanLabel(row.plor_nm));
     if (!isAuction(method)) continue;
     auctionRows++;
@@ -276,20 +293,17 @@ async function loadMarketAuctionDay(query: DayQuery): Promise<MarketAuctionDay> 
     else incompleteOrigins.add(cleanLabel(row.plor_nm));
   }
   if (auctionRows && !trades.length) throw new MarketAuctionSourceError({stage: 'normalization', page: 1, fields: fieldNames(rows[0])});
+  logSourceSummary(query, rows, apples.length, auctionRows, trades.length, methods);
   return {trades, incompleteOrigins: [...incompleteOrigins].filter(Boolean)};
 }
 
 /** 정산일로 자료를 조회하되 반환 날짜에는 확인된 낙찰일만 사용합니다. 서버 라우트에서 호출합니다. */
 export async function fetchMarketAuctionDay(query: DayQuery): Promise<MarketAuctionDay> {
   try {
-    const result = await loadMarketAuctionDay(query);
-    if (query.source === 'origin-hall' && result.trades.length) {
-      console.info('aT origin hall auction day available', {source: query.source, date: query.date, count: result.trades.length});
-    }
-    return result;
+    return await loadMarketAuctionDay(query);
   } catch (caught) {
     const error = caught instanceof MarketAuctionSourceError ? caught : new MarketAuctionSourceError({stage: 'normalization'});
-    console.warn('aT apple auction day unavailable', {source: query.source, date: isDate(query.date) ? query.date : undefined, ...error.failure});
+    console.warn('aT apple auction day unavailable', {source: query.source, date: isDate(query.date) ? query.date : undefined, marketCode: safeMarketCode(query), ...error.failure});
     throw error;
   }
 }
