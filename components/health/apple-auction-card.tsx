@@ -2,12 +2,21 @@
 
 import {useEffect, useId, useState} from 'react';
 import {requestJson} from '@/components/lot-forms';
-import type {AppleAuctionGroup, AppleAuctionsResponse} from '@/lib/apple-auction-types';
+import {APPLE_AUCTION_PARTS, type AppleAuctionGroup, type AppleAuctionsResponse} from '@/lib/apple-auction-types';
+import {mergeAppleAuctionGroups} from '@/lib/apple-auctions';
 import {isRegionKey, REGION_KEYS, REGIONS, type RegionKey} from '@/lib/regions';
+import {isDate, todayKST} from '@/lib/tracker';
 import './apple-auction-card.css';
 
 type Props = {region?: RegionKey | null; variety?: string | null};
-type RequestResult = {region: RegionKey; attempt: number; data: AppleAuctionsResponse | null};
+type RequestResult = {
+  region: RegionKey;
+  attempt: number;
+  groups: AppleAuctionGroup[];
+  checkedThrough: string;
+  complete: boolean;
+  partial: boolean;
+};
 
 const priceFormat = new Intl.NumberFormat('ko-KR', {maximumFractionDigits: 0});
 const weightFormat = new Intl.NumberFormat('ko-KR', {maximumFractionDigits: 3});
@@ -46,22 +55,41 @@ function AuctionCard({defaultRegion, variety}: {defaultRegion: RegionKey; variet
 
   useEffect(() => {
     const controller = new AbortController();
-    const params = new URLSearchParams({region});
-    requestJson<AppleAuctionsResponse>(`/api/market/apple-auctions?${params}`, {signal: controller.signal})
-      .then(data => {
-        if (!controller.signal.aborted) setResult({region, attempt, data});
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setResult({region, attempt, data: null});
-      });
+    const {signal} = controller;
+    async function load() {
+      let checkedThrough = todayKST();
+      let groups: AppleAuctionGroup[] = [];
+      let partial = false;
+      for (let part = 0; part < APPLE_AUCTION_PARTS; part++) {
+        if (signal.aborted) return;
+        const params = new URLSearchParams({region});
+        if (part > 0) {
+          params.set('part', String(part));
+          params.set('asOf', checkedThrough);
+        }
+        try {
+          const data = await requestJson<AppleAuctionsResponse>(`/api/market/apple-auctions?${params}`, {signal});
+          if (data.region !== region || !isDate(data.checkedThrough) || (part > 0 && data.checkedThrough !== checkedThrough)) {
+            throw new Error('Unexpected auction response');
+          }
+          checkedThrough = data.checkedThrough;
+          if (data.status === 'ready') groups = mergeAppleAuctionGroups(groups, data.groups.filter(group => group.days.length));
+          partial ||= data.partial || data.status === 'unavailable';
+        } catch {
+          partial = true;
+        }
+        if (signal.aborted) return;
+        setResult({region, attempt, groups, checkedThrough, partial, complete: part === APPLE_AUCTION_PARTS - 1});
+      }
+    }
+    void load();
     return () => controller.abort();
   }, [region, attempt]);
 
   const current = result?.region === region && result.attempt === attempt ? result : null;
-  const data = current?.data;
-  const groups = data?.status === 'ready' ? data.groups.filter(group => group.days.length) : [];
-  const loading = current === null;
-  const error = current !== null && (!data || data.status === 'unavailable' || data.region !== region);
+  const groups = current?.groups ?? [];
+  const loading = !current?.complete;
+  const hasGroups = groups.length > 0;
 
   return <section className="hs-card apple-auction" aria-labelledby={title}>
     <div className="apple-auction__heading">
@@ -79,17 +107,16 @@ function AuctionCard({defaultRegion, variety}: {defaultRegion: RegionKey; variet
         </select>
       </div>
     </div>
-    {loading ? <p className="apple-auction__notice" role="status">경매 자료를 불러오는 중이에요…</p>
-      : error ? <div className="apple-auction__retry">
-        <p className="apple-auction__notice" role="status">조회 자료를 불러오지 못했어요.</p>
+    {hasGroups && <AuctionResults key={JSON.stringify([region, attempt])} region={region} groups={groups} variety={variety} />}
+    {loading ? <p className="apple-auction__notice" role="status">{hasGroups ? '이전 거래일 자료를 더 확인하고 있어요…' : '경매 자료를 불러오는 중이에요…'}</p>
+      : current?.partial ? <div className="apple-auction__retry">
+        <p className="apple-auction__notice" role="status">{hasGroups ? '일부 시장 또는 거래일의 자료를 불러오지 못했어요.' : '조회 자료를 불러오지 못했어요.'}</p>
         <button className="hs-link" type="button" onClick={() => setAttempt(value => value + 1)}>다시 불러오기</button>
       </div>
-      : !groups.length ? <p className="apple-auction__notice" role="status">
+      : !hasGroups && <p className="apple-auction__notice" role="status">
         {REGIONS[region].label}산 사과의 최근 경매 자료를 확인하지 못했어요.
-        {data?.checkedThrough && <> 조회 기준일 <time dateTime={data.checkedThrough}>{data.checkedThrough}</time></>}
-      </p>
-      : <AuctionResults key={JSON.stringify([region, attempt])} region={region} groups={groups} variety={variety} />}
-    {!error && data?.partial && <p className="apple-auction__note">일부 시장의 자료는 아직 확인되지 않았어요.</p>}
+        {current?.checkedThrough && <> 조회 기준일 <time dateTime={current.checkedThrough}>{current.checkedThrough}</time></>}
+      </p>}
   </section>;
 }
 
