@@ -56,7 +56,7 @@ export default function GarakSummary({variety}: {variety?: string | null}) {
 
 function Tile({label, sub, p, live}: {label: string; sub?: string; p: TrendPoint | null; live?: boolean}) {
   return <div className={'gk-tile' + (live ? ' live' : '')}><dt>{label}<small>{sub ?? (p ? md(p.date) : '')}</small></dt>
-    <dd>{p ? <><b className="hs-num">{won.format(p.per10kg)}</b>원</> : <span>값 없음</span>}</dd></div>;
+    <dd>{p ? <><b className="hs-num">{won.format(p.per10kg)}</b>원</> : <span>{live ? '경매 진행 전' : '값 없음'}</span>}</dd></div>;
 }
 
 function Pct({label, v, none}: {label: string; v: number | null; none: string}) {
