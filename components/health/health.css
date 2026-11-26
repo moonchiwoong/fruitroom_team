@@ -468,3 +468,7 @@ html .hs .s3d{margin-top:16px}
 .cc .cc-measure{margin-top:4px}
 
 .dash-side{display:grid;gap:12px;align-content:start;min-width:0}
+/* 소비자 비교 카드가 없을 때(보관 끝남·계산 불가) 오른쪽 카드들이 전체 폭을 나눠 씀 */
+@media (min-width:1000px){
+  .dash-measurements:not(:has(> .cc)) > .dash-side{grid-column:1/-1;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+}
