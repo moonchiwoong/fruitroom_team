@@ -246,3 +246,9 @@
 .gk-chart{margin:0}.gk-chart figcaption{font-size:12px;font-weight:700;color:#636366;margin-bottom:2px}
 .gk-chart svg{width:100%;height:auto;display:block}
 @media (max-width:380px){.gk-tile dd b{font-size:17px}}
+.gk-why-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.gk-why-btns button{border:1px solid #F7C1C1;background:#fff;color:#A32D2D;border-radius:999px;min-height:36px;padding:0 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.gk-why-btns button.on{background:#FCEBEB}
+.gk-why{margin-top:8px;background:#FFF6E0;border-radius:10px;padding:10px 12px;display:grid;gap:4px}
+.gk-why b{font-size:13px;color:#7A4A00}.gk-why p{margin:0;font-size:14px;line-height:1.55;color:#1c1c1e}
+.gk-why a{font-size:12px;color:#636366;text-decoration:underline;text-underline-offset:2px}

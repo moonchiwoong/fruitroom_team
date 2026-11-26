@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {changePct, firstTradingDay, matchesVariety, realtimePoint, sameDayYearsAgo, settlementPoint} from '../lib/garak-trend';
+import {changePct, firstTradingDay, matchesVariety, realtimePoint, sameDayYearsAgo, settlementPoint, weekPoint} from '../lib/garak-trend';
 
 const row = (o: object) => ({date: '2026-11-25', marketCode: '110001', marketName: '서울가락', origin: '경북 안동시', variety: '후지', grade: '특', size: '', packageName: '상자', unitWeightKg: 10, boxes: 10, amount: 300000, low: 1, high: 1, ...o});
 
@@ -21,4 +21,11 @@ test('변화율·같은 날짜·휴장일 건너뛰기', async () => {
   const seen: string[] = [];
   const p = await firstTradingDay('2025-11-30', 7, async d => { seen.push(d); return d === '2025-11-28' ? {date: d, per10kg: 1, kg: 1} : null; });
   assert.equal(p?.date, '2025-11-28'); assert.deepEqual(seen, ['2025-11-30', '2025-11-29', '2025-11-28']);
+});
+
+test('7일 평균: 거래 없는 날은 빼고 물량(kg) 가중 평균', () => {
+  // 금요일 39,320원·44,722kg + 토요일 21,876원·14,300kg → 가중 평균 35,094원(단순 평균 30,598원이 아님)
+  const w = weekPoint(2023, '2023-11-20', '2023-11-26', [null, {date: '2023-11-25', per10kg: 21876, kg: 14300}, {date: '2023-11-24', per10kg: 39320, kg: 44722}]);
+  assert.deepEqual(w, {year: 2023, from: '2023-11-20', to: '2023-11-26', per10kg: 35094, kg: 59022, days: 2});
+  assert.equal(weekPoint(2023, 'a', 'b', [null, null]), null);
 });
