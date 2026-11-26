@@ -80,7 +80,7 @@ function Chart({v, points}: {v: TrendVariety; points: WeekPoint[]}) {
   const sel = open !== null ? noted[open] : null;
   const anchor = (_i: number) => 'middle' as const;
   return <figure className="gk-chart">
-    <figcaption>연도별 이맘때 (같은 날짜까지 7일 평균, 원/10kg){noted.some(Boolean) ? ' · ⓘ를 누르면 이유가 나와요' : ''}</figcaption>
+    <figcaption>연도별 이맘때 (같은 날짜까지 7일 평균, 원/10kg){noted.some(Boolean) && <span className="gk-hint">ⓘ를 누르면 이유가 나와요</span>}</figcaption>
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={points.map(p => `${p.year}년 ${won.format(p.per10kg)}원`).join(', ')}>
       <line x1={L} x2={W - R} y1={H - B + 4} y2={H - B + 4} stroke="#E5E8EB" />
       <polyline fill="none" stroke="#E5322D" strokeWidth="2.2" strokeLinejoin="round" points={points.map((p, i) => `${x(i)},${y(p.per10kg)}`).join(' ')} />

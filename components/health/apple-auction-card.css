@@ -269,3 +269,4 @@
 .gk-tile dd{margin-top:auto;padding-top:6px;white-space:nowrap;overflow-wrap:normal}
 .gk-tile dd b{font-size:clamp(15px,4.6vw,20px);letter-spacing:-.3px}
 @media (max-width:380px){.gk-tile dd b{font-size:clamp(14px,4.4vw,17px)}}
+.gk-hint{display:block;font-weight:500;color:#A32D2D;margin-top:2px}

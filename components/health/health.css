@@ -626,3 +626,6 @@ html .hs .s3d{margin-top:16px}
   .ts-stats>div{padding:8px}
   .ma-remind,.cc,.ts{min-width:0;overflow-wrap:anywhere}
 }
+/* 한 줄 요약 카드가 위 카드에 붙지 않게(폰) */
+.hs-today>.hs-hl{margin-top:12px}
+@media (min-width:1000px){.hs-today>.hs-hl{margin-top:0}}
