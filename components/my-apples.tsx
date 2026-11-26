@@ -16,7 +16,7 @@ import {AppleGraph, Apple3D} from '@/components/apple-graph';
 import MiniCharts from '@/components/mini-charts';
 import {weatherLabels, WEATHER_STATIONS} from '@/lib/rda-weather';
 import {lotRegionLabel} from '@/lib/lot-region';
-import {REMINDER_GAPS, nextMeasureDate, type ReminderGap} from '@/lib/measure-reminder';
+import {TARGET_PRESETS, checkTargetDate, targetIcs} from '@/lib/target-calendar';
 
 const NewApple = dynamic(() => import('@/components/new-apple'), {ssr: false, loading: () => <div className="loading-strip">여는 중…</div>});
 
@@ -208,7 +208,7 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
             {sortedObs.length > 3 && <button type="button" className="linkbtn" onClick={() => setAllRec(v => !v)}>{allRec ? '최근 3개만 보기' : `전체 ${sortedObs.length}개 보기`}</button>}</>
           : <p>아직 측정 기록이 없어요.</p>}
       </section>
-      {!lot.details?.archived_on && <NextMeasurement lot={lot} obs={obs} />}
+      {!lot.details?.archived_on && obs !== null && <TargetStorage lot={lot} p={p} maxDay={hongro ? 120 : 300} />}
     </div>
     {obs === null ? <p className="dash-chart ma-loading" role="status">측정 기록 확인 중…</p> : <>
       <div className="dash-chart only-mobile"><AppleGraph p={p} p0={p0} obs={obs} sel={sel} maxDay={hongro ? 120 : 200} target={lot.details?.firmness_target ?? null} /></div>
@@ -259,20 +259,34 @@ function SameDay({lot, obs, p, sel, hongro}: {lot: Lot; obs: Observation[]; p: R
   return <p className="ma-sameday" role="note">{md2(date)}에는 잰 값이 없어 차이를 표시하지 않아요{last ? ` · 최근 측정 ${md2(last.date)}` : ''}</p>;
 }
 
-/** 다음 권장 측정일을 보여 주고 측정 간격은 이 기기에만 기억합니다. */
-function NextMeasurement({lot, obs}: {lot: Lot; obs: Observation[] | null}) {
-  const [gap, setGap] = useState<ReminderGap>(21);
-  useEffect(() => { try { const g = Number(localStorage.getItem('appletrack:remind-gap')); if ((REMINDER_GAPS as readonly number[]).includes(g)) setGap(g as ReminderGap); } catch { /* 기본 21일 */ } }, []);
-  const today = todayKST();
-  const measured = (obs ?? []).filter(o => o.date <= today).map(o => o.date).sort().at(-1) ?? (lot.initial_measured_on && !weatherInitial(lot) ? lot.initial_measured_on : null);
-  const base = measured ?? storageStart(lot) ?? null;
-  const next = nextMeasureDate(base, gap, today);
-  if (!next) return null;
+/** 농가가 고른 목표 저장일의 계산값을 보여 주고 캘린더 일정(.ics)으로 내려 줍니다. 고른 날은 이 기기에만 기억합니다. */
+function TargetStorage({lot, p, maxDay}: {lot: Lot; p: ReturnType<typeof lotPredictor>; maxDay: number}) {
+  const key = `appletrack:target-date:${lot.id}`;
+  const start = storageStart(lot) ?? null, today = todayKST();
+  const [date, setDate] = useState('');
+  useEffect(() => { try { const v = localStorage.getItem(key); setDate(v && isDate(v) ? v : ''); } catch { setDate(''); } }, [key]);
+  const pick = (d: string) => { setDate(d); try { if (d) localStorage.setItem(key, d); else localStorage.removeItem(key); } catch { /* 이번만 */ } };
+  if (!start || !isDate(start)) return null;
   const md2 = (d: string) => `${+d.slice(5, 7)}월 ${+d.slice(8, 10)}일`;
-  return <section className="ma-remind dash-card" aria-label="다음 권장 측정일">
-    <h2>다음 권장 측정일</h2>
-    <p>{measured ? `마지막으로 잰 날 ${md2(measured)}` : `저장 시작 ${md2(base!)} · 아직 잰 기록 없음`} 기준</p>
-    <div className="ma-remind-gaps" role="radiogroup" aria-label="측정 간격">{REMINDER_GAPS.map(g => <button key={g} type="button" role="radio" aria-checked={gap === g} className={gap === g ? 'on' : ''} onClick={() => { setGap(g); try { localStorage.setItem('appletrack:remind-gap', String(g)); } catch { /* 이번만 */ } }}>{g}일마다</button>)}</div>
-    <p className="ma-remind-date"><b>{md2(next.date)}</b>{next.overdue ? ' · 권장 날짜가 지나 내일로 잡았어요' : ''}</p>
+  const chk = date ? checkTargetDate(start, date, today, maxDay) : null;
+  const q = chk?.ok ? (['firmness', 'brix'] as const).map(m => { const r = p.at(m, chk.day); return r.ok ? `${SHORT[m]} ${fmtNum(r.value, metricMeta[m].digits)} ${metricMeta[m].unit}` : null; }).filter((x): x is string => !!x) : [];
+  const save = () => {
+    if (!chk?.ok) return;
+    const ics = targetIcs({lotId: lot.id, lotName: lot.name || '내 사과', date, day: chk.day, quality: q.join(' · ') || undefined, url: `${location.origin}/#lot/${lot.id}`});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([ics], {type: 'text/calendar;charset=utf-8'}));
+    a.download = `appletrack-target-${date}.ics`; document.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(a.href); }, 1000);
+  };
+  return <section className="ma-remind dash-card" aria-label="목표 저장일">
+    <h2>목표 저장일</h2>
+    <p>언제까지 저장할지 고르면 그날 계산값을 보여 주고, 캘린더에 일정으로 넣을 수 있어요. 일수는 저장 시작일({md2(start)})부터 센 날이에요.</p>
+    <div className="ma-remind-gaps" role="radiogroup" aria-label="저장 일수로 고르기">{TARGET_PRESETS.filter(d => d <= maxDay).map(d => { const v = addDays(start, d); return <button key={d} type="button" role="radio" aria-checked={date === v} className={date === v ? 'on' : ''} onClick={() => pick(v)}>{d}일</button>; })}</div>
+    <label className="ma-target-date">날짜로 고르기 <input type="date" min={addDays(today, 1)} max={addDays(start, maxDay)} value={date} aria-invalid={chk ? !chk.ok : undefined} onChange={e => pick(e.target.value)} /></label>
+    {chk && !chk.ok && <p className="ld-err" role="alert">{chk.reason}</p>}
+    {chk?.ok && <>
+      <p className="ma-remind-date"><b>{md2(date)}</b> · 저장 {chk.day}일째 · 오늘부터 {daysBetween(today, date)}일 뒤</p>
+      <p>{q.length ? `이날 계산값: ${q.join(' · ')}` : '이날은 계산 범위 밖이라 품질 값은 표시하지 않아요.'}</p>
+      <button type="button" className="ma-target-save" onClick={save}>캘린더에 일정 등록</button>
+      <p className="ma-target-note">휴대폰에서는 내려받은 파일을 열면 캘린더 앱에 추가돼요. 그날 오전 9시에 알림이 울려요.</p>
+    </>}
   </section>;
 }

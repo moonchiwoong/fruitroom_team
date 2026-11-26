@@ -62,7 +62,7 @@ try {
       const shipLeft = (await page.locator('#ship-compare').count()) + ((await page.locator('main').innerText()).match(/출하 조건 비교|원\/kg/g)?.length ?? 0);
       show('상세의 출하 비교 흔적 수', shipLeft); assert.equal(shipLeft, 0);
       assert.equal(await page.getByRole('button', {name: '캘린더에 추가', exact: true}).count(), 0);
-      assert.ok(await page.getByRole('region', {name: '다음 권장 측정일'}).isVisible());
+      assert.ok(await page.getByRole('region', {name: '목표 저장일'}).isVisible());
       assert.ok(await page.getByRole('button', {name: '측정 추가', exact: true}).isVisible());
       ok(`${tag} 캘린더 버튼 제거 · 권장 측정일과 측정 추가 표시`);
       // ---- 6. 새로고침·뒤로 가기·직접 열기

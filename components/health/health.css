@@ -392,10 +392,13 @@ html .hs .s3d{margin-top:16px}
 /* 다음 권장 측정일 */
 .ma-remind{display:grid;gap:8px}
 .ma-remind h2{margin:0;font-size:17px}.ma-remind p{margin:0;color:#4E5968;font-size:14px}
-.ma-remind-gaps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.ma-remind-gaps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
 .ma-remind-gaps button{border:1px solid #D1D6DB;background:#fff;border-radius:10px;padding:8px 0;font:inherit;font-size:14px;cursor:pointer;color:#191F28}
 .ma-remind-gaps button.on{border:2px solid #E5322D;background:#FDECEC;font-weight:700}
 .ma-remind-date b{font-size:20px;color:#191F28}
+.ma-target-date{display:grid;gap:4px;font-size:14px;color:#4E5968}.ma-target-date input{font:inherit;font-size:16px;padding:8px 10px;border:1px solid #D1D6DB;border-radius:10px;background:#fff;color:#191F28}
+.ma-target-save{justify-self:start;border:0;background:#E5322D;color:#fff;border-radius:10px;padding:10px 16px;font:inherit;font-size:15px;font-weight:700;cursor:pointer}
+.ma-remind p.ma-target-note{font-size:13px;color:#6B7684}
 /* 휴대폰: 저장 일수 버튼이 큰 글자에서도 한 줄로 */
 @media (max-width:720px){.ma-days{flex-wrap:nowrap!important;gap:2px}.ma-days button{min-width:0!important;flex:1 1 0;padding:0 2px!important;white-space:nowrap;font-size:13px}}
 /* 휴대폰: 본문 왼쪽 줄을 머리말 로고와 맞춤(바깥 여백 18px + 안쪽 16px이 겹쳐 34px로 들어가 있던 것) */
