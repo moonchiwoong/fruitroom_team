@@ -21,19 +21,22 @@ try {
     await page.goto(`${base}/#home`);
     const card = page.locator('section.apple-auction');
     await card.waitFor({timeout: 30000});
-    const graded = card.locator('.apple-auction__graded');
-    await graded.waitFor({timeout: 120000});
-    await graded.locator('table, .apple-auction__notice:not(:has-text("확인하고 있어요"))').first().waitFor({timeout: 120000});
+        await card.locator('.aa-grades').waitFor({timeout: 150000});
     show(`${width}px 카드까지 걸린 시간`, `${Math.round((Date.now() - t0) / 1000)}초`);
     show('카드 내용', await card.innerText());
     show('호출한 우리 서버 주소', market.filter(p => p.includes('graded')).join(' | '));
-    const rows = await graded.locator('table tbody tr').count();
+    const rows = await card.locator('.aa-grade').count();
     show('등급 줄 수', rows); show('등급 자료 응답 시간', timing.map(t => `${t.status} ${t.ms}ms`).join(', '));
+    assert.ok(rows > 0, '등급 줄이 있어야 함');
+    const varieties = await card.locator('select[id$="-variety"] option').evaluateAll(o => o.map(x => x.textContent.trim()));
+    show('품종 목록', varieties.join(', ')); assert.ok(varieties.every(v => ['후지', '부사', '후지(부사)', '홍로'].includes(v)));
     await card.scrollIntoViewIfNeeded();
     await card.screenshot({path: `tests/browser/artifacts/graded-auction-${width}.png`});
     const overflow = await card.evaluate(el => el.scrollWidth > el.clientWidth + 1);
     assert.equal(overflow, false, '카드가 가로로 넘침');
-    console.log(`✓ ${width}px 경매가 카드: 실시간 + 등급별 정산가 표시, 가로 넘침 없음`);
+    await card.locator('.aa-more > summary').click();
+    await card.screenshot({path: `tests/browser/artifacts/graded-auction-${width}-open.png`});
+    console.log(`✓ ${width}px 경매가 카드: 등급별 정산가 먼저·나머지 접기, 후지·홍로만, 가로 넘침 없음`);
     await context.close();
   }
   assert.deepEqual(errors, []);

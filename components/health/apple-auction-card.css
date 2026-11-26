@@ -190,3 +190,36 @@
 .apple-auction__grades strong{color:#191F28}
 .apple-auction__range span{display:block;white-space:nowrap}
 @media (min-width:600px){.apple-auction__range span{display:inline}}
+/* 요약형 경매가(정산 등급별 먼저, 나머지는 접기) */
+.aa-context{margin:10px 0 8px;font-size:14px;line-height:1.5;color:#3a3a3c;overflow-wrap:anywhere}
+.aa-context b{color:#1c1c1e}
+.aa-context-sub{display:block;font-size:12px;color:#8A8A8E}
+.aa-grades{list-style:none;margin:0;padding:0;display:grid}
+.aa-grade{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;padding:12px 0;border-top:1px solid #F2F2F7}
+.aa-grade:first-child{border-top:0}
+.aa-chip{min-width:40px;height:28px;padding:0 8px;border-radius:8px;display:grid;place-items:center;font-size:14px;font-weight:800;background:#F2F2F7;color:#3a3a3c;box-sizing:border-box}
+.aa-chip[data-grade="특"]{background:#FDECEC;color:#B4231F}
+.aa-chip[data-grade="상"]{background:#FFF3E0;color:#9A5B00}
+.aa-price{margin:0;font-size:15px;font-weight:700;color:#1c1c1e;display:flex;flex-wrap:wrap;align-items:baseline;gap:0 4px}
+.aa-price b{font-size:24px}
+.aa-price small{font-size:13px;font-weight:600;color:#8A8A8E}
+.aa-range{position:relative;height:6px;margin:8px 0 6px;border-radius:3px;background:#F2F2F7}
+.aa-range i{position:absolute;top:0;bottom:0;border-radius:3px;background:#F7B3B1}
+.aa-range em{position:absolute;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:#E5322D;box-shadow:0 0 0 2px #fff}
+.aa-sub{margin:0;font-size:13px;color:#636366;overflow-wrap:anywhere}
+.aa-wide{color:#9A5B00;font-weight:700}
+.aa-boxes{text-align:right;font-size:12px;color:#8A8A8E;white-space:nowrap}
+.aa-boxes b{display:block;font-size:15px;color:#3a3a3c}
+.aa-more{margin-top:12px;border-top:1px solid #F2F2F7;padding-top:4px}
+.aa-more>summary{min-height:44px;display:flex;align-items:center;font-size:15px;font-weight:700;color:var(--hs-acc,#E5322D);cursor:pointer;list-style:none}
+.aa-more>summary::-webkit-details-marker{display:none}
+.aa-more>summary::after{content:'';width:8px;height:8px;margin-left:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translateY(-2px);transition:transform .15s}
+.aa-more[open]>summary::after{transform:rotate(-135deg) translateY(-2px)}
+.aa-more-body{display:grid;gap:10px;padding-bottom:4px}
+.aa-live{background:#F7F7FA;border-radius:12px;padding:12px;display:grid;gap:4px}
+.aa-live-head{margin:0;display:flex;gap:6px;align-items:center;font-size:14px}
+.aa-live-head span{font-size:12px;font-weight:600;color:#636366;background:#fff;border-radius:999px;padding:1px 8px}
+.aa-live-val{margin:0;font-size:14px;font-weight:700;display:flex;flex-wrap:wrap;align-items:baseline;gap:0 4px}
+.aa-live-val b{font-size:22px}
+.aa-live-val small{font-size:12px;font-weight:500;color:#636366}
+@media (prefers-reduced-motion: reduce){.aa-more>summary::after{transition:none}}
