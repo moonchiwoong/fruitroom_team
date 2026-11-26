@@ -2,13 +2,12 @@
 // 로그인 후 홈 ‘요약’: 보관 중인 사과 → 고른 사과의 오늘 계산값 4가지 → 한 줄 요약.
 // 값은 lotPredictor(기존 식)만 씁니다. 작은 선도 그 식으로 계산한 0일~마지막 날 값입니다(예시 모양 없음).
 import {useEffect, useMemo, useState} from 'react';
-import Storage2D, {type StorageItem} from '@/components/health/storage-2d';
 import {josa} from '@/lib/josa';
 import type {Lot, Observation} from '@/lib/lot-types';
 import {lotPredictor, easyChange, latestObservation} from '@/lib/lot-predict';
 import {isHongroVariety} from '@/lib/cultivar';
 import {fmtNum, metricMeta, todayKST, type MetricId} from '@/lib/tracker';
-import {storageStart, lotReadiness, weatherInitial, quantityUnit} from '@/lib/lot-readiness';
+import {storageStart, lotReadiness, weatherInitial} from '@/lib/lot-readiness';
 import {daysBetween, isDate} from '@/lib/tracker';
 import {WEATHER_STATIONS} from '@/lib/rda-weather';
 import {applePhoto} from '@/lib/photos';
@@ -47,7 +46,6 @@ export default function HomeSummary({lots, loaded, error, retry, openLot, newLot
     return {l, day, loss, since, measured, status, tone, region: WEATHER_STATIONS[rid]?.label ?? null};
   }), [active]);
   const lot = active.find(l => l.id === selId) ?? active[0] ?? null;
-  const items3d = useMemo<StorageItem[]>(() => infos.map(x => ({id: x.l.id, name: x.l.name || x.l.variety, variety: x.l.variety, hongro: isHongroVariety(x.l.variety), day: x.day, tone: x.tone as StorageItem['tone'], status: x.status, temp: x.l.details?.storage_temperature ?? null, qty: x.l.quantity ?? null, unit: x.l.quantity ? quantityUnit(x.l) : null})), [infos]);
   return <div className="hs">
     <header className="hs-top"><div><p className="hs-date">{dateLabel()}</p><h1>요약</h1></div><button type="button" className="hs-avatar" aria-label="내 정보" onClick={openAccount}>{name.slice(0, 1) || '나'}</button></header>
     <div className="hs-sec"><h2>보관 중인 사과</h2>{loaded && !error && active.length > 0 && <button type="button" className="hs-link" onClick={newLot}>+ 저장 시작</button>}</div>
@@ -64,7 +62,6 @@ export default function HomeSummary({lots, loaded, error, retry, openLot, newLot
       </div>
       : <>
         <Kpis infos={infos} />
-        <Storage2D items={items3d} onOpen={openLot} />
         <div className="hs-dash">
         <section className="hs-table-wrap only-pc" aria-label="보관 중인 사과 한눈에"><table className="hs-table">
           <thead><tr><th>사과</th><th>저장</th><th>무게 감소 (오늘)</th><th>마지막 측정</th><th>상태</th></tr></thead>
@@ -112,14 +109,14 @@ function LotToday({lot, openLot}: {lot: Lot; openLot: (id: string) => void}) {
       // 계산할 수 없는 항목은 빈 카드 여러 장 대신 한 장으로 모아 보여 줍니다.
       const ready = ORDER.filter(m => p.at(m, today).ok), missing = ORDER.filter(m => !p.at(m, today).ok);
       const reasons = [...new Set(missing.map(m => p.at(m, today)).map(r => (r.ok ? '' : r.reason) || '계산에 필요한 값이 없어요.'))];
-      const none = <div className={'hs-card hs-none' + (ready.length ? ' slim' : '')}>
+      const none = <div className={'hs-card hs-none' + (ready.length ? ' slim in-grid' + (ready.length % 2 === 0 ? ' wide' : '') : '')}>
         <b>{ready.length ? `${josa(missing.map(m => METRIC_LABEL[m]).join('·'), '은는')} 아직 계산 없음` : '아직 계산할 수 있는 값이 없어요'}</b>
         <ul>{reasons.map(x => <li key={x}>{x}</li>)}</ul>
         {!ready.length && <button type="button" className="hs-btn" onClick={() => openLot(lot.id)}>측정 기록 넣으러 가기</button>}
       </div>;
       return <>
-        {ready.length > 0 && <div className="hs-grid">{ready.map(m => <MetricCard key={m} m={m} p={p} day={today} maxDay={maxDay} measuredToday={m !== 'loss' && today === p.todayDay && !obsErr && !!latestObservation(obs, m, todayKST())} onOpen={() => openLot(lot.id)} />)}</div>}
-        {missing.length > 0 && none}
+        {ready.length > 0 && <div className="hs-grid">{ready.map(m => <MetricCard key={m} m={m} p={p} day={today} maxDay={maxDay} measuredToday={m !== 'loss' && today === p.todayDay && !obsErr && !!latestObservation(obs, m, todayKST())} onOpen={() => openLot(lot.id)} />)}{missing.length > 0 && none}</div>}
+        {!ready.length && none}
       </>;
     })()}
     {obsErr && <p className="hs-note warn" role="alert">측정 기록을 불러오지 못해 실측을 반영하지 않은 계산값이에요. 잠시 뒤 다시 열어 주세요.</p>}
