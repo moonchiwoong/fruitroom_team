@@ -65,9 +65,7 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
 
   // 넓은 화면·마우스 사용이면 실제 3D 사과를 천천히 돌리고, 마우스를 따라 무대가 살짝 기웁니다(움직임 줄이기 설정이면 끔).
   const [wide3d, setWide3d] = useState(false);
-  // 사과는 화면 크기와 상관없이 팀이 만든 3D 모델(apple-web.glb)만 보여 줍니다. 움직임 줄이기 설정이면 돌리지 않습니다.
-  const [still, setStill] = useState<boolean | null>(null);
-  useEffect(() => { const q = window.matchMedia('(prefers-reduced-motion: reduce)'); const f = () => setStill(q.matches); f(); q.addEventListener('change', f); return () => q.removeEventListener('change', f); }, []);
+  // 사과는 화면 크기와 상관없이 팀이 만든 3D 모델(apple-web.glb)만 보여 주고, 천천히 돌립니다.
   useEffect(() => { const q = window.matchMedia('(min-width: 861px) and (pointer: fine) and (prefers-reduced-motion: no-preference)'); const f = () => setWide3d(q.matches); f(); q.addEventListener('change', f); return () => q.removeEventListener('change', f); }, []);
   const tilt = (e: React.PointerEvent<HTMLDivElement>) => { if (!wide3d) return; const r = e.currentTarget.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5; e.currentTarget.style.setProperty('--rx', `${(-y * 4).toFixed(2)}deg`); e.currentTarget.style.setProperty('--ry', `${(x * 5).toFixed(2)}deg`); };
   const untilt = (e: React.PointerEvent<HTMLDivElement>) => { e.currentTarget.style.setProperty('--rx', '0deg'); e.currentTarget.style.setProperty('--ry', '0deg'); };
@@ -84,7 +82,7 @@ export default function Landing({recovery = false, onRecovered}: {recovery?: boo
       </section>
       <div className="lh-stage" aria-hidden="true" onPointerMove={tilt} onPointerLeave={untilt}>
         <div className="lh-ring" />
-        <div className="lh-apple lh-up lh-d2"><HeroApple3D rotate={still === false} /></div>
+        <div className="lh-apple lh-up lh-d2"><HeroApple3D /></div>
         {cards.map(([m, t], i) => <div key={m} className={`lh-card lh-c${i} lh-up lh-d${i + 2}`}><div className={motion ? 'lh-float' : ''}><span className="hs-lab" style={{color: METRIC_COLOR[m]}}><MetricIcon m={m} />{METRIC_LABEL[m]}</span><p>{t}</p></div></div>)}
       </div>
     </div>
@@ -342,6 +340,6 @@ function AuthCard({mode, setMode, onRecovered}: {mode: Mode; setMode: (m: Mode) 
 
 const AppleViewer3D = dynamic(() => import('@/components/quality-apple-viewer'), {ssr: false, loading: () => <div className="lh-apple-wait" aria-hidden="true" />});
 const NO_METRIC = {ok: false, value: null, unit: ''};
-function HeroApple3D({rotate}: {rotate: boolean}) {
-  return <AppleViewer3D bare autoRotate={rotate} day={0} cultivar="후지" metrics={{firmness: NO_METRIC, brix: NO_METRIC, acidity: NO_METRIC, loss: {...NO_METRIC, unit: '%'}}} />;
+function HeroApple3D() {
+  return <AppleViewer3D bare gentleRotate day={0} cultivar="후지" metrics={{firmness: NO_METRIC, brix: NO_METRIC, acidity: NO_METRIC, loss: {...NO_METRIC, unit: '%'}}} />;
 }

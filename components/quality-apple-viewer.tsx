@@ -34,6 +34,8 @@ export type QualityAppleViewerProps = {
   bare?: boolean;
   /** 첫 화면 장식용: 천천히 저절로 돌고, 확대·축소는 막습니다. 움직임 줄이기 설정이면 돌지 않습니다. */
   autoRotate?: boolean;
+  /** 첫 화면용: 움직임 줄이기 설정이어도 아주 천천히 돌림 */
+  gentleRotate?: boolean;
 };
 
 const bytesCache = new Map<string, Promise<ArrayBuffer>>();
@@ -72,7 +74,7 @@ type MutableBody = {geometry: THREE.BufferGeometry; original: Float32Array; cent
 type ViewerApi = {controls: OrbitControls; camera: THREE.PerspectiveCamera; group: THREE.Group; bodies: MutableBody[]; update: (appearance: AppleAppearance) => void};
 
 /** The downloaded GLB is immutable; this viewer owns its parsed GPU resources. */
-export default function QualityAppleViewer({day, cultivar, metrics, modelUrl, compact = false, bare = false, autoRotate = false}: QualityAppleViewerProps) {
+export default function QualityAppleViewer({day, cultivar, metrics, modelUrl, compact = false, bare = false, autoRotate = false, gentleRotate = false}: QualityAppleViewerProps) {
   const mount = useRef<HTMLDivElement>(null), api = useRef<ViewerApi | null>(null);
   const loss = metrics.loss.ok && metrics.loss.value !== null ? metrics.loss.value : null;
   const appearance = appleAppearance(loss), appearanceRef = useRef(appearance);
@@ -108,7 +110,8 @@ export default function QualityAppleViewer({day, cultivar, metrics, modelUrl, co
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 0, 0); controls.enableDamping = true; controls.enablePan = false;
     controls.minDistance = 2.2; controls.maxDistance = 8; controls.minPolarAngle = 0.05; controls.maxPolarAngle = Math.PI - 0.05;
-    if (autoRotate && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { controls.autoRotate = true; controls.autoRotateSpeed = 1.6; }
+    if (gentleRotate) { controls.autoRotate = true; controls.autoRotateSpeed = 0.7; }
+    else if (autoRotate && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { controls.autoRotate = true; controls.autoRotateSpeed = 1.6; }
     if (autoRotate) controls.enableZoom = false;
     controls.saveState();
     scene.add(new THREE.HemisphereLight(0xffffff, 0x4d5b42, 2.3));
