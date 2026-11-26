@@ -2,6 +2,7 @@
 // 새 식이나 보정은 없습니다. 품질 예측 화면과 같은 입력(품종·보관·온도·1-MCP·초기값)을 씁니다.
 // 같은 항목을 초기값 이후에 직접 잰 기록이 있으면, 가장 최근 측정값에서 이어 계산합니다(식은 그대로, 출발점만 바뀜).
 import type {Lot, Observation} from './lot-types';
+import {harvestMonthError} from './harvest-window';
 import {formFromLot, firmnessToN, effectiveInitialMeasuredOn} from './tracker-form';
 import {predictQuality} from './quality-models';
 import {calculateHongroForm} from './hongro-tracker';
@@ -73,7 +74,10 @@ export function lotPredictor(lot: Lot, observations: Observation[] = [], overrid
   const latest = (m: 'firmness' | 'brix' | 'acidity') => latestObservation(observations.filter(o => o.id !== initialObsId && (!isDate(baseDate) || o.date >= baseDate)), m);
   const todayDay = isDate(start) ? daysBetween(start, todayKST()) : null;
 
+  // 수확일이 품종 수확 달 밖인 기존 기록은 계산하지 않습니다(기록은 지우지 않고, 정보 수정에서 고칠 수 있음).
+  const harvestErr = harvestMonthError(lot.variety, lot.harvest_date);
   function at(m: MetricId, day: number): LotPoint {
+    if (harvestErr) return {ok: false, reason: '수확일이 이 품종의 수확 달 밖이라 계산하지 않아요. 정보 수정에서 수확일을 확인해 주세요.'};
     if (!isDate(start)) return {ok: false, reason: '저장 시작일이 없어요.'};
     const base = {cultivar: form.variety, storage: (form.storage === '일반 저온' ? 'cold' : form.storage === 'CA' ? 'ca' : 'other') as 'cold' | 'ca' | 'other',
       temperature: num(form.temperature), mcp: (form.mcp === '처리' ? 'treated' : form.mcp === '미처리' ? 'untreated' : 'unknown') as 'treated' | 'untreated' | 'unknown',

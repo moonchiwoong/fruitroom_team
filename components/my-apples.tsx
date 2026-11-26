@@ -17,6 +17,8 @@ import MiniCharts from '@/components/mini-charts';
 import {weatherLabels, WEATHER_STATIONS} from '@/lib/rda-weather';
 import {lotRegionLabel} from '@/lib/lot-region';
 import {TARGET_PRESETS, checkTargetDate, targetIcs} from '@/lib/target-calendar';
+import {CONSUMER_BRIX, compareRow, lossKg, sugarNotes, sugarRef, summaryLine, type CompareRow} from '@/lib/consumer-compare';
+import {HARVEST_MONTHS, harvestCultivar, harvestMonthError} from '@/lib/harvest-window';
 
 const NewApple = dynamic(() => import('@/components/new-apple'), {ssr: false, loading: () => <div className="loading-strip">여는 중…</div>});
 
@@ -186,6 +188,8 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
         </div>
       </div>
       {(ready.status === 'unsupported' || ready.status === 'conditions') && <p className="ma-hint muted">{ready.title} · {ready.detail}</p>}
+      {harvestMonthError(lot.variety, lot.harvest_date) && (() => { const c = harvestCultivar(lot.variety)!, [a, b] = HARVEST_MONTHS[c], h = lot.harvest_date!;
+        return <p className="ma-hint warn" role="alert">수확일 {+h.slice(5, 7)}월 {+h.slice(8, 10)}일이 {c === 'hongro' ? '홍로' : '후지'} 수확 달({a}~{b}월) 밖이라 계산값을 보여 주지 않아요. 기록은 그대로 두었으니 ‘사과 정보 수정’에서 수확일을 확인해 주세요.</p>; })()}
       {waitSept && <p className="ma-hint warn">9월 강수량은 9월이 끝나야 집계돼서, 10월 1일부터 날씨로 자동 추정해요. 지금 당도나 단단함을 재서 ‘측정 추가’로 넣으면 바로 예측돼요.</p>}
       {override && <p className="ma-hint">{pend?.year}년 농업기상 자료로 처음 품질을 자동 추정했어요(실측 아님).</p>}
       {over && <p className="ma-hint warn">오늘은 저장 {p.todayDay}일째라 계산 범위({limit}일)를 넘었어요. 아래 날짜 버튼은 범위 안 날짜의 계산값이에요. 지금 상태는 직접 측정해 확인해 주세요.</p>}
@@ -209,6 +213,7 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
           : <p>아직 측정 기록이 없어요.</p>}
       </section>
       {!lot.details?.archived_on && obs !== null && <TargetStorage lot={lot} p={p} maxDay={hongro ? 120 : 300} />}
+      {!lot.details?.archived_on && obs !== null && <ConsumerCompare lot={lot} p={p} onMeasure={() => setMeasure(true)} />}
     </div>
     {obs === null ? <p className="dash-chart ma-loading" role="status">측정 기록 확인 중…</p> : <>
       <div className="dash-chart only-mobile"><AppleGraph p={p} p0={p0} obs={obs} sel={sel} maxDay={hongro ? 120 : 200} target={lot.details?.firmness_target ?? null} /></div>
@@ -285,8 +290,50 @@ function TargetStorage({lot, p, maxDay}: {lot: Lot; p: ReturnType<typeof lotPred
     {chk?.ok && <>
       <p className="ma-remind-date"><b>{md2(date)}</b> · 저장 {chk.day}일째 · 오늘부터 {daysBetween(today, date)}일 뒤</p>
       <p>{q.length ? `이날 계산값: ${q.join(' · ')}` : '이날은 계산 범위 밖이라 품질 값은 표시하지 않아요.'}</p>
+      {(() => { const b = p.at('brix', chk.day); if (!b.ok) return null; const n = sugarNotes(b.value, lot.variety); return <p className="cc-note">단맛: {n.range}{n.ref ? ` · ${n.ref}` : ''}</p>; })()}
       <button type="button" className="ma-target-save" onClick={save}>캘린더에 일정 등록</button>
       <p className="ma-target-note">휴대폰에서는 내려받은 파일을 열면 캘린더 앱에 추가돼요. 그날 오전 9시에 알림이 울려요.</p>
     </>}
+  </section>;
+}
+
+const DIR_TXT = {up: '▲ 높아짐', down: '▼ 낮아짐', same: '= 같음'} as const;
+const CC_LABEL: Record<CompareRow['metric'], string> = {brix: '당도', acidity: '산도', loss: '무게 감소'};
+
+/** 소비자 선호 당도와 지금 품질 대조 + ‘오늘부터 30일 뒤 → 60일 뒤’ 비교(기존 계산식 그대로, 판정·점수 없음). */
+function ConsumerCompare({lot, p, onMeasure}: {lot: Lot; p: ReturnType<typeof lotPredictor>; onMeasure: () => void}) {
+  const t = p.todayDay;
+  if (t === null || t < 0) return null;
+  const today = todayKST();
+  const md2 = (d: string) => `${+d.slice(5, 7)}월 ${+d.slice(8, 10)}일`;
+  const now = p.at('brix', t);
+  const rows = (['brix', 'acidity', 'loss'] as const).map(m => compareRow(m, p.at(m, t + 30), p.at(m, t + 60)));
+  const startKg = lot.details?.quantity_unit === 'kg' && typeof lot.quantity === 'number' && lot.quantity > 0 ? lot.quantity : null;
+  const summary = summaryLine(rows, startKg);
+  const ref = sugarRef(lot.variety);
+  const notes = now.ok ? sugarNotes(now.value, lot.variety) : null;
+  const unitOf = (m: CompareRow['metric']) => m === 'brix' ? ' °Brix' : '%';
+  return <section className="ma-remind dash-card cc" aria-label="소비자 선호와 비교">
+    <h2>소비자 선호와 비교</h2>
+    <div className="cc-now">
+      <p className="cc-now-val">오늘 단맛 {now.ok ? <><b>{fmtNum(now.value, metricMeta.brix.digits)}</b> °Brix</> : <span>계산 없음</span>}</p>
+      {notes ? <><p className="cc-note">{notes.range}</p>{notes.ref && <p className="cc-note">{notes.ref}</p>}</> : !now.ok && <p className="cc-note">{now.reason}</p>}
+      <div className="cc-band" aria-hidden="true">{now.ok && <i style={{left: `${Math.min(100, Math.max(0, (now.value - 10) / 8 * 100))}%`}} />}<span style={{left: `${(CONSUMER_BRIX.min - 10) / 8 * 100}%`, width: `${(CONSUMER_BRIX.max - CONSUMER_BRIX.min) / 8 * 100}%`}} /></div>
+      <p className="cc-scale" aria-hidden="true"><span>10</span><span>선호 {CONSUMER_BRIX.min}~{CONSUMER_BRIX.max}</span><span>18 °Brix</span></p>
+    </div>
+    <h3 className="cc-h">30일 더 보관하면</h3>
+    <p className="cc-when">오늘부터 30일 뒤({md2(addDays(today, 30))} · 저장 {t + 30}일째) → 60일 뒤({md2(addDays(today, 60))} · 저장 {t + 60}일째)</p>
+    {summary ? <p className="cc-summary">{summary}</p> : <p className="cc-note">비교할 값이 없어요.</p>}
+    <ul className="cc-rows">{rows.map(r => {
+      const k = r.metric === 'loss' ? lossKg(r, startKg) : null;
+      return <li key={r.metric}><span className="cc-lab">{CC_LABEL[r.metric]}</span>
+        {r.dir === null ? <span className="cc-na">비교할 값이 없어요</span> : <>
+          <span className="cc-val">{r.metric === 'loss' && k ? <>처음 100kg당 {fmtNum(k.per100.a, metricMeta.loss.digits)} → {fmtNum(k.per100.b, metricMeta.loss.digits)}kg{k.mine && <small>등록 물량 {fmtNum(startKg!, 0)}kg: {fmtNum(k.mine.a, metricMeta.loss.digits)} → {fmtNum(k.mine.b, metricMeta.loss.digits)}kg</small>}</>
+            : <>{fmtNum(r.a!, metricMeta[r.metric].digits)} → {fmtNum(r.b!, metricMeta[r.metric].digits)}{unitOf(r.metric)}</>}</span>
+          <span className={'cc-dir ' + r.dir}>{r.metric === 'loss' && r.dir === 'up' ? '▲ 더 줄어듦' : DIR_TXT[r.dir]}{r.metric === 'loss' && k ? (r.dir === 'up' ? ` · 추가 ${fmtNum(k.mine ? k.mine.extra : k.per100.extra, metricMeta.loss.digits)}kg` : '') : r.dir !== 'same' ? ` · ${r.diffText}` : ''}</span>
+        </>}</li>;
+    })}</ul>
+    <button type="button" className="ma-target-save cc-measure" onClick={onMeasure}>오늘 잰 당도 기록하기</button>
+    <p className="ma-target-note">선호 범위: <a href={CONSUMER_BRIX.url} target="_blank" rel="noreferrer">{CONSUMER_BRIX.source}</a>{ref && <> · 품종 기준: <a href={ref.url} target="_blank" rel="noreferrer">{ref.source}</a></>}. 무게 감소는 저장 시작 무게 대비 누적 감소율이에요. 기존 팀 계산식 결과이며 정확도 검증 전이고, 출하·품질 판정이 아니에요.</p>
   </section>;
 }

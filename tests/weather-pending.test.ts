@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {weatherPending, lotPredictor} from '../lib/lot-predict';
 import {predictAll} from '../lib/initial-quality';
 
-const fujiLot = (inputs: any, estimate: any = null) => ({id: 'f', name: 'f', variety: '후지', intake_date: '2026-09-25', storage_start_date: '2026-09-25', initial_measured_on: '2026-09-25', harvest_date: '2026-09-25',
+const fujiLot = (inputs: any, estimate: any = null) => ({id: 'f', name: 'f', variety: '후지', intake_date: '2026-10-25', storage_start_date: '2026-10-25', initial_measured_on: '2026-10-25', harvest_date: '2026-10-25',
   storage: '일반 저온', mcp: '미처리', firmness: null, brix: null, acidity: null, details: {initial_same_start: true, initial_source: '날씨 기반 추정', fuji_weather: {region: 'jangsu', year: 2026, inputs, estimate}}} as any);
 
 test('날씨 값이 비어 저장된 물량을 찾아낸다', () => {
