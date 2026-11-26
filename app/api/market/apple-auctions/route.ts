@@ -8,13 +8,13 @@ import {addDays, todayKST} from '@/lib/tracker';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 25;
 
-// 농넷에서 공판장 이름과 코드를 대조했고, 응답의 시장명도 확인합니다.
+// 공판장 조회와 사업자 정보에서 확인한 번호를 사용하고, 응답의 시장명도 확인합니다.
 const ORIGIN_HALLS: Partial<Record<RegionKey, string>> = {
-  geochang: '6118204840',
+  geochang: '6118200280',
   yeongju: '5128204505',
 };
 const HALL_NAMES: Record<string, RegExp> = {
-  '6118204840': /거창사과원(?:예)?(?:농협|농업협동조합|협)/,
+  '6118200280': /거창사과원(?:예)?(?:농협|농업협동조합|협)/,
   '5128204505': /풍기농(?:협|업협동조합)/,
 };
 const SETTLEMENT_WINDOWS = [[0, 1, 2], [3, 4, 5, 6], [7, 8, 9, 10], [11, 12, 13]] as const;
@@ -28,8 +28,16 @@ function sourceKey(source: MarketAuctionSource) {
 async function loadDay(source: MarketAuctionSource, date: string, marketCode?: string) {
   const serviceKey = sourceKey(source);
   if (!serviceKey) throw new Error('Missing auction source configuration');
-  const timeout = source === 'origin-hall' ? 7500 : 18000;
-  const {trades, incompleteOrigins} = await fetchMarketAuctionDay({source, date, serviceKey, marketCode, signal: AbortSignal.timeout(timeout)});
+  const geochangHall = source === 'origin-hall' && marketCode === ORIGIN_HALLS.geochang;
+  const signal = AbortSignal.timeout(source === 'origin-hall' ? 8500 : 18000);
+  const query = {source, date, serviceKey, marketCode, signal, unfilteredHall: geochangHall};
+  let day = await fetchMarketAuctionDay(query);
+  // 거창사과원예농협 본점과 청과물종합처리장 사업자 번호를 순서대로 확인합니다.
+  // 동일 공판장 자료가 두 번호에 연결되어도 한 번만 집계합니다.
+  if (geochangHall && !day.trades.length && !day.incompleteOrigins.length) {
+    day = await fetchMarketAuctionDay({...query, marketCode: '6118204840'});
+  }
+  const {trades, incompleteOrigins} = day;
   const hallName = marketCode ? HALL_NAMES[marketCode] : undefined;
   if (hallName && trades.some(trade => !hallName.test(trade.marketName.replace(/\s+/g, '')))) {
     throw new Error('Unexpected origin auction hall');
@@ -42,8 +50,8 @@ async function loadDay(source: MarketAuctionSource, date: string, marketCode?: s
 }
 
 // 같은 도매시장 원자료를 산지를 바꿀 때마다 다시 받지 않습니다.
-const recentDay = unstable_cache(loadDay, ['apple-auction-recent-day-v2'], {revalidate: 3600});
-const earlierDay = unstable_cache(loadDay, ['apple-auction-earlier-day-v2'], {revalidate: 86400});
+const recentDay = unstable_cache(loadDay, ['apple-auction-recent-day-v3'], {revalidate: 3600});
+const earlierDay = unstable_cache(loadDay, ['apple-auction-earlier-day-v3'], {revalidate: 86400});
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
