@@ -5,7 +5,7 @@ import {requestJson} from '@/components/lot-forms';
 import {APPLE_AUCTION_PARTS, type AppleAuctionGroup, type AppleAuctionsResponse} from '@/lib/apple-auction-types';
 import {mergeAppleAuctionGroups} from '@/lib/apple-auctions';
 import {isRegionKey, REGION_KEYS, REGIONS, type RegionKey} from '@/lib/regions';
-import {isDate, todayKST} from '@/lib/tracker';
+import {todayKST} from '@/lib/tracker';
 import './apple-auction-card.css';
 
 type Props = {region?: RegionKey | null; variety?: string | null};
@@ -56,33 +56,33 @@ function AuctionCard({defaultRegion, variety}: {defaultRegion: RegionKey; variet
   useEffect(() => {
     const controller = new AbortController();
     const {signal} = controller;
-    async function load() {
-      let checkedThrough = todayKST();
-      let groups: AppleAuctionGroup[] = [];
-      let partial = false;
+    const checkedThrough = todayKST();
+    const sources: AppleAuctionGroup['source'][] = ['wholesale'];
+    if (region === 'geochang' || region === 'yeongju') sources.unshift('origin-hall');
+    let groups: AppleAuctionGroup[] = [];
+    let partial = false;
+    let remaining = sources.length * APPLE_AUCTION_PARTS;
+
+    async function loadSource(source: AppleAuctionGroup['source']) {
       for (let part = 0; part < APPLE_AUCTION_PARTS; part++) {
         if (signal.aborted) return;
-        const params = new URLSearchParams({region});
-        if (part > 0) {
-          params.set('part', String(part));
-          params.set('asOf', checkedThrough);
-        }
+        const params = new URLSearchParams({region, source, part: String(part), asOf: checkedThrough});
         try {
           const data = await requestJson<AppleAuctionsResponse>(`/api/market/apple-auctions?${params}`, {signal});
-          if (data.region !== region || !isDate(data.checkedThrough) || (part > 0 && data.checkedThrough !== checkedThrough)) {
+          if (data.region !== region || data.checkedThrough !== checkedThrough || data.groups.some(group => group.source !== source)) {
             throw new Error('Unexpected auction response');
           }
-          checkedThrough = data.checkedThrough;
           if (data.status === 'ready') groups = mergeAppleAuctionGroups(groups, data.groups.filter(group => group.days.length));
           partial ||= data.partial || data.status === 'unavailable';
         } catch {
           partial = true;
         }
         if (signal.aborted) return;
-        setResult({region, attempt, groups, checkedThrough, partial, complete: part === APPLE_AUCTION_PARTS - 1});
+        remaining--;
+        setResult({region, attempt, groups, checkedThrough, partial, complete: remaining === 0});
       }
     }
-    void load();
+    for (const source of sources) void loadSource(source);
     return () => controller.abort();
   }, [region, attempt]);
 
@@ -108,7 +108,7 @@ function AuctionCard({defaultRegion, variety}: {defaultRegion: RegionKey; variet
       </div>
     </div>
     {hasGroups && <AuctionResults key={JSON.stringify([region, attempt])} region={region} groups={groups} variety={variety} />}
-    {loading ? <p className="apple-auction__notice" role="status">{hasGroups ? '이전 거래일 자료를 더 확인하고 있어요…' : '경매 자료를 불러오는 중이에요…'}</p>
+    {loading ? <p className="apple-auction__notice" role="status">{hasGroups ? '다른 시장과 이전 거래일 자료를 확인하고 있어요…' : '경매 자료를 불러오는 중이에요…'}</p>
       : current?.partial ? <div className="apple-auction__retry">
         <p className="apple-auction__notice" role="status">{hasGroups ? '일부 시장 또는 거래일의 자료를 불러오지 못했어요.' : '조회 자료를 불러오지 못했어요.'}</p>
         <button className="hs-link" type="button" onClick={() => setAttempt(value => value + 1)}>다시 불러오기</button>
@@ -122,7 +122,7 @@ function AuctionCard({defaultRegion, variety}: {defaultRegion: RegionKey; variet
 
 function AuctionResults({region, groups, variety}: {region: RegionKey; groups: AppleAuctionGroup[]; variety?: string | null}) {
   const filters = useId();
-  const [selectedId, setSelectedId] = useState(() => initialGroup(groups, variety).id);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = groups.find(group => group.id === selectedId) ?? initialGroup(groups, variety);
   const markets = [...new Map(groups.map(group => [marketKey(group), group])).values()];
   const market = marketKey(selected);
