@@ -96,6 +96,7 @@ export async function GET(request: Request) {
   const response: AppleAuctionsResponse = {status, region, groups, checkedThrough: baseDate, partial};
   return Response.json(response, {
     status: status === 'unavailable' ? 503 : 200,
-    headers: {'cache-control': partial || status === 'unavailable' ? 'no-store' : 'public, max-age=120, s-maxage=600'},
+    // 원자료만 캐시합니다. 응답은 산지, 거래처, 조회 구간마다 달라집니다.
+    headers: {'cache-control': 'no-store', 'netlify-cdn-cache-control': 'no-store'},
   });
 }
