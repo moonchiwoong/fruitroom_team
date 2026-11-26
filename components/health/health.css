@@ -491,3 +491,38 @@ html .hs .s3d{margin-top:16px}
 .cc-src summary::-webkit-details-marker{display:none}
 .cc-src summary::after{content:'▾';font-size:11px;transition:transform .15s}
 .cc-src[open] summary::after{transform:rotate(180deg)}
+/* 소비자 비교·목표 저장일 카드 간결판(시안 반영) */
+.cc-h,.ts-h{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.cc-h h2,.ts-h h2{margin:0}
+.ts-h small{font-size:12px;color:#8A8A8E;white-space:nowrap}
+.cc-pill{display:inline-block;font-size:12px;font-weight:700;font-style:normal;padding:3px 10px;border-radius:999px;white-space:nowrap}
+.cc-pill.in{background:#EAF3DE;color:#27500A}.cc-pill.low{background:#FAEEDA;color:#633806}.cc-pill.high{background:#E6F1FB;color:#0C447C}
+.cc-lab{margin:4px 0 0;font-size:12px;color:#8A8A8E}
+.cc-big{margin:0;display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 4px}
+.cc-big b{font-size:28px;font-weight:800;letter-spacing:-.5px;color:#1c1c1e}.cc-big small{font-size:13px;color:#636366}
+.cc-ref{margin-left:8px;font-size:12px;color:#636366}
+.cc-h3{display:flex;justify-content:space-between;align-items:baseline;margin:16px 0 4px;font-size:14px;font-weight:800}
+.cc-h3 .cc-when{font-size:12px;font-weight:500;color:#8A8A8E}
+.cc .cc-rows li{grid-template-columns:44px minmax(0,1fr) auto;align-items:center;gap:8px;padding:9px 0;font-size:13px}
+.cc-lab2{font-weight:700;color:#1c1c1e}
+.cc .cc-val{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc-tag{font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.cc-tag.same{background:#F2F2F7;color:#636366}.cc-tag.down{background:#FCEBEB;color:#A32D2D}.cc-tag.up{background:#FCEBEB;color:#A32D2D}.cc-tag.more{background:#E6F1FB;color:#0C447C}
+.cc-na{color:#8A8A8E;font-size:13px}
+.cc-measure-link{display:inline-flex;align-items:center;gap:4px;margin-top:8px;border:1px solid #F7C1C1;background:#fff;color:#A32D2D;border-radius:999px;min-height:34px;padding:0 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.ts-or{display:flex;align-items:center;gap:8px;margin:10px 0 6px;font-size:12px;color:#8A8A8E}
+.ts-or:before,.ts-or:after{content:'';flex:1;border-top:1px solid #EFEFF2}
+.ts-date{display:flex;align-items:center;gap:8px;min-height:44px;border:1px solid #D1D6DB;border-radius:10px;padding:0 10px 0 12px;color:#A32D2D;cursor:pointer}
+.ts-date b{font-size:14px;color:#1c1c1e;white-space:nowrap}
+.ts-date input{margin-left:auto;border:0!important;background:transparent!important;font:inherit;font-size:13px;color:#636366;min-width:0;max-width:150px;padding:0!important;height:auto!important;box-shadow:none!important}
+.ts-res{background:#F7F7FA;border-radius:12px;padding:12px 14px;margin-top:12px}
+.ts-day{margin:0;display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px}.ts-day b{font-size:20px;font-weight:800}.ts-day span{font-size:12px;color:#636366}
+.ts-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.ts-stats>div{background:#fff;border-radius:10px;padding:8px 10px;min-width:0}
+.ts-lab{display:flex;align-items:center;gap:6px;font-size:12px;color:#636366}.ts-lab .cc-pill{font-size:11px;padding:1px 6px}
+.ts-stats b{font-size:18px;font-weight:800}.ts-stats small{font-size:12px;color:#636366;margin-left:2px}
+.ts-none{margin:8px 0 0;font-size:13px;color:#636366}
+.ts-cta{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin-top:12px}
+.ts-cta .ma-target-save{display:inline-flex;align-items:center;gap:6px;font-size:14px}
+.ts-cta small{font-size:12px;color:#8A8A8E}
+.ts .ma-remind-gaps{margin-top:4px}

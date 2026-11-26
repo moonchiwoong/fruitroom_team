@@ -14,7 +14,7 @@ try {
     const cc = page.locator('section[aria-label="소비자 선호와 비교"]'), ts = page.locator('section[aria-label="목표 저장일"]');
     await cc.waitFor({timeout: 30000}); await ts.waitFor();
     assert.match(await cc.innerText(), /오늘 단맛/); assert.equal(await cc.getByRole('button', {name: '오늘 잰 당도 기록하기'}).count(), 0);
-    await ts.getByRole('radio').first().click(); assert.match(await ts.innerText(), /캘린더에 일정 등록/);
+    await ts.getByRole('radio').first().click(); assert.match(await ts.innerText(), /캘린더에 등록/);
     assert.equal(await page.getByRole('heading', {name: '사과 경매가'}).count(), 1);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     assert.equal(dataCalls.length, 0, '개인 데이터 API 호출 없음');

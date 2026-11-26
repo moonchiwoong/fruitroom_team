@@ -19,13 +19,13 @@ try {
     if (big) await page.locator('.big-text-toggle').first().click();
     const cc = page.locator('section[aria-label="소비자 선호와 비교"]'); await cc.waitFor({timeout: 20000});
     const ts = page.locator('section[aria-label="목표 저장일"]');
-    const before = {when: await cc.locator('.cc-when').innerText(), sum: await cc.locator('.cc-summary, .cc-note').first().innerText()};
+    const before = {when: await cc.locator('.cc-when').innerText()};
     show(`${tag} 카드`, await cc.innerText());
-    await ts.getByRole('radio', {name: '30일'}).click(); const n30 = await ts.locator('.cc-note').innerText().catch(() => '');
-    await ts.getByRole('radio', {name: '60일'}).click(); const n60 = await ts.locator('.cc-note').innerText().catch(() => '');
+    await ts.getByRole('radio', {name: '30일'}).click(); const n30 = await ts.locator('.ts-res').innerText().catch(() => '');
+    await ts.getByRole('radio', {name: '60일'}).click(); const n60 = await ts.locator('.ts-res').innerText().catch(() => '');
     show('목표일 30일 당도 대조', n30); show('목표일 60일 당도 대조', n60);
     assert.equal(await cc.locator('.cc-when').innerText(), before.when, '비교 기준(30일 뒤→60일 뒤)은 그대로');
-    assert.match(before.when, new RegExp(`오늘부터 30일 뒤\\(${+today.slice(5,7)}월|30일 뒤\\(`));
+    assert.match(before.when, /^\d{1,2}\/\d{1,2} → \d{1,2}\/\d{1,2}$/);
     // 측정 창: 날짜 오늘·당도 비어 있음, 취소하면 목표일 선택 유지
     await cc.getByRole('button', {name: '오늘 잰 당도 기록하기'}).click();
     await page.locator('#mf-date').waitFor();

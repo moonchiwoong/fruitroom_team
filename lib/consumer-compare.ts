@@ -18,6 +18,17 @@ export function sugarRef(variety: string | null | undefined): SugarRef | null {
 const r1 = (x: number) => Math.round(x * 10) / 10;
 
 /** 당도 한 값과 선호 범위·품종 기준 비교 문구(소수 첫째 자리 표시값 기준). */
+/** 카드 배지·짧은 기준 문구(소수 첫째 자리 표시값 기준). */
+export function sugarBadge(brix: number): {kind: 'in' | 'low' | 'high'; text: string} {
+  const b = r1(brix);
+  return b < CONSUMER_BRIX.min ? {kind: 'low', text: '선호보다 낮음'} : b > CONSUMER_BRIX.max ? {kind: 'high', text: '선호보다 높음'} : {kind: 'in', text: '선호 범위 안'};
+}
+export function sugarRefShort(brix: number, variety: string | null | undefined): string | null {
+  const ref = sugarRef(variety); if (!ref) return null;
+  const d = r1(r1(brix) - ref.value), name = ref.value === 14 ? '특 등급 기준' : '수확 최소 당도';
+  return `${name} ${fmtNum(ref.value, 1)} · ${d === 0 ? '같음' : `${d > 0 ? '+' : '−'}${fmtNum(Math.abs(d), 1)}`}`;
+}
+
 export function sugarNotes(brix: number, variety: string | null | undefined): {range: string; ref: string | null} {
   const b = r1(brix);
   const range = b < CONSUMER_BRIX.min ? `소비자 선호 범위(${CONSUMER_BRIX.min}~${CONSUMER_BRIX.max} °Brix)보다 낮아요`

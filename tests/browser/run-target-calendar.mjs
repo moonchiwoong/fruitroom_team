@@ -21,8 +21,8 @@ try {
     show('카드 처음', await card.innerText());
     await card.getByRole('radio', {name: '60일'}).click();
     const txt = await card.innerText(); show('60일 고른 뒤', txt);
-    assert.match(txt, /저장 60일째/); assert.match(txt, /이날 계산값: 단단함 [\d.]+ N/);
-    const [dl] = await Promise.all([page.waitForEvent('download'), card.getByRole('button', {name: '캘린더에 일정 등록'}).click()]);
+    assert.match(txt, /저장 60일째/); assert.match(txt, /단단함\s*[\d.]+\s*N/);
+    const [dl] = await Promise.all([page.waitForEvent('download'), card.getByRole('button', {name: '캘린더에 등록'}).click()]);
     const ics = (await readFile(await dl.path(), 'utf8')).replace(/\r\n /g, '');
     show('내려받은 파일 이름', dl.suggestedFilename()); assert.match(dl.suggestedFilename(), /^appletrack-target-\d{4}-\d{2}-\d{2}\.ics$/);
     show('파일 일정 시각', ics.match(/DTSTART;TZID[^\r\n]*/)?.[0]); show('파일 제목', ics.match(/SUMMARY:[^\r\n]*/)?.[0]);
@@ -32,7 +32,7 @@ try {
     await card.locator('input[type=date]').fill(today);
     const err = card.getByRole('alert'); await err.waitFor(); show('오늘 날짜 입력', await err.innerText());
     assert.match(await err.innerText(), /오늘 이후/);
-    assert.equal(await card.getByRole('button', {name: '캘린더에 일정 등록'}).count(), 0);
+    assert.equal(await card.getByRole('button', {name: '캘린더에 등록'}).count(), 0);
     // 새로고침해도 마지막으로 고른 값(오늘) 대신 기억한 값이 유지되는지: 다시 60일 고르고 새로고침
     await card.getByRole('radio', {name: '60일'}).click(); await page.reload(); await card.waitFor();
     show('새로고침 후 선택', await card.getByRole('radio', {checked: true}).innerText());
