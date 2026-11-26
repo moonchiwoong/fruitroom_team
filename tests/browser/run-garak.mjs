@@ -19,6 +19,9 @@ try {
     assert.ok(box.width <= 481 && box.height <= 211, `그래프 크기 ${box.width}x${box.height}`);
     assert.equal(await card.evaluate(e => e.scrollWidth > e.clientWidth + 1), false);
     assert.match(await card.locator('.gk-why').innerText(), /2026년 이맘때 값이 낮았던 이유/);
+    const dot = card.locator('.gk-chart svg g[role="button"]').last();
+    await dot.click(); assert.equal(await card.locator('.gk-why').count(), 0, 'ⓘ 눌러 닫힘');
+    await dot.click(); assert.match(await card.locator('.gk-why').innerText(), /이맘때 값이 (낮았던|높았던) 이유/, 'ⓘ 눌러 열림');
     assert.match(await card.innerText(), /전년 대비\(최근 7일 평균\) ▼ 33\.3%/);
     console.log(`✓ ${w}px(배율 ${zoom}) 서울가락 시세만 · 그래프 ${Math.round(box.width)}x${Math.round(box.height)} · 사유 칸`);
     await card.screenshot({path: `tests/browser/artifacts/garak-card-${w}.png`}); await context.close();

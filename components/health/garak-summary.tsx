@@ -81,11 +81,12 @@ function Chart({v, points}: {v: TrendVariety; points: WeekPoint[]}) {
   const sel = open !== null ? noted[open] : null;
   const anchor = (i: number) => (i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle');
   return <figure className="gk-chart">
-    <figcaption>연도별 이맘때 (같은 날짜까지 7일 평균, 원/10kg){noted.some(Boolean) ? ' · ⓘ를 누르면 이유가 나와요' : ''}</figcaption>
+    <figcaption>연도별 이맘때 (같은 날짜까지 7일 평균, 원/10kg){noted.some(Boolean) ? ' · ⓘ나 아래 버튼을 누르면 이유가 나와요' : ''}</figcaption>
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={points.map(p => `${p.year}년 ${won.format(p.per10kg)}원`).join(', ')}>
       <line x1={L} x2={W - R} y1={H - B + 4} y2={H - B + 4} stroke="#E5E8EB" />
       <polyline fill="none" stroke="#E5322D" strokeWidth="2.2" strokeLinejoin="round" points={points.map((p, i) => `${x(i)},${y(p.per10kg)}`).join(' ')} />
-      {points.map((p, i) => <g key={p.year}>
+      {points.map((p, i) => <g key={p.year} {...(noted[i] ? {role: 'button', tabIndex: 0, 'aria-label': `${p.year}년 가격 변동 이유 보기`, style: {cursor: 'pointer'}, onClick: () => setOpen(open === i ? null : i), onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(open === i ? null : i); } }} : {})}>
+        {noted[i] && <rect x={x(i) - 20} y={0} width="40" height={H} fill="transparent" />}
         <circle cx={x(i)} cy={y(p.per10kg)} r={i === points.length - 1 ? 4.5 : 3.5} fill={i === points.length - 1 ? '#E5322D' : '#fff'} stroke="#E5322D" strokeWidth="2" />
         <text x={x(i) + (i === points.length - 1 ? -7 : i === 0 ? 2 : 0)} y={y(p.per10kg) - 10} textAnchor={anchor(i)} fontSize="10" fontWeight={noted[i] || i === points.length - 1 ? 700 : 400} fill={noted[i] ? '#A32D2D' : '#4E5968'}>{(p.per10kg / 10000).toFixed(1)}만{noted[i] ? ' ⓘ' : ''}</text>
         <text x={x(i)} y={H - 4} textAnchor={anchor(i)} fontSize="10" fill="#8A8A8E">{p.year}</text>
