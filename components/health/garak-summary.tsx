@@ -92,7 +92,7 @@ function Chart({v, points}: {v: TrendVariety; points: WeekPoint[]}) {
       </g>)}
     </svg>
     {noted.some(Boolean) && <div className="gk-why-btns">{noted.map((n, i) => n && <button key={points[i].year} type="button" aria-expanded={open === i} className={open === i ? 'on' : ''} onClick={() => setOpen(open === i ? null : i)}>
-      {points[i].year}년 {n.pct > 0 ? '▲' : '▼'} {Math.abs(n.pct).toFixed(0)}% 이유</button>)}</div>}
+      {points[i].year}년 {n.pct > 0 ? '▲' : '▼'} {Math.abs(n.pct).toFixed(0)}%</button>)}</div>}
     {sel && open !== null && <div className="gk-why" role="note">
       <b>{points[open].year}년 이맘때 값이 {sel.pct > 0 ? '높았던' : '낮았던'} 이유</b>
       <p>{sel.note.text}</p>
