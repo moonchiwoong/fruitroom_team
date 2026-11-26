@@ -17,6 +17,8 @@ export type MarketAuctionTrade = {
   unitPrice: number;
 };
 
+export type MarketAuctionDay = {trades: MarketAuctionTrade[]; incompleteOrigins: string[]};
+
 type DayQuery = {
   source: MarketAuctionSource;
   date: string;
@@ -139,7 +141,8 @@ function trade(row: RecordFields, query: DayQuery): MarketAuctionTrade | null {
 }
 
 function parsePage(content: unknown, page: number): AuctionPage {
-  const response = record(record(content)?.response);
+  const envelope = record(content);
+  const response = record(envelope?.response) ?? envelope;
   const status = text(record(response?.header)?.resultCode);
   // 공공데이터포털 공통 응답 코드 03은 NODATA_ERROR입니다.
   if (status === '03') return {rows: [], total: 0, pageSize: PAGE_SIZE};
@@ -191,7 +194,7 @@ async function fetchPage(base: URL, page: number, signal: AbortSignal): Promise<
 }
 
 /** 정산일로 자료를 조회하되 반환 날짜에는 확인된 낙찰일만 사용합니다. 서버 라우트에서 호출합니다. */
-export async function fetchMarketAuctionDay(query: DayQuery): Promise<MarketAuctionTrade[]> {
+export async function fetchMarketAuctionDay(query: DayQuery): Promise<MarketAuctionDay> {
   if (!isDate(query.date) || !query.serviceKey.trim() || (query.source === 'origin-hall' && !query.marketCode)) {
     throw new MarketAuctionSourceError();
   }
@@ -217,12 +220,22 @@ export async function fetchMarketAuctionDay(query: DayQuery): Promise<MarketAuct
     }
   }
   if (rows.length !== first.total) throw new MarketAuctionSourceError();
-  if (rows.length === 0) return [];
+  if (rows.length === 0) return {trades: [], incompleteOrigins: []};
 
   const apples = rows.filter(isApple);
   if (!apples.length || apples.every(row => !text(row.trd_se))) throw new MarketAuctionSourceError();
-  const auctions = apples.filter(row => isAuction(text(row.trd_se)));
-  const verified = auctions.map(row => trade(row, query)).filter((row): row is MarketAuctionTrade => row !== null);
-  if (auctions.length && !verified.length) throw new MarketAuctionSourceError();
-  return verified;
+  const trades: MarketAuctionTrade[] = [];
+  const incompleteOrigins = new Set<string>();
+  let auctionRows = 0;
+  for (const row of apples) {
+    const method = text(row.trd_se);
+    if (!method) incompleteOrigins.add(cleanLabel(row.plor_nm));
+    if (!isAuction(method)) continue;
+    auctionRows++;
+    const normalized = trade(row, query);
+    if (normalized) trades.push(normalized);
+    else incompleteOrigins.add(cleanLabel(row.plor_nm));
+  }
+  if (auctionRows && !trades.length) throw new MarketAuctionSourceError();
+  return {trades, incompleteOrigins: [...incompleteOrigins].filter(Boolean)};
 }
