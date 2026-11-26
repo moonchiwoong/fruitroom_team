@@ -18,10 +18,12 @@ try {
     const box = await card.locator('.gk-chart svg').boundingBox();
     assert.ok(box.width <= 481 && box.height <= 211, `그래프 크기 ${box.width}x${box.height}`);
     assert.equal(await card.evaluate(e => e.scrollWidth > e.clientWidth + 1), false);
-    assert.match(await card.locator('.gk-why').innerText(), /2026년 이맘때 값이 낮았던 이유/);
+    assert.equal(await card.locator('.gk-why').count(), 0, '처음엔 아무 해도 고르지 않음');
+    assert.equal(await card.locator('.gk-chart svg circle[r="5"]').count(), 0, '처음엔 빨간 큰 점 없음');
     const dot = card.locator('.gk-chart svg g[role="button"]').last();
-    await dot.click(); assert.equal(await card.locator('.gk-why').count(), 0, 'ⓘ 눌러 닫힘');
-    await dot.click(); assert.match(await card.locator('.gk-why').innerText(), /이맘때 값이 (낮았던|높았던) 이유/, 'ⓘ 눌러 열림');
+    await dot.click(); assert.match(await card.locator('.gk-why').innerText(), /2026년 이맘때 값이 낮았던 이유/, 'ⓘ 눌러 열림');
+    assert.equal(await card.locator('.gk-chart svg circle[r="5"]').count(), 1, '고른 해에 빨간 점');
+    await dot.click(); assert.equal(await card.locator('.gk-why').count(), 0, 'ⓘ 다시 눌러 닫힘');
     assert.match(await card.innerText(), /전년 대비\(최근 7일 평균\) ▼ 33\.3%/);
     console.log(`✓ ${w}px(배율 ${zoom}) 서울가락 시세만 · 그래프 ${Math.round(box.width)}x${Math.round(box.height)} · 사유 칸`);
     await card.screenshot({path: `tests/browser/artifacts/garak-card-${w}.png`}); await context.close();

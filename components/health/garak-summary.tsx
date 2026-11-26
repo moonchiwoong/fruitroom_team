@@ -76,8 +76,7 @@ function Chart({v, points}: {v: TrendVariety; points: WeekPoint[]}) {
     const pct = prev && prev.year === p.year - 1 ? (p.per10kg - prev.per10kg) / prev.per10kg * 100 : null;
     return pct !== null && Math.abs(pct) >= NOTE_MIN_CHANGE && YEAR_NOTES[v][p.year] ? {pct, note: YEAR_NOTES[v][p.year]} : null;
   });
-  const last = [...noted.keys()].filter(i => noted[i]).at(-1);
-  const [open, setOpen] = useState<number | null>(last ?? null);
+  const [open, setOpen] = useState<number | null>(null);
   const sel = open !== null ? noted[open] : null;
   const anchor = (i: number) => (i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle');
   // 값 글자가 선과 겹치지 않게: 위·아래 자리 중 선이 덜 지나가는 쪽에 둡니다(같으면 위).
