@@ -69,10 +69,18 @@ export default function HomeSummary({lots, loaded, error, retry, openLot, newLot
   const items3d = useMemo<StorageItem[]>(() => infos.map(x => ({id: x.l.id, name: x.l.name || x.l.variety, variety: x.l.variety, hongro: isHongroVariety(x.l.variety), day: x.day, tone: x.tone as StorageItem['tone'], status: x.status, temp: x.l.details?.storage_temperature ?? null, qty: x.l.quantity ?? null, unit: x.l.details?.quantity_unit ?? null})), [infos]);
   return <div className="hs">
     <header className="hs-top"><div><p className="hs-date">{dateLabel()}</p><h1>요약</h1></div><button type="button" className="hs-avatar" aria-label="내 정보" onClick={openAccount}>{name.slice(0, 1) || '나'}</button></header>
-    <div className="hs-sec"><h2>보관 중인 사과</h2><button type="button" className="hs-link" onClick={newLot}>+ 저장 시작</button></div>
+    <div className="hs-sec"><h2>보관 중인 사과</h2>{loaded && !error && active.length > 0 && <button type="button" className="hs-link" onClick={newLot}>+ 저장 시작</button>}</div>
     {!loaded ? <p className="hs-note" role="status">내 사과를 불러오는 중이에요…</p>
       : error ? <p className="hs-note" role="alert">{error} <button type="button" className="hs-link" onClick={retry}>다시 불러오기</button></p>
-      : !active.length ? <div className="hs-card hs-empty"><b>아직 보관 중인 사과가 없어요.</b><p>저장을 시작한 사과를 등록하면 오늘 상태를 여기서 볼 수 있어요.</p><button type="button" className="hs-btn" onClick={newLot}>+ 저장 시작</button></div>
+      : !active.length ? <div className="hs-card hs-start">
+        <div className="hs-start-head"><b>아직 보관 중인 사과가 없어요</b><p>저장고에 넣은 사과를 등록하면 이 화면에서 오늘 상태를 바로 볼 수 있어요.</p></div>
+        <ol className="hs-steps">
+          <li><span className="hs-num">1</span><div><b>사과 등록</b><small>품종·산지·저장 시작일</small></div></li>
+          <li><span className="hs-num">2</span><div><b>처음 측정</b><small>단단함·단맛·신맛·무게</small></div></li>
+          <li><span className="hs-num">3</span><div><b>오늘 상태 확인</b><small>저장 일수별 계산값과 경매가</small></div></li>
+        </ol>
+        <div className="hs-start-actions"><button type="button" className="hs-btn" onClick={newLot}>+ 저장 시작</button><a className="hs-link" href="/try">예시 사과로 먼저 둘러보기 ›</a></div>
+      </div>
       : <>
         <Kpis infos={infos} />
         {can3d && wide && <Storage3D items={items3d} onOpen={openLot} />}
@@ -117,7 +125,20 @@ function LotToday({lot, openLot}: {lot: Lot; openLot: (id: string) => void}) {
   const f = p.at('firmness', today);
   return <>
     <div className="hs-sec"><h2>{lot.name || lot.variety} · {p.todayDay !== null && p.todayDay > maxDay ? `${maxDay}일째(계산 끝)` : '오늘'}</h2><button type="button" className="hs-link" onClick={() => openLot(lot.id)}>자세히</button></div>
-    <div className="hs-grid">{ORDER.map(m => <MetricCard key={m} m={m} p={p} day={today} maxDay={maxDay} measuredToday={m !== 'loss' && today === p.todayDay && !obsErr && !!latestObservation(obs, m, todayKST())} onOpen={() => openLot(lot.id)} />)}</div>
+    {(() => {
+      // 계산할 수 없는 항목은 빈 카드 여러 장 대신 한 장으로 모아 보여 줍니다.
+      const ready = ORDER.filter(m => p.at(m, today).ok), missing = ORDER.filter(m => !p.at(m, today).ok);
+      const reasons = [...new Set(missing.map(m => p.at(m, today)).map(r => (r.ok ? '' : r.reason) || '계산에 필요한 값이 없어요.'))];
+      const none = <div className={'hs-card hs-none' + (ready.length ? ' slim' : '')}>
+        <b>{ready.length ? `${josa(missing.map(m => METRIC_LABEL[m]).join('·'), '은는')} 아직 계산 없음` : '아직 계산할 수 있는 값이 없어요'}</b>
+        <ul>{reasons.map(x => <li key={x}>{x}</li>)}</ul>
+        {!ready.length && <button type="button" className="hs-btn" onClick={() => openLot(lot.id)}>측정 기록 넣으러 가기</button>}
+      </div>;
+      return <>
+        {ready.length > 0 && <div className="hs-grid">{ready.map(m => <MetricCard key={m} m={m} p={p} day={today} maxDay={maxDay} measuredToday={m !== 'loss' && today === p.todayDay && !obsErr && !!latestObservation(obs, m, todayKST())} onOpen={() => openLot(lot.id)} />)}</div>}
+        {missing.length > 0 && none}
+      </>;
+    })()}
     {obsErr && <p className="hs-note warn" role="alert">측정 기록을 불러오지 못해 실측을 반영하지 않은 계산값이에요. 잠시 뒤 다시 열어 주세요.</p>}
     {f.ok && <><div className="hs-sec"><h2>한 줄 요약</h2></div>
       <div className="hs-card hs-hl"><span className="hs-lab" style={{color: METRIC_COLOR.firmness}}><MetricIcon m="firmness" />{METRIC_LABEL.firmness}</span>
@@ -127,7 +148,7 @@ function LotToday({lot, openLot}: {lot: Lot; openLot: (id: string) => void}) {
           <Bar label={f.from === 'measured' && today === p.todayDay && latestObservation(obs, 'firmness', todayKST()) ? '오늘 실측' : f.from === 'measured' ? '오늘(측정값부터 계산)' : '오늘(계산)'} v={f.value} max={Math.max(f.first, f.value)} color="#C7C7CC" />
         </div>}
       </div></>}
-    <p className="hs-src">기존 팀 계산식 결과 · 정확도 검증 전 · 출하·안전 판정 아님</p>
+    {ORDER.some(m => p.at(m, today).ok) && <p className="hs-src">기존 팀 계산식 결과 · 정확도 검증 전 · 출하·안전 판정 아님</p>}
   </>;
 }
 
