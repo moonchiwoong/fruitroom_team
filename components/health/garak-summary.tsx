@@ -37,7 +37,7 @@ export default function GarakSummary({variety}: {variety?: string | null}) {
         <button key={x} type="button" role="radio" aria-checked={v === x} className={v === x ? 'on' : ''} onClick={() => setV(x)}>{x}</button>)}</div>
     </div>
     {!cur ? <p className="apple-auction__notice" role="status">서울가락 시세를 확인하고 있어요…</p>
-      : !d || d.status !== 'ready' ? <p className="apple-auction__notice" role="status">{cur.failed || d?.status === 'unavailable' ? '서울가락 시세를 불러오지 못했어요.' : `최근 서울가락에서 ${v} 경매 거래를 찾지 못했어요.`}</p>
+      : !d || d.status !== 'ready' ? <p className="apple-auction__notice" role="status">{cur.failed || d?.status === 'unavailable' ? '서울가락 시세를 불러오지 못했어요.' : `최근 서울가락에서 ${v} 경매 거래를 찾지 못했어요.`}{v === '홍로' && d?.status === 'empty' && <span className="gk-off">홍로는 추석 이후 9월 하순까지 수확되는 중생종이라, 이 시기엔 가락시장 거래가 거의 없어요. <a href="https://mafra.go.kr/bbs/home/793/571531/artclView.do" target="_blank" rel="noreferrer">출처: 농림축산식품부</a></span>}</p>
       : <>
         <dl className="gk-tiles">
           <Tile label="작년 이맘때" sub="7일 평균" p={asPoint(lastWeek)} />

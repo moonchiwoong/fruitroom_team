@@ -270,3 +270,4 @@
 .gk-tile dd b{font-size:clamp(15px,4.6vw,20px);letter-spacing:-.3px}
 @media (max-width:380px){.gk-tile dd b{font-size:clamp(14px,4.4vw,17px)}}
 .gk-hint{display:block;font-weight:500;color:#A32D2D;margin-top:2px}
+.gk-off{display:block;margin-top:6px;font-size:13px;color:#7A4A00;background:#FFF6E0;border-radius:10px;padding:10px 12px;line-height:1.55}.gk-off a{color:#636366;text-decoration:underline;margin-left:4px}
