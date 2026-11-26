@@ -190,7 +190,6 @@ body:has(.app-header) .site-footer-bottom,body:has(.app-header) .site-footer-leg
 .dash-wx{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;margin:0}
 .dash-wx div{display:flex;justify-content:space-between;gap:8px;font-size:13px;border-bottom:1px solid #F2F2F7;padding:4px 0}
 .dash-wx dt{color:var(--hx-sub)}.dash-wx dd{margin:0;font-weight:700}
-.dash-bottom{display:grid;gap:12px}
 .ma-dash .dash-title-row {
   display: flex;
   flex-wrap: wrap;
@@ -214,11 +213,13 @@ body:has(.app-header) .site-footer-bottom,body:has(.app-header) .site-footer-leg
 @media (min-width:1000px){
   .only-mobile{display:none!important}
   .dash-measurements {
-    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
     align-items: start;
   }
+  /* 최근 측정은 가로 전체, 그 아래 소비자 비교(왼쪽)·목표 저장일(오른쪽) */
+  .dash-measurements > .dash-rec { grid-column: 1 / -1; }
+
   .dash-measurements > :only-child { grid-column: 1 / -1; }
-  .ma-dash > .dash-bottom { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ma-dash .dash-tiles .ma-rows,.lp-dash .dash-tiles .ma-rows{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;background:none!important;padding:0!important}
   .ma-dash .dash-tiles .ma-row,.lp-dash .dash-tiles .ma-row{flex-direction:column;align-items:flex-start;background:#fff;border-radius:14px;padding:12px 14px;border:0!important;gap:6px;justify-content:flex-start}
   .ma-dash .dash-tiles .ma-row div,.lp-dash .dash-tiles .ma-row div{text-align:left}
@@ -246,7 +247,13 @@ body:has(.app-header) .site-footer-bottom,body:has(.app-header) .site-footer-leg
 .hs-tag{display:inline-block;font-size:12px;font-weight:700;padding:3px 8px;border-radius:999px;white-space:nowrap}
 .hs-tag.ok{background:#E8F5EC;color:#1F7A3A}.hs-tag.warn{background:#FFF1E6;color:#C2410C}.hs-tag.muted{background:#F0F0F3;color:#6E6E73}
 @media (min-width:1000px){
-  .hs-dash{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}
+  /* 표는 위에 가로 전체, 그 아래 ‘오늘’ 카드(왼쪽)와 한 줄 요약(오른쪽): 사과 수가 적어도 빈 공간이 생기지 않게 */
+  .hs-dash{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start}
+  .hs-today{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);column-gap:16px;grid-auto-flow:row dense;align-items:start}
+  .hs-today>*{grid-column:1/-1}
+  .hs-today>.hs-grid,.hs-today>.hs-none{grid-column:1;grid-row:span 3}
+  .hs-today>.hs-sum-h,.hs-today>.hs-hl,.hs-today>.hs-src{grid-column:2}
+  .hs-today>.hs-sum-h{margin-top:0}
   .hs-today>.hs-sec:first-child{margin-top:0}
   .hs-today .hs-grid{grid-template-columns:1fr 1fr}
 }
@@ -459,3 +466,5 @@ html .hs .s3d{margin-top:16px}
 .cc-dir{font-size:13px;font-weight:700;color:#4E5968}.cc-dir.down{color:#B4231F}.cc-dir.up{color:#1B64DA}
 .cc-na{color:#8A8A8E}
 .cc .cc-measure{margin-top:4px}
+
+.dash-side{display:grid;gap:12px;align-content:start;min-width:0}

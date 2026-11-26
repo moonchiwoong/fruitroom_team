@@ -140,7 +140,7 @@ function LotToday({lot, openLot}: {lot: Lot; openLot: (id: string) => void}) {
       </>;
     })()}
     {obsErr && <p className="hs-note warn" role="alert">측정 기록을 불러오지 못해 실측을 반영하지 않은 계산값이에요. 잠시 뒤 다시 열어 주세요.</p>}
-    {f.ok && <><div className="hs-sec"><h2>한 줄 요약</h2></div>
+    {f.ok && <><div className="hs-sec hs-sum-h"><h2>한 줄 요약</h2></div>
       <div className="hs-card hs-hl"><span className="hs-lab" style={{color: METRIC_COLOR.firmness}}><MetricIcon m="firmness" />{METRIC_LABEL.firmness}</span>
         <p>{josa(lot.name || lot.variety, '은는')} 저장 {today}일째, {easyChange('firmness', f.value, f.first, p.weather)}.</p>
         {f.first !== null && <div className="hs-bars">
