@@ -1,5 +1,6 @@
 [build]
-  command = "npm run build"
+  # The auction credentials are needed only by the deployed server. Keep them out of the compiler cache.
+  command = "env -u AT_ORIGIN_AUCTION_SERVICE_KEY -u AT_WHOLESALE_AUCTION_SERVICE_KEY npm run build"
   publish = ".next"
 [build.environment]
   NODE_VERSION = "22"
