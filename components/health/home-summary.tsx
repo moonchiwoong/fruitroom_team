@@ -122,7 +122,10 @@ function LotToday({lot, openLot}: {lot: Lot; openLot: (id: string) => void}) {
   if (obs === null) return <p className="hs-note" role="status">측정 기록 확인 중…</p>;
   if (!p) return <p className="hs-note">이 사과는 계산할 수 없어요.</p>;
   const today = p.todayDay !== null && p.todayDay >= 0 ? Math.min(p.todayDay, maxDay) : 0;
-  const f = p.at('firmness', today);
+  // 한 줄 요약: 처음보다 가장 많이 변한 항목(변화율 %, 무게 감소는 줄어든 % 그대로). 같으면 단단함→단맛→신맛→무게 순.
+  const change = (m: MetricId) => { const r = p.at(m, today); if (!r.ok) return -1; if (m === 'loss') return Math.abs(r.value); return r.first ? Math.abs((r.value - r.first) / r.first * 100) : -1; };
+  const hm = ORDER.reduce<MetricId | null>((best, m) => change(m) < 0 ? best : best === null || change(m) > change(best) ? m : best, null);
+  const f = hm ? p.at(hm, today) : p.at('firmness', today);
   return <>
     <div className="hs-sec"><h2>{lot.name || lot.variety} · {p.todayDay !== null && p.todayDay > maxDay ? `${maxDay}일째(계산 끝)` : '오늘'}</h2><button type="button" className="hs-link" onClick={() => openLot(lot.id)}>자세히</button></div>
     {(() => {
@@ -140,20 +143,20 @@ function LotToday({lot, openLot}: {lot: Lot; openLot: (id: string) => void}) {
       </>;
     })()}
     {obsErr && <p className="hs-note warn" role="alert">측정 기록을 불러오지 못해 실측을 반영하지 않은 계산값이에요. 잠시 뒤 다시 열어 주세요.</p>}
-    {f.ok && <><div className="hs-sec hs-sum-h"><h2>한 줄 요약</h2></div>
-      <div className="hs-card hs-hl"><span className="hs-lab" style={{color: METRIC_COLOR.firmness}}><MetricIcon m="firmness" />{METRIC_LABEL.firmness}</span>
-        <p>{josa(lot.name || lot.variety, '은는')} 저장 {today}일째, {easyChange('firmness', f.value, f.first, p.weather)}.</p>
-        {f.first !== null && <div className="hs-bars">
-          <Bar label={p.weather ? '수확 때(추정)' : '처음'} v={f.first} max={Math.max(f.first, f.value)} color={METRIC_COLOR.firmness} />
-          <Bar label={f.from === 'measured' && today === p.todayDay && latestObservation(obs, 'firmness', todayKST()) ? '오늘 실측' : f.from === 'measured' ? '오늘(측정값부터 계산)' : '오늘(계산)'} v={f.value} max={Math.max(f.first, f.value)} color="#C7C7CC" />
+    {hm && f.ok && <><div className="hs-sec hs-sum-h"><h2>한 줄 요약</h2></div>
+      <div className="hs-card hs-hl"><span className="hs-lab" style={{color: METRIC_COLOR[hm]}}><MetricIcon m={hm} />{METRIC_LABEL[hm]}<small className="hs-why">처음보다 가장 많이 변한 항목</small></span>
+        <p>{josa(lot.name || lot.variety, '은는')} 저장 {today}일째, {hm === 'loss' ? `무게가 약 ${fmtNum(f.value, 1)}% 줄었어요` : `${METRIC_LABEL[hm]} ${easyChange(hm, f.value, f.first, p.weather)}`}.</p>
+        {hm !== 'loss' && f.first !== null && <div className="hs-bars">
+          <Bar label={p.weather ? '수확 때(추정)' : '처음'} v={f.first} max={Math.max(f.first, f.value)} color={METRIC_COLOR[hm]} digits={metricMeta[hm].digits} />
+          <Bar label={f.from === 'measured' && today === p.todayDay && latestObservation(obs, hm, todayKST()) ? '오늘 실측' : f.from === 'measured' ? '오늘(측정값부터 계산)' : '오늘(계산)'} v={f.value} max={Math.max(f.first, f.value)} color="#C7C7CC" digits={metricMeta[hm].digits} />
         </div>}
       </div></>}
     {ORDER.some(m => p.at(m, today).ok) && <p className="hs-src">기존 팀 계산식 결과 · 정확도 검증 전 · 출하·안전 판정 아님</p>}
   </>;
 }
 
-function Bar({label, v, max, color}: {label: string; v: number; max: number; color: string}) {
-  return <div className="hs-bar"><span className="hs-num">{fmtNum(v, 1)}</span><div><i style={{width: `${Math.max(4, v / max * 100)}%`, background: color}} /><small>{label}</small></div></div>;
+function Bar({label, v, max, color, digits = 1}: {label: string; v: number; max: number; color: string; digits?: number}) {
+  return <div className="hs-bar"><span className="hs-num">{fmtNum(v, digits)}</span><div><i style={{width: `${Math.max(4, v / max * 100)}%`, background: color}} /><small>{label}</small></div></div>;
 }
 
 function MetricCard({m, p, day, maxDay, measuredToday, onOpen}: {m: MetricId; p: NonNullable<ReturnType<typeof lotPredictor>>; day: number; maxDay: number; measuredToday: boolean; onOpen: () => void}) {
