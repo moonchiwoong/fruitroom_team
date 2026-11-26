@@ -25,23 +25,24 @@ function sourceKey(source: MarketAuctionSource) {
     : process.env.AT_WHOLESALE_AUCTION_SERVICE_KEY)?.trim();
 }
 
-async function loadDay(source: MarketAuctionSource, date: string, marketCode?: string): Promise<RegionalAuctionTrade[]> {
+async function loadDay(source: MarketAuctionSource, date: string, marketCode?: string) {
   const serviceKey = sourceKey(source);
   if (!serviceKey) throw new Error('Missing auction source configuration');
-  const trades = await fetchMarketAuctionDay({source, date, serviceKey, marketCode, signal: AbortSignal.timeout(15000)});
+  const {trades, incompleteOrigins} = await fetchMarketAuctionDay({source, date, serviceKey, marketCode, signal: AbortSignal.timeout(15000)});
   const hallName = marketCode ? HALL_NAMES[marketCode] : undefined;
   if (hallName && trades.some(trade => !hallName.test(trade.marketName.replace(/\s+/g, '')))) {
     throw new Error('Unexpected origin auction hall');
   }
-  return trades.flatMap(trade => {
+  const mapped: RegionalAuctionTrade[] = trades.flatMap(trade => {
     const region = auctionOriginRegion(trade.origin);
     return region ? [{...trade, region, source}] : [];
   });
+  return {trades: mapped, incompleteRegions: [...new Set(incompleteOrigins.map(auctionOriginRegion))].filter(isRegionKey)};
 }
 
 // 같은 도매시장 원자료를 산지를 바꿀 때마다 다시 받지 않습니다.
-const recentDay = unstable_cache(loadDay, ['apple-auction-recent-day-v1'], {revalidate: 3600});
-const earlierDay = unstable_cache(loadDay, ['apple-auction-earlier-day-v1'], {revalidate: 86400});
+const recentDay = unstable_cache(loadDay, ['apple-auction-recent-day-v2'], {revalidate: 3600});
+const earlierDay = unstable_cache(loadDay, ['apple-auction-earlier-day-v2'], {revalidate: 86400});
 
 export async function GET(request: Request) {
   const region = new URL(request.url).searchParams.get('region');
@@ -69,8 +70,12 @@ export async function GET(request: Request) {
       (age < 3 ? recentDay : earlierDay)(source, addDays(today, -age), marketCode))));
     for (const result of results) {
       if (result.status === 'fulfilled') {
+        if (result.value.incompleteRegions.includes(region)) {
+          partial = true;
+          continue;
+        }
         successful++;
-        for (const trade of result.value) {
+        for (const trade of result.value.trades) {
           if (trade.region === region && trade.date <= today) trades.push(trade);
         }
       } else {
