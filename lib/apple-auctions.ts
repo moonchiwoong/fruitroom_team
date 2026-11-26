@@ -1,4 +1,4 @@
-import type {AppleAuctionGroup} from './apple-auction-types';
+import type {AppleAuctionDay, AppleAuctionGroup} from './apple-auction-types';
 import type {MarketAuctionSource, MarketAuctionTrade} from './market-auction-source';
 import {REGION_KEYS, REGIONS, type RegionKey} from './regions';
 
@@ -30,6 +30,16 @@ type GroupTotal = Omit<AppleAuctionGroup, 'days'> & {
   dailyTotals: Map<string, {quantity: number; amount: number}>;
 };
 
+const compareGroups = (a: AppleAuctionGroup, b: AppleAuctionGroup) =>
+  Number(b.source === 'origin-hall') - Number(a.source === 'origin-hall') ||
+  b.days[0].date.localeCompare(a.days[0].date) || b.days[0].totalWeightKg - a.days[0].totalWeightKg ||
+  a.marketName.localeCompare(b.marketName, 'ko') || a.variety.localeCompare(b.variety, 'ko');
+
+function auctionDay(date: string, quantity: number, totalAmount: number, unitWeightKg: number): AppleAuctionDay {
+  return {date, quantity, totalAmount, averagePrice: Math.round(totalAmount / quantity),
+    totalWeightKg: Math.round(quantity * unitWeightKg * 1000) / 1000};
+}
+
 export function groupAppleAuctions(trades: readonly RegionalAuctionTrade[], region: RegionKey): AppleAuctionGroup[] {
   const groups = new Map<string, GroupTotal>();
 
@@ -49,14 +59,29 @@ export function groupAppleAuctions(trades: readonly RegionalAuctionTrade[], regi
   }
 
   return [...groups.values()].map(({dailyTotals, ...group}) => {
-    const days = [...dailyTotals.entries()].sort(([a], [b]) => b.localeCompare(a)).slice(0, 5).map(([date, totals]) => ({
-      date,
-      averagePrice: Math.round(totals.amount / totals.quantity),
-      quantity: totals.quantity,
-      totalWeightKg: Math.round(totals.quantity * group.unitWeightKg * 1000) / 1000,
-    }));
+    const days = [...dailyTotals.entries()].sort(([a], [b]) => b.localeCompare(a)).slice(0, 5)
+      .map(([date, totals]) => auctionDay(date, totals.quantity, totals.amount, group.unitWeightKg));
     return {...group, days};
-  }).sort((a, b) => Number(b.source === 'origin-hall') - Number(a.source === 'origin-hall') ||
-    b.days[0].date.localeCompare(a.days[0].date) || b.days[0].totalWeightKg - a.days[0].totalWeightKg ||
-    a.marketName.localeCompare(b.marketName, 'ko') || a.variety.localeCompare(b.variety, 'ko'));
+  }).sort(compareGroups);
+}
+
+export function mergeAppleAuctionGroups(currentGroups: readonly AppleAuctionGroup[], partGroups: readonly AppleAuctionGroup[]): AppleAuctionGroup[] {
+  const groups = new Map(currentGroups.map(group => [group.id, group]));
+  for (const group of partGroups) {
+    const current = groups.get(group.id);
+    if (!current) {
+      groups.set(group.id, group);
+      continue;
+    }
+    const byDate = new Map(current.days.map(day => [day.date, day]));
+    for (const day of group.days) {
+      const previous = byDate.get(day.date);
+      byDate.set(day.date, previous
+        ? auctionDay(day.date, previous.quantity + day.quantity, previous.totalAmount + day.totalAmount, group.unitWeightKg)
+        : day);
+    }
+    const days = [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+    groups.set(group.id, {...group, days});
+  }
+  return [...groups.values()].sort(compareGroups);
 }
