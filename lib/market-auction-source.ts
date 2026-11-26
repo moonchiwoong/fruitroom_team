@@ -46,8 +46,14 @@ const SOURCES = {
 const PAGE_SIZE = 1_000;
 const MAX_PAGES = 30;
 const PAGE_CONCURRENCY = 4;
-const TIMEOUT_MS = 15_000;
+const TIMEOUT_MS = 20_000;
 const RESULT_CODES = new Set(['0', '00', '000', '01', '02', '03', '04', '05', '10', '11', '12', '20', '21', '22', '23', '29', '30', '31', '32', '33', '99']);
+// aT 공영도매시장 API 15141808의 selectable은 쉼표로 구분한 응답 컬럼을 받습니다.
+const WHOLESALE_FIELDS = [
+  'scsbd_dt', 'whsl_mrkt_cd', 'whsl_mrkt_nm', 'plor_nm',
+  'gds_mclsf_nm', 'gds_lclsf_cd', 'gds_mclsf_cd', 'gds_sclsf_nm', 'corp_gds_item_nm', 'corp_gds_vrty_nm',
+  'trd_se', 'grd_nm', 'pkg_nm', 'sz_nm', 'unit_nm', 'unit_qty', 'unit_tot_qty', 'qty', 'scsbd_prc', 'totprc',
+].join(',');
 
 type SourceFailure = {
   stage: 'configuration' | 'network' | 'timeout' | 'http' | 'gateway' | 'shape' | 'pagination' | 'normalization';
@@ -199,6 +205,7 @@ function endpoint(query: DayQuery): URL {
   url.searchParams.set('cond[gds_mclsf_cd::EQ]', '01');
   url.searchParams.set(`cond[${source.dateField}::EQ]`, query.source === 'origin-hall' ? query.date.replaceAll('-', '') : query.date);
   if (query.marketCode) url.searchParams.set(`cond[${source.marketField}::EQ]`, query.marketCode);
+  if (query.source === 'wholesale') url.searchParams.set('selectable', WHOLESALE_FIELDS);
   return url;
 }
 
@@ -215,6 +222,7 @@ async function fetchPage(base: URL, page: number, signal: AbortSignal): Promise<
       parsed = JSON.parse(raw);
     } catch {
       const code = resultCode(/<(?:returnReasonCode|resultCode|errCode)>\s*(\d{1,3})\s*</.exec(raw.slice(0, 4_096))?.[1]);
+      if (response.ok && code === '03') return {rows: [], total: 0, pageSize: PAGE_SIZE};
       throw new MarketAuctionSourceError({stage: code ? 'gateway' : response.ok ? 'shape' : 'http', page, httpStatus, resultCode: code});
     }
     return parsePage(parsed, page, httpStatus);
@@ -274,7 +282,11 @@ async function loadMarketAuctionDay(query: DayQuery): Promise<MarketAuctionDay> 
 /** 정산일로 자료를 조회하되 반환 날짜에는 확인된 낙찰일만 사용합니다. 서버 라우트에서 호출합니다. */
 export async function fetchMarketAuctionDay(query: DayQuery): Promise<MarketAuctionDay> {
   try {
-    return await loadMarketAuctionDay(query);
+    const result = await loadMarketAuctionDay(query);
+    if (query.source === 'origin-hall' && result.trades.length) {
+      console.info('aT origin hall auction day available', {source: query.source, date: query.date, count: result.trades.length});
+    }
+    return result;
   } catch (caught) {
     const error = caught instanceof MarketAuctionSourceError ? caught : new MarketAuctionSourceError({stage: 'normalization'});
     console.warn('aT apple auction day unavailable', {source: query.source, date: isDate(query.date) ? query.date : undefined, ...error.failure});
