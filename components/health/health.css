@@ -276,6 +276,8 @@ body:has(.app-header) .site-footer-bottom,body:has(.app-header) .site-footer-leg
   .lp-dash>*{grid-column:1/-1}
   .lp-dash>.dash-days{grid-area:days}.lp-dash>.dash-tiles{grid-area:tiles}.lp-dash>.dash-chart.only-pc{grid-area:chart}
   .lp-dash>.dash-side{grid-area:side;display:grid;gap:12px}
+  .lp-dash>.dash-side:empty{display:none}
+  .lp-dash:not(:has(>.dash-side>*))>.dash-chart.only-pc{grid-area:auto;grid-column:1/-1}
   .try-simple .try-tabs{max-width:420px}
 }
 /* 체험 화면: 머리말·본문을 상단 로고와 같은 선에 맞춤 */

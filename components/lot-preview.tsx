@@ -7,6 +7,7 @@ import {lotPredictor, easyChange, EASY_METRICS} from '@/lib/lot-predict';
 import {fmtNum, metricMeta, addDays} from '@/lib/tracker';
 import {AppleGraph} from '@/components/apple-graph';
 import MiniCharts from '@/components/mini-charts';
+import {ConsumerCompare, TargetStorage} from '@/components/my-apples';
 
 const SHORT: Record<string, string> = {firmness: '단단함', loss: '무게', brix: '단맛', acidity: '신맛'};
 const md = (d: string) => { const [, m, day] = d.split('-').map(Number); return `${m}/${day}`; };
@@ -29,6 +30,10 @@ export default function LotPreview({lot, observations = [], obsLabel = '측정'}
     <div className="dash-chart only-mobile"><AppleGraph p={p} p0={p0} obs={observations} sel={sel} maxDay={hongro ? 120 : 200} measLabel={obsLabel === '측정' ? '내가 잰 값' : obsLabel} /></div>
     <section className="dash-chart only-pc" aria-label="저장 일수별 변화"><h2>저장 일수별 변화 <small>선: 계산값 · 세로선: 고른 날</small></h2><MiniCharts p={p} obs={observations} sel={sel} maxDay={hongro ? 120 : 200} /></section>
     <div className="dash-side">{obs.length > 0 && <section className="ma-records" aria-label={`${obsLabel} 기록`}><h2>{obsLabel} 기록</h2><ul>{obs.slice(0, 5).map(o => <li key={o.id} className="ma-rec"><span><b>{md(o.date)}</b> {[o.brix != null ? `단맛 ${o.brix}` : null, o.firmness != null ? `단단함 ${o.firmness} N` : null, o.acidity != null ? `신맛 ${o.acidity}%` : null].filter(Boolean).join(' · ')}</span></li>)}</ul></section>}
+    </div>
+    <div className="dash-measurements lp-extra">
+      <ConsumerCompare lot={lot} p={p} />
+      <TargetStorage lot={lot} p={p} maxDay={hongro ? 120 : 300} link={typeof location !== 'undefined' ? location.origin : undefined} />
     </div>
   </div>;
 }

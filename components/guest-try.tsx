@@ -10,6 +10,7 @@ import {exampleForm, payloadFromForm} from '@/lib/tracker-form';
 import type {Observation} from '@/lib/lot-types';
 
 const NewApple = dynamic(() => import('@/components/new-apple'), {ssr: false, loading: () => <div className="loading-strip">화면을 준비하고 있어요…</div>});
+import AppleAuctionCard from '@/components/health/apple-auction-card';
 const LotPreview = dynamic(() => import('@/components/lot-preview'), {ssr: false, loading: () => <div className="loading-strip">예시를 불러오는 중…</div>});
 const ModelInfo = dynamic(() => import('@/components/model-info'), {ssr: false, loading: () => <div className="loading-strip">계산 근거를 불러오는 중…</div>});
 
@@ -93,6 +94,7 @@ function SimpleTry({mode, setMode, onLogin}: {mode: Mode; setMode: (m: Mode) => 
       <div className="ma-title"><h1>예시 사과 · 후지</h1><p>후지 · 일반 저온 · 1-MCP 미처리 · <b>예시 데이터(실제 기록 아님)</b></p></div>
       <LotPreview lot={example.lot} observations={example.obs} obsLabel="예시 측정" />
       <p className="ma-foot">처음 값(예시)에서 예측식으로 0일부터 계산했어요 · 시연용 계산 · 출하·안전 판정 아님</p>
+      <div className="try-market"><AppleAuctionCard variety="후지" /></div>
       <div className="ma-actions"><button type="button" className="ma-primary big" onClick={() => setMode('real')}>내 사과로 해 보기</button></div>
     </> : <NewApple guest onLogin={onLogin} />}
   </div>;

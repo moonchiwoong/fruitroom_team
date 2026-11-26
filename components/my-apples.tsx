@@ -264,7 +264,7 @@ function SameDay({lot, obs, p, sel, hongro}: {lot: Lot; obs: Observation[]; p: R
 }
 
 /** 농가가 고른 목표 저장일의 계산값을 보여 주고 캘린더 일정(.ics)으로 내려 줍니다. 고른 날은 이 기기에만 기억합니다. */
-function TargetStorage({lot, p, maxDay}: {lot: Lot; p: ReturnType<typeof lotPredictor>; maxDay: number}) {
+export function TargetStorage({lot, p, maxDay, link}: {lot: Lot; p: ReturnType<typeof lotPredictor>; maxDay: number; link?: string}) {
   const key = `appletrack:target-date:${lot.id}`;
   const start = storageStart(lot) ?? null, today = todayKST();
   const [date, setDate] = useState('');
@@ -276,7 +276,7 @@ function TargetStorage({lot, p, maxDay}: {lot: Lot; p: ReturnType<typeof lotPred
   const q = chk?.ok ? (['firmness', 'brix'] as const).map(m => { const r = p.at(m, chk.day); return r.ok ? `${SHORT[m]} ${fmtNum(r.value, metricMeta[m].digits)} ${metricMeta[m].unit}` : null; }).filter((x): x is string => !!x) : [];
   const save = () => {
     if (!chk?.ok) return;
-    const ics = targetIcs({lotId: lot.id, lotName: lot.name || '내 사과', date, day: chk.day, quality: q.join(' · ') || undefined, url: `${location.origin}/#lot/${lot.id}`});
+    const ics = targetIcs({lotId: lot.id, lotName: lot.name || '내 사과', date, day: chk.day, quality: q.join(' · ') || undefined, url: link ?? `${location.origin}/#lot/${lot.id}`});
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([ics], {type: 'text/calendar;charset=utf-8'}));
     a.download = `appletrack-target-${date}.ics`; document.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(a.href); }, 1000);
   };
@@ -300,7 +300,7 @@ const DIR_TXT = {up: '▲ 높아짐', down: '▼ 낮아짐', same: '= 같음'} a
 const CC_LABEL: Record<CompareRow['metric'], string> = {brix: '당도', acidity: '산도', loss: '무게 감소'};
 
 /** 소비자 선호 당도와 지금 품질 대조 + ‘오늘부터 30일 뒤 → 60일 뒤’ 비교(기존 계산식 그대로, 판정·점수 없음). */
-function ConsumerCompare({lot, p, onMeasure}: {lot: Lot; p: ReturnType<typeof lotPredictor>; onMeasure: () => void}) {
+export function ConsumerCompare({lot, p, onMeasure}: {lot: Lot; p: ReturnType<typeof lotPredictor>; onMeasure?: () => void}) {
   const t = p.todayDay;
   if (t === null || t < 0) return null;
   const today = todayKST();
@@ -332,7 +332,7 @@ function ConsumerCompare({lot, p, onMeasure}: {lot: Lot; p: ReturnType<typeof lo
           <span className={'cc-dir ' + r.dir}>{r.metric === 'loss' && r.dir === 'up' ? '▲ 더 줄어듦' : DIR_TXT[r.dir]}{r.metric === 'loss' && k ? (r.dir === 'up' ? ` · 추가 ${fmtNum(k.mine ? k.mine.extra : k.per100.extra, metricMeta.loss.digits)}kg` : '') : r.dir !== 'same' ? ` · ${r.diffText}` : ''}</span>
         </>}</li>;
     })}</ul>
-    <button type="button" className="ma-target-save cc-measure" onClick={onMeasure}>오늘 잰 당도 기록하기</button>
+    {onMeasure && <button type="button" className="ma-target-save cc-measure" onClick={onMeasure}>오늘 잰 당도 기록하기</button>}
     <p className="ma-target-note">선호 범위: <a href={CONSUMER_BRIX.url} target="_blank" rel="noreferrer">{CONSUMER_BRIX.source}</a>{ref && <> · 품종 기준: <a href={ref.url} target="_blank" rel="noreferrer">{ref.source}</a></>}. 무게 감소는 저장 시작 무게 대비 누적 감소율이에요. 기존 팀 계산식 결과이며 정확도 검증 전이고, 출하·품질 판정이 아니에요.</p>
   </section>;
 }
