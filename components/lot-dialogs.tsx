@@ -13,7 +13,7 @@ import {lotReadiness, quantityUnit, storageStart, hasInitialValues, weatherIniti
 import {isDate} from '@/lib/tracker';
 import {harvestMonthError} from '@/lib/harvest-window';
 
-const VARIETIES = ['후지', '홍로', '감홍'] as const;
+const VARIETIES = ['후지', '홍로'] as const;
 const str = (v: unknown) => v === null || v === undefined ? '' : String(v);
 const store = {
   get(k: string) { try { return window.localStorage.getItem(k); } catch { return null; } },
@@ -68,6 +68,7 @@ export function LotEditor({open, lot, onClose, onSaved}: {open: boolean; lot?: L
     if (!isDate(f.start)) return setError('저장 시작일을 입력해 주세요.');
     if (!isDate(intake)) return setError('입고일을 입력하거나 ‘저장 시작일과 같은 날 입고’를 선택해 주세요.');
     if (harvestErr) return setError(harvestErr);
+    if (f.mcp !== '처리' && f.mcp !== '미처리') return setError('1-MCP 처리 여부를 골라 주세요.');
     const body: Record<string, unknown> = {name: f.name.trim(), variety, location: f.location.trim() || null, quantity: f.quantity.trim() || null, storage_start_date: f.start, intake_date: intake,
       storage: f.storage, mcp: f.mcp, harvest_date: f.harvest || null, packaging: f.packaging.trim() || null, sensor_id: f.sensor.trim() || null,
       details: {storage_temperature: f.temperature.trim() === '' ? null : f.temperature, quantity_unit: f.unit}};
@@ -91,7 +92,7 @@ export function LotEditor({open, lot, onClose, onSaved}: {open: boolean; lot?: L
         {f.unit === 'kg' && <select aria-label="저장 수량 단위" value={f.unit} onChange={e => set('unit', e.target.value as 'kg' | '상자')}><option>상자</option><option>kg</option></select>}{f.unit !== 'kg' && <span className="ld-unit">상자</span>}</div></Field>
       <Field id="le-start" label="저장 시작일" hint="저장고에 넣어 보관을 시작한 날 · 예측의 0일차"><input id="le-start" type="date" max={today()} value={f.start} onChange={e => set('start', e.target.value)} /></Field>
       <Field id="le-storage" label="보관 방식"><select id="le-storage" value={f.storage} onChange={e => set('storage', e.target.value)}><option>일반 저온</option><option value="CA">CA 저장</option>{f.storage === '기타' && <option value="기타">기타 (예측 준비 중)</option>}</select></Field>
-      <Field id="le-mcp" label="1-MCP 처리" hint="모르면 ‘모름’으로 두세요. ‘미처리’로 바꿔 계산하지 않아요."><select id="le-mcp" value={f.mcp} onChange={e => set('mcp', e.target.value)}><option value="미확인">모름</option><option value="처리">처리함</option><option value="미처리">미처리</option></select></Field>
+      <Field id="le-mcp" label="1-MCP 처리"><select id="le-mcp" value={f.mcp === '처리' || f.mcp === '미처리' ? f.mcp : ''} onChange={e => set('mcp', e.target.value)}><option value="" disabled>골라 주세요</option><option value="처리">처리함</option><option value="미처리">미처리</option></select></Field>
       {variety === '홍로' && (f.temperature === '' || f.temperature === '0' || f.temperature === '4')
         ? <Field id="le-temp" label="저장고 온도"><select id="le-temp" value={f.temperature} onChange={e => set('temperature', e.target.value)}><option value="">선택</option><option value="0">0℃</option><option value="4">4℃</option></select></Field>
         : <Field id="le-temp" label={<>실제 저장고 온도 <small>℃ · 선택</small></>} hint="기록한 온도를 지원 온도로 바꾸지 않아요."><input id="le-temp" type="number" inputMode="decimal" step="any" value={f.temperature} placeholder="예: 0" onChange={e => set('temperature', e.target.value)} /></Field>}

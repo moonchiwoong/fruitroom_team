@@ -56,6 +56,10 @@ try {
       const lot = lots.find(l => /후지/.test(l.variety)) ?? lots[0];
       await page.goto(`${base}/#lot/${lot.id}`); await page.locator('.ma-detail h1').waitFor();
       await page.getByRole('button', {name: /사과 정보 수정/}).click();
+      const opts = sel => page.locator(`${sel} option`).allInnerTexts();
+      assert.deepEqual(await opts('#le-variety'), ['후지', '홍로', '기타 (직접 입력)']);
+      assert.ok(!(await opts('#le-mcp')).includes('모름'), '1-MCP에 모름 없음');
+      ok(`${tag} 사과 정보 수정: 품종 ${(await opts('#le-variety')).join('/')} · 1-MCP ${(await opts('#le-mcp')).join('/')}`);
       const more = page.locator('details.ld-more');
       if (!(await more.evaluate(d => d.open))) await more.locator('summary').click();
       await page.locator('#le-harvest').fill('2026-03-10');
