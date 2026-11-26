@@ -143,7 +143,7 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
     </div> : <>
     <button type="button" className="na-switch" onClick={() => { setPath(null); setWx({state: 'idle'}); setVals(null); }}>← 시작 방법 다시 고르기 ({path === 'region' ? '지역으로 시작' : '직접 잰 값'})</button>
 
-    {path === 'region' && <section className="na-card"><h2><span>1</span>산지</h2>
+    {path === 'region' && <section className="na-card na-full"><h2><span>1</span>산지</h2>
       <RegionMapPicker value={mapRegion} onPick={pickMap} />
       {mapRegion && <p className="ma-sub">관측지점 {WEATHER_STATIONS[mapRegion].name} · 이 산지는 {MAP_PINS[mapRegion].cultivars.join('·')} 예측식이 있어요.</p>}</section>}
 
@@ -167,7 +167,7 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
         : <><Seg name="na-storage" legend="보관 방식" value={storage} options={[{value: '일반 저온', label: '일반 저온'}, {value: 'CA', label: 'CA'}]} onChange={v => { setStorage(v); if (v === 'CA') setMcp('미처리'); }} />
           <Seg name="na-mcp" legend="1-MCP 처리" value={mcp} options={[{value: '처리', label: '처리함', disabled: storage === 'CA', tag: storage === 'CA' ? '준비 중' : undefined}, {value: '미처리', label: '미처리'}]} onChange={setMcp} /></>}</section>
 
-    <section className="na-card"><h2><span>5</span>{source === 'weather' ? '처음 품질 (날씨로 추정)' : '잰 값'}</h2>
+    <section className={'na-card' + (source === 'weather' ? '' : ' na-full')}><h2><span>5</span>{source === 'weather' ? '처음 품질 (날씨로 추정)' : '잰 값'}</h2>
       {source === 'weather' ? <div className="na-wx" role="status" aria-live="polite">
         {!wKey ? <p className="ma-sub">{!wRegion ? '생산지를 고르면' : '수확일을 넣으면'} 그 해 농업기상 자료로 처음 품질을 추정해요.</p>
           : wx.state === 'loading' ? <p><Loader2 className="spin" size={15} aria-hidden="true" />{year}년 4~9월 {station} 날씨를 모으는 중이에요…</p>
