@@ -66,7 +66,7 @@ function Pct({label, v, none}: {label: string; v: number | null; none: string}) 
 }
 
 function Chart({v, points}: {v: TrendVariety; points: WeekPoint[]}) {
-  const W = 320, H = 136, L = 8, R = 8, T = 26, B = 22;
+  const W = 320, H = 140, L = 8, R = 8, T = 26, B = 24;
   const vals = points.map(p => p.per10kg), lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
   const x = (i: number) => L + (W - L - R) * (points.length === 1 ? .5 : i / (points.length - 1));
   const y = (val: number) => T + (H - T - B) * (1 - (val - lo) / span);
@@ -80,6 +80,15 @@ function Chart({v, points}: {v: TrendVariety; points: WeekPoint[]}) {
   const [open, setOpen] = useState<number | null>(last ?? null);
   const sel = open !== null ? noted[open] : null;
   const anchor = (i: number) => (i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle');
+  // 값 글자가 선과 겹치지 않게: 위·아래 자리 중 선이 덜 지나가는 쪽에 둡니다(같으면 위).
+  const lineY = (px: number) => { for (let i = 1; i < points.length; i++) { const a = x(i - 1), b = x(i); if (px >= a && px <= b) return y(points[i - 1].per10kg) + (y(points[i].per10kg) - y(points[i - 1].per10kg)) * (px - a) / (b - a || 1); } return null; };
+  const labelDy = points.map((p, i) => {
+    const text = `${(p.per10kg / 10000).toFixed(1)}만${noted[i] ? ' ⓘ' : ''}`, w = text.length * 6 + 4, cx = x(i) + (i === points.length - 1 ? -7 : i === 0 ? 2 : 0), py = y(p.per10kg);
+    const x0 = anchor(i) === 'start' ? cx : anchor(i) === 'end' ? cx - w : cx - w / 2;
+    const hits = (top: number, bottom: number) => { let n = 0; for (let k = 0; k <= 10; k++) { const ly = lineY(x0 + w * k / 10); if (ly !== null && ly >= top && ly <= bottom) n++; } return n; };
+    const up = hits(py - 21, py - 5), down = py + 19 <= H - 16 ? hits(py + 5, py + 21) : Infinity;
+    return down < up ? 17 : -10;
+  });
   return <figure className="gk-chart">
     <figcaption>연도별 이맘때 (같은 날짜까지 7일 평균, 원/10kg){noted.some(Boolean) ? ' · ⓘ나 아래 버튼을 누르면 이유가 나와요' : ''}</figcaption>
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={points.map(p => `${p.year}년 ${won.format(p.per10kg)}원`).join(', ')}>
@@ -87,8 +96,8 @@ function Chart({v, points}: {v: TrendVariety; points: WeekPoint[]}) {
       <polyline fill="none" stroke="#E5322D" strokeWidth="2.2" strokeLinejoin="round" points={points.map((p, i) => `${x(i)},${y(p.per10kg)}`).join(' ')} />
       {points.map((p, i) => <g key={p.year} {...(noted[i] ? {role: 'button', tabIndex: 0, className: 'gk-pt' + (open === i ? ' on' : ''), 'aria-label': `${p.year}년 가격 변동 이유 보기`, style: {cursor: 'pointer'}, onClick: () => setOpen(open === i ? null : i), onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(open === i ? null : i); } }} : {})}>
         {noted[i] && <rect x={x(i) - 20} y={0} width="40" height={H} rx="10" className="gk-hit" />}
-        <circle cx={x(i)} cy={y(p.per10kg)} r={i === points.length - 1 ? 4.5 : 3.5} fill={i === points.length - 1 ? '#E5322D' : '#fff'} stroke="#E5322D" strokeWidth="2" />
-        <text x={x(i) + (i === points.length - 1 ? -7 : i === 0 ? 2 : 0)} y={y(p.per10kg) - 10} textAnchor={anchor(i)} fontSize="10" fontWeight={noted[i] || i === points.length - 1 ? 700 : 400} fill={noted[i] ? '#A32D2D' : '#4E5968'}>{(p.per10kg / 10000).toFixed(1)}만{noted[i] ? ' ⓘ' : ''}</text>
+        <circle cx={x(i)} cy={y(p.per10kg)} r={open === i ? 5 : 3.5} fill={open === i ? '#E5322D' : '#fff'} stroke="#E5322D" strokeWidth="2" />
+        <text x={x(i) + (i === points.length - 1 ? -7 : i === 0 ? 2 : 0)} y={y(p.per10kg) + labelDy[i]} textAnchor={anchor(i)} fontSize="10" fontWeight={noted[i] || i === points.length - 1 ? 700 : 400} fill={noted[i] ? '#A32D2D' : '#4E5968'}>{(p.per10kg / 10000).toFixed(1)}만{noted[i] ? ' ⓘ' : ''}</text>
         <text x={x(i)} y={H - 4} textAnchor={anchor(i)} fontSize="10" fill="#8A8A8E">{p.year}</text>
       </g>)}
     </svg>
