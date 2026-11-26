@@ -141,9 +141,10 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
       <button type="button" onClick={() => { setPath('measured'); setSource('measured'); setWx({state: 'idle'}); }}>
         <b>직접 잰 값으로 시작</b><p>수확하거나 입고할 때 잰 당도·단단함·신맛을 넣어요. 하나만 있어도 돼요.</p><em>더 정확해요 →</em></button>
     </div> : <>
-    <button type="button" className="na-switch" onClick={() => { setPath(null); setWx({state: 'idle'}); setVals(null); }}>← 시작 방법 다시 고르기 ({path === 'region' ? '지역으로 시작' : '직접 잰 값'})</button>
+    <div className="na-sheet">
+    <div className="na-sheet-h"><b>{path === 'region' ? '주산지로 시작' : '직접 잰 값으로 시작'}</b><button type="button" className="na-switch" onClick={() => { setPath(null); setWx({state: 'idle'}); setVals(null); }}>시작 방법 바꾸기</button></div>
 
-    {path === 'region' && <section className="na-card na-full"><h2><span>1</span>산지</h2>
+    {path === 'region' && <section className="na-card na-full na-maprow"><h2><span>1</span>주산지</h2>
       <RegionMapPicker value={mapRegion} onPick={pickMap} />
       {mapRegion && <p className="ma-sub">관측지점 {WEATHER_STATIONS[mapRegion].name} · 이 산지는 {MAP_PINS[mapRegion].cultivars.join('·')} 예측식이 있어요.</p>}</section>}
 
@@ -167,7 +168,7 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
         : <><Seg name="na-storage" legend="보관 방식" value={storage} options={[{value: '일반 저온', label: '일반 저온'}, {value: 'CA', label: 'CA'}]} onChange={v => { setStorage(v); if (v === 'CA') setMcp('미처리'); }} />
           <Seg name="na-mcp" legend="1-MCP 처리" value={mcp} options={[{value: '처리', label: '처리함', disabled: storage === 'CA', tag: storage === 'CA' ? '준비 중' : undefined}, {value: '미처리', label: '미처리'}]} onChange={setMcp} /></>}</section>
 
-    <section className={'na-card' + (source === 'weather' ? '' : ' na-full')}><h2><span>5</span>{source === 'weather' ? '처음 품질 (날씨로 추정)' : '잰 값'}</h2>
+    <section className={'na-card' + (source === 'weather' ? '' : ' na-full')}><h2><span>5</span>{source === 'weather' ? '처음 품질' : '잰 값'}</h2>
       {source === 'weather' ? <div className="na-wx" role="status" aria-live="polite">
         {!wKey ? <p className="ma-sub">{!wRegion ? '생산지를 고르면' : '수확일을 넣으면'} 그 해 농업기상 자료로 처음 품질을 추정해요.</p>
           : wx.state === 'loading' ? <p><Loader2 className="spin" size={15} aria-hidden="true" />{year}년 4~9월 {station} 날씨를 모으는 중이에요…</p>
@@ -189,12 +190,10 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
       <p className="ma-sub">상자 수를 넣으면 무게가 줄어든 만큼을 ‘몇 상자 무게’로도 보여 줘요.</p></details>
 
     </>}
+    </div>
     {guest && guestHint && <p className="ma-hint muted na-guest-hint" aria-live="polite">{guestHint}</p>}
     {guest && preview && missing.length === 0 && !harvestErr && <section id="na-result" className="na-card na-result" aria-label="결과"><h2>결과</h2><LotPreview lot={preview.lot} /><p className="ma-sub">시연용 계산 · 출하·안전 판정 아님</p>
       <button type="button" className="linkbtn na-save-link" onClick={onLogin}>이 사과를 계속 기록하려면 가입하기 →</button></section>}
-    {!guest && preview && <section className="na-card na-preview" aria-label="미리보기"><h2>저장 {preview.day}일 뒤 (미리보기)</h2>
-      <div className="ma-rows">{preview.rows.map(({k, r}) => <div key={k} className="ma-row"><span>{SHORT[k]}</span><div>{r.ok ? <><b>{easyChange(k, r.value, r.first, preview.weather)}</b><small>{fmtNum(r.value, metricMeta[k].digits)} {k === 'firmness' ? 'N' : metricMeta[k].unit}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div></div>)}</div>
-      <p className="ma-sub">시연용 계산 · 출하·안전 판정 아님</p></section>}
 
     </>}
     {err && <p className="error-box" role="alert">{err}</p>}

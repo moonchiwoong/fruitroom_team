@@ -526,28 +526,49 @@ html .hs .s3d{margin-top:16px}
 .ts-cta .ma-target-save{display:inline-flex;align-items:center;gap:6px;font-size:14px}
 .ts-cta small{font-size:12px;color:#8A8A8E}
 .ts .ma-remind-gaps{margin-top:4px}
-/* 새 사과 등록: 새 UI(흰 카드·빨간 선택 칩)에 맞춤 */
-.na .na-card{gap:12px;padding:16px 18px;align-content:start}
-.na .na-card h2>span{background:#E5322D}
-.na .na-card .qt3-seg{background:none!important;padding:0!important;gap:6px!important}
-.na .na-card .qt3-seg span{min-height:42px;border:1px solid #D1D6DB;border-radius:10px;background:#fff;color:#191F28;font-weight:500;box-shadow:none!important}
+/* 새 사과 등록: 카드 한 장 + 줄마다 ‘이름 | 선택’(새 UI) */
+.na .na-sheet{background:#fff;border-radius:16px;padding:6px 18px 10px;display:grid}
+.na .na-sheet-h{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0}
+.na .na-sheet-h b{font-size:16px;font-weight:800}
+.na .na-switch{font-size:13px;font-weight:700;color:#A32D2D;justify-self:auto}
+.na .na-sheet>.na-card{display:grid!important;grid-template-columns:88px minmax(0,1fr);column-gap:12px;row-gap:0;align-items:start;background:none!important;border:0!important;border-top:1px solid #F2F2F5!important;border-radius:0!important;box-shadow:none!important;padding:14px 0!important;margin:0}
+.na .na-sheet>.na-card>h2{grid-column:1;grid-row:1/span 8;margin:0;padding-top:10px;font-size:14px;font-weight:700;color:#4E5968;display:block}
+.na .na-sheet>.na-card>h2>span{display:none}
+.na .na-sheet>.na-card>h2 small{display:block;font-size:11px;font-weight:500;margin-top:2px}
+.na .na-sheet>.na-card>:not(h2){grid-column:2;margin-bottom:8px}
+.na .na-sheet>.na-card>:last-child{margin-bottom:0}
+.na .na-card .qt3-seg{display:flex!important;flex-wrap:wrap;background:none!important;padding:0!important;gap:6px!important}
+.na .na-card .qt3-seg>label{flex:none}
+.na .na-card .qt3-seg span{min-height:36px;padding:0 14px;border:1px solid #D1D6DB;border-radius:999px;background:#fff;color:#191F28;font-size:14px;font-weight:500;box-shadow:none!important}
 .na .na-card .qt3-seg label.active span{border:2px solid #E5322D;background:#FDECEC;color:#A32D2D;font-weight:700}
 .na .na-card .qt3-seg label.active span svg{display:none}
 .na .na-card .qt3-seg label.disabled span{opacity:.5}
-.na .na-field>span{font-size:14px;font-weight:700;color:#4E5968}
-.na .na-field input,.na .na-field select{height:44px;border:1px solid #D1D6DB;border-radius:10px}
+.na .na-card .na-q+.na-q>legend{font-size:12px;font-weight:700;color:#8A8A8E;margin:4px 0 6px}
+.na .na-field>span{font-size:13px;font-weight:700;color:#4E5968}
+.na .na-field input,.na .na-field select{height:42px;border:1px solid #D1D6DB;border-radius:10px}
 .na .na-field input:focus,.na .na-field select:focus{outline:none;border-color:#E5322D;box-shadow:0 0 0 3px #FDECEC}
-.na .na-switch{font-size:13px;font-weight:700;color:#A32D2D;justify-self:start}
-.na .na-more{background:#fff;border-radius:14px;padding:4px 16px}
-.na .na-more summary{font-weight:700;color:#4E5968}
-.na .new-date-check{display:flex;align-items:center;gap:8px;font-size:14px;color:#4E5968}
+.na .na-measure{gap:8px}
+.na .na-measure>.na-field{background:#F7F7FA;border-radius:12px;padding:8px 10px;flex-wrap:wrap}
+.na .na-measure>.na-field>span{flex-basis:100%;min-width:0}
+.na .na-measure>.na-field input{background:#fff}
+.na .na-wx{background:#F7F7FA;border-radius:12px;padding:10px 12px}
+.na .na-more{border-top:1px solid #F2F2F5;padding:12px 0 4px}
+.na .na-more summary{font-weight:700;color:#4E5968;font-size:14px}
+.na .new-date-check{display:flex;align-items:center;gap:8px;font-size:13px;color:#4E5968}
 .na .new-date-check input{accent-color:#E5322D;width:18px;height:18px}
+.na .na-maprow .rmp-credit{font-size:11px;color:#8A8A8E;margin:4px 0 0}
 @media (min-width:1000px){
-  .ma.na{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px 16px;align-items:stretch}
-  .ma.na>*{grid-column:1/-1}
-  .ma.na>.na-card:not(.na-full):not(.na-result):not(.na-preview){grid-column:auto}
-  .na .na-full .na-measure{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 16px}
-  .na .na-full .na-measure>.na-field{flex-wrap:wrap}
-  .na .na-full .na-measure>.na-field>span{flex-basis:100%;min-width:0}
-  .na .na-full .na-measure>p{grid-column:1/-1}
+  .na .na-measure{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .na .na-measure>p{grid-column:1/-1}
+  .na .na-maprow .rmp{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:4px 16px;align-items:start}
+  .na .na-maprow .rmp svg{height:340px;grid-row:1/span 2}
+  .na .na-maprow .rmp-chips{margin-top:0;grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+@media (max-width:599.98px){
+  .na .na-sheet{padding:4px 14px 8px}
+  .na .na-sheet>.na-card{grid-template-columns:minmax(0,1fr)}
+  .na .na-sheet>.na-card>h2{grid-row:auto;padding:0 0 8px}
+  .na .na-sheet>.na-card>:not(h2){grid-column:1}
+  .na .na-maprow .rmp svg{height:min(44vh,300px)}
+}
+.na .na-field:has(#na-harvest)>span{display:none}
