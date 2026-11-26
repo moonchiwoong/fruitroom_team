@@ -1,4 +1,5 @@
 // 목표 저장일 카드: 일수/날짜 선택 → 계산값 표시 → 캘린더 파일(.ics) 내려받기. 가상 기록만 사용.
+// 한글 파일 이름 검사는 브라우저가 UTF-8 로케일로 떠야 합니다: LANG=C.UTF-8 LC_ALL=C.UTF-8 로 실행하세요.
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
@@ -24,7 +25,7 @@ try {
     assert.match(txt, /저장 60일째/); assert.match(txt, /단단함\s*[\d.]+\s*N/);
     const [dl] = await Promise.all([page.waitForEvent('download'), card.getByRole('button', {name: '캘린더에 등록'}).click()]);
     const ics = (await readFile(await dl.path(), 'utf8')).replace(/\r\n /g, '');
-    show('내려받은 파일 이름', dl.suggestedFilename()); assert.match(dl.suggestedFilename(), /^appletrack-target-\d{4}-\d{2}-\d{2}\.ics$/);
+    show('내려받은 파일 이름', dl.suggestedFilename()); assert.match(dl.suggestedFilename(), /^목표저장일_.+_\d{1,2}월\d{1,2}일\.ics$/);
     show('파일 일정 시각', ics.match(/DTSTART;TZID[^\r\n]*/)?.[0]); show('파일 제목', ics.match(/SUMMARY:[^\r\n]*/)?.[0]);
     assert.match(ics, /DTSTART;TZID=Asia\/Seoul:\d{8}T090000/); assert.match(ics, /저장 60일째/); assert.match(ics, /BEGIN:VALARM/);
     // 날짜 직접 입력: 오늘은 막힘

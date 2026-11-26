@@ -275,7 +275,7 @@ export function TargetStorage({lot, p, maxDay, link}: {lot: Lot; p: ReturnType<t
     if (!chk?.ok) return;
     const ics = targetIcs({lotId: lot.id, lotName: lot.name || '내 사과', date, day: chk.day, quality: q.join(' · ') || undefined, url: link ?? `${location.origin}/#lot/${lot.id}`});
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([ics], {type: 'text/calendar;charset=utf-8'}));
-    a.download = `appletrack-target-${date}.ics`; document.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(a.href); }, 1000);
+    a.download = `목표저장일_${(lot.name || '내 사과').replace(/[\\/:*?"<>|]/g, '_').trim()}_${+date.slice(5, 7)}월${+date.slice(8, 10)}일.ics`; document.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(a.href); }, 1000);
   };
   const val = (m: 'firmness' | 'brix') => chk?.ok ? p.at(m, chk.day) : null;
   return <section className="ma-remind dash-card ts" aria-label="목표 저장일">
