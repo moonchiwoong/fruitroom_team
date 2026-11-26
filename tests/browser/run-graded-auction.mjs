@@ -20,9 +20,13 @@ try {
     const t0 = Date.now();
     await page.goto(`${base}/#home`);
     const card = page.locator('section.apple-auction');
+    const gk = card.locator('.gk');
     await card.waitFor({timeout: 30000});
         await card.locator('.aa-grades').waitFor({timeout: 150000});
     show(`${width}px 카드까지 걸린 시간`, `${Math.round((Date.now() - t0) / 1000)}초`);
+    await gk.locator('.gk-tiles').waitFor({timeout: 120000});
+    show('가락 시세', await gk.innerText());
+    await gk.screenshot({path: `tests/browser/artifacts/garak-${width}.png`});
     show('카드 내용', await card.innerText());
     show('호출한 우리 서버 주소', market.filter(p => p.includes('graded')).join(' | '));
     const rows = await card.locator('.aa-grade').count();

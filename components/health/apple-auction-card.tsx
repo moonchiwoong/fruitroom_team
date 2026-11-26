@@ -7,6 +7,7 @@ import {settlementMarketCode} from '@/lib/settlement-markets';
 import {mergeAppleAuctionGroups} from '@/lib/apple-auctions';
 import {isRegionKey, REGION_KEYS, REGIONS, type RegionKey} from '@/lib/regions';
 import {todayKST} from '@/lib/tracker';
+import GarakSummary from '@/components/health/garak-summary';
 import './apple-auction-card.css';
 
 type Props = {region?: RegionKey | null; variety?: string | null};
@@ -114,8 +115,10 @@ function AuctionCard({defaultRegion, variety}: {defaultRegion: RegionKey; variet
   const gradedNow = graded?.key === gradedKey ? graded : null;
 
   return <section className="hs-card apple-auction" aria-labelledby={title}>
-    <div className="apple-auction__heading">
-      <h2 id={title}>사과 경매가</h2>
+    <h2 className="apple-auction__title" id={title}>사과 경매가</h2>
+    <GarakSummary variety={variety} />
+    <div className="apple-auction__heading apple-auction__local">
+      <h3>내 산지 경매가</h3>
       <div className="apple-auction__filter">
         <label htmlFor={`${title}-region`}>산지</label>
         <select id={`${title}-region`} value={region} onChange={event => {
