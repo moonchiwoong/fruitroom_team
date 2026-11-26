@@ -15,7 +15,7 @@ import {lotPredictor, easyChange, EASY_METRICS} from '@/lib/lot-predict';
 import {fmtNum, metricMeta, todayKST, isDate} from '@/lib/tracker';
 import LotPreview from '@/components/lot-preview';
 import {WEATHER_STATIONS} from '@/lib/rda-weather';
-import RegionMapPicker, {MAP_PINS, type MapRegion} from '@/components/region-map-picker';
+import RegionMapPicker, {MAP_CREDIT, MAP_PINS, type MapRegion} from '@/components/region-map-picker';
 import '@/components/health/health.css';
 import type {HongroRegion} from '@/lib/hongro';
 
@@ -145,8 +145,9 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
     <div className="na-sheet-h"><b>{path === 'region' ? '주산지로 시작' : '직접 잰 값으로 시작'}</b><button type="button" className="na-switch" onClick={() => { setPath(null); setWx({state: 'idle'}); setVals(null); }}>시작 방법 바꾸기</button></div>
 
     {path === 'region' && <section className="na-card na-full na-maprow"><h2><span>1</span>주산지</h2>
-      <RegionMapPicker value={mapRegion} onPick={pickMap} />
-      {mapRegion && <p className="ma-sub">관측지점 {WEATHER_STATIONS[mapRegion].name} · 이 산지는 {MAP_PINS[mapRegion].cultivars.join('·')} 예측식이 있어요.</p>}</section>}
+      <RegionMapPicker value={mapRegion} onPick={pickMap} credit={false} />
+      {mapRegion && <p className="ma-sub">관측지점 {WEATHER_STATIONS[mapRegion].name} · 이 산지는 {MAP_PINS[mapRegion].cultivars.join('·')} 예측식이 있어요.</p>}
+      <p className="rmp-credit">{MAP_CREDIT}</p></section>}
 
     {(path === 'measured' || mapRegion) && <section className="na-card"><h2><span>{path === 'region' ? 2 : 1}</span>품종</h2>
       <Seg name="na-cultivar" legend="품종" value={cultivar} options={(['후지', '홍로'] as const).filter(c => path !== 'region' || !mapRegion || MAP_PINS[mapRegion].cultivars.includes(c)).map(c => ({value: c, label: c}))} onChange={v => { setCultivar(v); setWx({state: 'idle'}); setVals(null); }} /></section>}

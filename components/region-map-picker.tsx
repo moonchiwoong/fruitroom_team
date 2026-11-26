@@ -12,7 +12,9 @@ export type MapRegion = RegionKey;
 export const MAP_PINS = Object.fromEntries(REGION_KEYS.map(k => [k, {...REGIONS[k].map, cultivars: regionCultivars(k)}])) as Record<MapRegion, {x: number; y: number; cultivars: ('후지' | '홍로')[]; left?: boolean}>;
 const FULL = [0, 40, 524, 520];
 
-export default function RegionMapPicker({value, onPick}: {value: MapRegion | ''; onPick: (r: MapRegion) => void}) {
+export const MAP_CREDIT = '지도: svg-maps (CC BY 4.0) · 점은 대략적인 위치';
+
+export default function RegionMapPicker({value, onPick, credit = true}: {value: MapRegion | ''; onPick: (r: MapRegion) => void; credit?: boolean}) {
   const target = value ? [MAP_PINS[value].x - 150, MAP_PINS[value].y - 130, 300, 260] : FULL;
   const [box, setBox] = useState<number[]>(target), cur = useRef<number[]>(target);
   useEffect(() => {
@@ -35,6 +37,6 @@ export default function RegionMapPicker({value, onPick}: {value: MapRegion | '';
         </g>; })}
     </svg>
     <div className="rmp-chips">{(Object.keys(MAP_PINS) as MapRegion[]).map(r => <button key={r} type="button" className={value === r ? 'on' : ''} aria-pressed={value === r} onClick={() => onPick(r)}>{WEATHER_STATIONS[r].label}<small>{MAP_PINS[r].cultivars.join('·')}</small></button>)}</div>
-    <p className="rmp-credit">지도: svg-maps (CC BY 4.0) · 점은 대략적인 위치</p>
+    {credit && <p className="rmp-credit">{MAP_CREDIT}</p>}
   </div>;
 }
