@@ -14,9 +14,9 @@ try {
     await page.locator('.hs-today .hs-hl').waitFor({timeout: 30000});
     assert.equal(await page.getByRole('heading', {name: '요약', level: 1}).count(), 1, '체험은 요약부터');
     assert.equal(await page.getByRole('heading', {name: '사과 경매가'}).count(), 1);
-    const btn = await page.locator('.hs-today .hs-more').boundingBox(), wide = await page.locator('.hs-today .hs-more-wide').boundingBox();
-    assert.ok(btn.height >= 40 && wide.height >= 44, `자세히 버튼 크기 ${btn.height}/${wide.height}`);
-    await page.locator('.hs-today .hs-more-wide').click();
+    const btn = await page.locator('.hs-today .hs-more').boundingBox();
+    assert.ok(btn.height >= 40, `자세히 버튼 크기 ${btn.height}`); assert.equal(await page.locator('.hs-more-wide').count(), 0);
+    await page.locator('.hs-today .hs-more').click();
     const cc = page.locator('section[aria-label="소비자 선호와 비교"]'), ts = page.locator('section[aria-label="목표 저장일"]');
     await cc.waitFor({timeout: 30000}); await ts.waitFor();
     assert.match(await cc.innerText(), /오늘 단맛/); assert.equal(await cc.getByRole('button', {name: '오늘 잰 당도 기록하기'}).count(), 0);

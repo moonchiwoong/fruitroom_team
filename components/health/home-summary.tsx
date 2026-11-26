@@ -131,7 +131,6 @@ function LotToday({lot, openLot, guest = false}: {lot: Lot; openLot: (id: string
           <Bar label={f.from === 'measured' && today === p.todayDay && latestObservation(obs, hm, todayKST()) ? '오늘 실측' : f.from === 'measured' ? '오늘(측정값부터 계산)' : '오늘(계산)'} v={f.value} max={Math.max(f.first, f.value)} color="#C7C7CC" digits={metricMeta[hm].digits} />
         </div>}
       </div></>}
-    <button type="button" className="hs-more-wide" onClick={() => openLot(lot.id)}><span><b>이 사과 자세히 보기</b><small>저장 일수별 그래프 · 소비자 선호 비교 · 목표 저장일 · 측정 기록</small></span><ChevronRight size={20} aria-hidden="true" /></button>
     {ORDER.some(m => p.at(m, today).ok) && <p className="hs-src">기존 팀 계산식 결과 · 정확도 검증 전 · 출하·안전 판정 아님</p>}
   </>;
 }

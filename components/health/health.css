@@ -601,10 +601,6 @@ html .hs .s3d{margin-top:16px}
   .dash-measurements>.dash-side{display:flex;flex-direction:column;gap:12px}
   .dash-measurements>.dash-side>:last-child{flex:1}
 }
-/* 요약 ‘자세히 보기’: 누르기 쉬운 버튼 + 아래쪽 넓은 버튼 */
+/* 요약 ‘자세히 보기’: 누르기 쉬운 버튼 */
 .hs-more{display:inline-flex;align-items:center;gap:2px;min-height:40px;padding:0 12px 0 16px;border:1.5px solid #F7C1C1;border-radius:999px;background:#fff;color:#A32D2D;font:inherit;font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap}
 .hs-more:hover{background:#FDECEC}
-.hs-more-wide{all:unset;box-sizing:border-box;width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding:14px 18px;border-radius:14px;background:#E5322D;color:#fff;cursor:pointer}
-.hs-more-wide span{display:grid;gap:2px}.hs-more-wide b{font-size:16px;font-weight:800}.hs-more-wide small{font-size:12px;opacity:.9;font-weight:500}
-.hs-more-wide:hover{background:#C9261F}.hs-more-wide:focus-visible{outline:3px solid #F7C1C1;outline-offset:2px}
-@media (min-width:1000px){.hs-today>.hs-more-wide{grid-column:1/-1}}
