@@ -131,18 +131,9 @@ try {
       const page = await context.newPage(); page.on('pageerror', e => errors.push(e.message));
       await page.goto(`${base}/try`);
       show('체험 화면 출하 비교 흔적 수', await page.locator('#ship-compare').count()); assert.equal(await page.locator('#ship-compare').count(), 0);
-      await page.getByRole('tab', {name: '내 사과로 해 보기'}).click();
-      await page.getByText('지역으로 시작').first().click();
-      const hint = page.locator('.na-guest-hint');
-      show('산지 선택 전 안내', await hint.innerText());
-      assert.match(await hint.innerText(), /생산지를 먼저/); assert.ok(!/저장고 온도/.test(await hint.innerText()));
-      await page.locator('.rmp-chips button').filter({hasText: '청송'}).click();
-      show('청송 선택 후 안내', await hint.innerText());
-      assert.match(await hint.innerText(), /보관 방식·1-MCP/); assert.ok(!/저장고 온도/.test(await hint.innerText()));
-      await page.locator('.rmp-chips button').filter({hasText: '거창'}).click();
-      show('거창 선택 후 안내', await hint.innerText());
-      assert.match(await hint.innerText(), /저장고 온도/); assert.ok(!/1-MCP/.test(await hint.innerText()));
-      ok(`${tag} 4 체험 안내: 산지 전 → 청송(후지: 보관 방식·1-MCP) → 거창(홍로: 저장고 온도)`);
+      assert.equal(await page.getByText('내 사과로 해 보기').count(), 0, '체험은 예시 사과만');
+      await page.locator('section[aria-label="소비자 선호와 비교"]').waitFor();
+      ok(`${tag} 4 체험: 예시 사과만 · ‘내 사과로 해 보기’ 없음`);
       await context.close();
     }
   }

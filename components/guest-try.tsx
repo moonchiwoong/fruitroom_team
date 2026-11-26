@@ -9,7 +9,6 @@ import type {Lot} from '@/lib/lot-types';
 import {exampleForm, payloadFromForm} from '@/lib/tracker-form';
 import type {Observation} from '@/lib/lot-types';
 
-const NewApple = dynamic(() => import('@/components/new-apple'), {ssr: false, loading: () => <div className="loading-strip">화면을 준비하고 있어요…</div>});
 import AppleAuctionCard from '@/components/health/apple-auction-card';
 const LotPreview = dynamic(() => import('@/components/lot-preview'), {ssr: false, loading: () => <div className="loading-strip">예시를 불러오는 중…</div>});
 const ModelInfo = dynamic(() => import('@/components/model-info'), {ssr: false, loading: () => <div className="loading-strip">계산 근거를 불러오는 중…</div>});
@@ -65,10 +64,10 @@ export default function GuestTry() {
     <main className="site-main">
       <div className="page-hero"><div className="page-hero-inner">
         <h1>{view === 'basis' ? '계산 근거·적용 범위' : '애플트랙 체험'}</h1>
-        {view !== 'basis' && <p>예시 사과를 보거나, 내 사과 정보를 넣어 바로 결과를 볼 수 있어요. 가입하지 않아도 돼요.</p>}
+        {view !== 'basis' && <p>예시 사과로 저장 중 품질 변화를 바로 볼 수 있어요. 가입하지 않아도 돼요.</p>}
       </div></div>
       <div className="page-body">
-        {trackerVisited && <div hidden={view !== 'track'}><SimpleTry mode={mode} setMode={m => go({mode: m})} onLogin={() => toLogin(true)} /></div>}
+        {trackerVisited && <div hidden={view !== 'track'}><SimpleTry /></div>}
         {view === 'basis' && <ModelInfo context={modelContext} />}
       </div>
     </main>
@@ -76,8 +75,8 @@ export default function GuestTry() {
   </div>;
 }
 
-/** 간단 체험: ‘예시 사과’(예시 데이터)와 ‘내 사과로 해 보기’(저장 없이 결과) 두 가지만 있습니다. */
-function SimpleTry({mode, setMode, onLogin}: {mode: Mode; setMode: (m: Mode) => void; onLogin: () => void}) {
+/** 간단 체험: 예시 사과(예시 데이터)만 보여 줍니다. */
+function SimpleTry() {
   const example = useMemo(() => {
     const f = exampleForm(), payload = payloadFromForm(f, 'real');
     const lot = {id: 'example', ...payload, latest_observation: null} as unknown as Lot;
@@ -86,16 +85,11 @@ function SimpleTry({mode, setMode, onLogin}: {mode: Mode; setMode: (m: Mode) => 
     return {lot, obs};
   }, []);
   return <div className="ma try-simple">
-    <div className="ma-days try-tabs" role="tablist" aria-label="체험 방식">
-      <button type="button" role="tab" aria-selected={mode === 'example'} className={mode === 'example' ? 'active' : ''} onClick={() => setMode('example')}>예시 사과 보기</button>
-      <button type="button" role="tab" aria-selected={mode === 'real'} className={mode === 'real' ? 'active' : ''} onClick={() => setMode('real')}>내 사과로 해 보기</button>
-    </div>
-    {mode === 'example' ? <>
+    <>
       <div className="ma-title"><h1>예시 사과 · 후지</h1><p>후지 · 일반 저온 · 1-MCP 미처리 · <b>예시 데이터(실제 기록 아님)</b></p></div>
       <LotPreview lot={example.lot} observations={example.obs} obsLabel="예시 측정" />
       <p className="ma-foot">처음 값(예시)에서 예측식으로 0일부터 계산했어요 · 시연용 계산 · 출하·안전 판정 아님</p>
       <div className="try-market"><AppleAuctionCard variety="후지" /></div>
-      <div className="ma-actions"><button type="button" className="ma-primary big" onClick={() => setMode('real')}>내 사과로 해 보기</button></div>
-    </> : <NewApple guest onLogin={onLogin} />}
+    </>
   </div>;
 }

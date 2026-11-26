@@ -12,40 +12,6 @@ const show = (label, text) => console.log(`    └ ${label}: ${String(text).repl
 try {
   for (const width of [1366, 388]) {
     const tag = `${width}px`;
-    // 1. 공개 체험 · 홍로(거창): 3월은 막고 결과를 보여 주지 않음 → 9월은 통과
-    {
-      const context = await browser.newContext({viewport: {width, height: 900}, locale: 'ko-KR', timezoneId: 'Asia/Seoul', reducedMotion: 'reduce'});
-      await context.route('https://review.supabase.co/**', r => r.fulfill({status: 401, contentType: 'application/json', body: '{}'}));
-      const page = await context.newPage(); page.on('pageerror', e => errors.push(e.message));
-      await page.goto(`${base}/try`);
-      await page.getByRole('tab', {name: '내 사과로 해 보기'}).click();
-      await page.getByText('지역으로 시작').first().click();
-      await page.locator('.rmp-chips button').filter({hasText: '거창'}).click();
-      await page.locator('#na-harvest').fill('2026-03-10');
-      const err = page.locator('#na-harvest-err');
-      await err.waitFor();
-      show('홍로 3/10 입력', await err.innerText());
-      assert.match(await err.innerText(), /홍로는 8~10월에 수확한 사과만/);
-      assert.equal(await page.locator('#na-harvest').getAttribute('aria-invalid'), 'true');
-      assert.equal(await page.locator('#na-result').count(), 0);
-      await page.locator('#na-harvest').fill('2026-09-15');
-      await err.waitFor({state: 'detached'});
-      show('홍로 9/15 입력 후 안내', (await page.locator('#na-harvest-err').count()) ? '남음' : '없음');
-      ok(`${tag} 체험 홍로: 3월 차단·결과 숨김 → 9월 통과`);
-      // 후지(청송): 9월은 막고 10월은 통과
-      await page.goto(`${base}/try`);
-      await page.getByRole('tab', {name: '내 사과로 해 보기'}).click();
-      await page.getByText('지역으로 시작').first().click();
-      await page.locator('.rmp-chips button').filter({hasText: '청송'}).click();
-      await page.locator('#na-harvest').fill('2026-09-15');
-      await err.waitFor();
-      show('후지 9/15 입력', await err.innerText());
-      assert.match(await err.innerText(), /후지는 10~11월/);
-      await page.locator('#na-harvest').fill('2026-10-28');
-      await err.waitFor({state: 'detached'});
-      ok(`${tag} 체험 후지: 9월 차단 → 10월 통과`);
-      await context.close();
-    }
     // 2. 로그인 · 사과 정보 수정: 수확일을 3월로 바꾸면 안내하고 저장 요청을 보내지 않음
     {
       const context = await browser.newContext({viewport: {width, height: 900}, locale: 'ko-KR', timezoneId: 'Asia/Seoul', reducedMotion: 'reduce'});
