@@ -1,8 +1,7 @@
 'use client';
 import {FUJI_REGION_KEYS, isFujiRegionKey} from '@/lib/regions';
 import {WEATHER_STATIONS} from '@/lib/rda-weather';
-import {Component, Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
-import dynamic from 'next/dynamic';
+import {Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
 import {AlertTriangle, ArrowLeft, ArrowRight, Info, Warehouse, ArrowUpRight, CalendarDays, Check, ChevronDown, Download, FlaskConical, Loader2, Pin, PinOff, Plus, RotateCcw, Save, Thermometer, Undo2} from 'lucide-react';
 import {useTeamSession} from '@/components/team-auth';
 import {ObservationForm, requestJson} from '@/components/lot-forms';
@@ -27,7 +26,6 @@ import {predictQuality, getQualitySeries, selectQualityModel, HONGRO_LOSS_RATE} 
 type ModelResult = ReturnType<typeof predictQuality>;
 type ModelInput = Parameters<typeof predictQuality>[0];
 
-const QualityAppleViewer = dynamic(() => import('@/components/quality-apple-viewer'), {ssr: false, loading: () => <div className="t3d-empty"><Loader2 className="spin" size={18} />3D 예시를 불러오는 중…</div>});
 
 type Mode = 'real' | 'example';
 const plainMeaning: Record<MetricId, string> = {firmness: '단단한 정도', brix: '단맛의 정도', acidity: '신맛의 정도', loss: '무게가 줄어든 비율'};
@@ -869,7 +867,6 @@ export default function QualityTracker({lots, onLotsChanged, request, openModelI
             </details>
           </section>
         </div>
-        <div className="qt2-more"><Apple3DFold day={selDay} cultivar={form.variety} metrics={modelResults} /></div>
         {guest && !exampleMode && <div className="qt-actions qt-result-actions qt2-actions"><button className="btn btn-primary" onClick={handoffToLogin}><Save size={16} />로그인하고 저장하기</button></div>}
       </section>
     </div>
@@ -916,33 +913,8 @@ function ObsCompare({metric, measured, series, exampleMode, initialMeasure, obse
   </table><p className="qt-help">차이는 검증 지표가 아닙니다. 표본이 다르면(파괴 측정) 같은 과실의 변화가 아닙니다.</p></div>;
 }
 
-class Boundary extends Component<{children: ReactNode}, {failed: boolean}> {
-  state = {failed: false};
-  static getDerivedStateFromError() { return {failed: true}; }
-  render() { return this.state.failed ? <div className="t3d-empty">3D 예시를 표시하지 못했습니다. 입력·결과·그래프는 그대로 사용할 수 있습니다.</div> : this.props.children; }
-}
 
 
-
-/** 3D 외관은 기본 화면에서 빼고, 펼칠 때만 불러옵니다(모델 파일 약 3MB). */
-function Apple3DFold({day, cultivar, metrics}: {day: number; cultivar: string; metrics: Record<MetricId, ModelResult>}) {
-  const [open, setOpen] = useState(false);
-  // 수확 때(무게 감소 0%)와 고른 날을 나란히 놓아 비교합니다. 모양은 계산된 무게 감소율만 반영합니다.
-  const start = {...metrics, loss: {...metrics.loss, ok: true, value: 0}} as Record<MetricId, ModelResult>;
-  const lossV = metrics.loss.ok && metrics.loss.value !== null ? metrics.loss.value : null;
-  const caption = lossV === null ? '무게 감소를 계산할 수 없어 모양을 바꾸지 않았어요.' : lossV < 0.05 ? '아직 무게가 거의 줄지 않아 모양 차이가 없어요.' : `저장 ${day}일째에는 무게가 약 ${fmtNum(lossV, 1)}% 줄어, 그만큼 크기가 작아지고 겉에 잔주름이 생기는 모습으로 그렸어요.${lossV < 2 ? ' 변화가 작아서 눈으로는 미세해요.' : ''}`;
-  return <details className="qt2-fold ag-3d" onToggle={e => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
-    <summary>사과 모양 비교 (3D · 수확 때 ↔ 저장 {day}일째)<Plus size={16} /></summary>
-    {open && <div className="ag-cmp-wrap">
-      <div className="ag-cmp">
-        <figure><figcaption><b>수확 때</b><span>무게 감소 0%</span></figcaption><Boundary><QualityAppleViewer bare day={0} cultivar={cultivar} metrics={start} /></Boundary></figure>
-        <figure><figcaption><b>저장 {day}일째</b><span>{lossV === null ? '계산 없음' : `무게 약 ${fmtNum(lossV, 1)}% 감소`}</span></figcaption><Boundary><QualityAppleViewer bare day={day} cultivar={cultivar} metrics={metrics} /></Boundary></figure>
-      </div>
-      <p className="ag-cmp-cap">{caption}</p>
-      <p className="qt-help">날짜를 바꾸면 오른쪽 사과가 바뀌어요. 실제 사과 사진을 바탕으로 만든 3D 모델이에요. 크기·주름 변화는 무게 감소 계산값으로 그린 것이고, 저장 중 사과를 찍어 비교한 건 아니에요.</p>
-    </div>}
-  </details>;
-}
 
 /** 한눈에 고르는 선택 버튼 묶음. 실제 라디오 입력이라 화살표 키로도 바꿀 수 있습니다. */
 function Seg<T extends string>({id, legend, value, options, onChange, err}: {id: string; legend: ReactNode; value: T | ''; options: {value: T; label: string; disabled?: boolean; tag?: string}[]; onChange: (v: T) => void; err?: string}) {

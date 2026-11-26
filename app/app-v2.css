@@ -165,7 +165,6 @@
 .qt2-cta{display:flex;align-items:center;justify-content:space-between;gap:16px 32px;flex-wrap:wrap;padding:24px 0;border-bottom:1px solid var(--app-line)}
 .qt2-cta h3{display:inline;font-family:var(--app-serif);font-size:28px;font-weight:700;margin:0 20px 0 0;color:var(--app-ink)}
 .qt2-cta p{display:inline;margin:0;font-size:16px;color:var(--app-sub)}
-.qt2-more{display:flex;flex-wrap:wrap;align-items:flex-start;gap:0 32px;padding-top:12px}
 .qt2-fold{flex:1 1 100%;border-bottom:1px solid var(--app-line)}
 .qt2-fold>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:56px;font-size:17px;color:var(--app-ink);cursor:pointer}
 .qt2-fold>summary::-webkit-details-marker{display:none}
@@ -967,14 +966,6 @@ html.big-text .as-intro .lv-hero-copy, html.big-text .as-cap > *, html.big-text 
 html.big-text [role="dialog"]{max-height:calc(100dvh - 24px);overflow-y:auto}
 html.big-text [role="dialog"] > *{zoom:1.3}
 /* 3D 나란히 비교 */
-.ag-cmp-wrap{display:grid;gap:10px;padding:4px 0 16px}
-.ag-cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.ag-cmp figure{margin:0;min-width:0;border:1px solid var(--c-line);border-radius:14px;overflow:hidden;background:#f7f8f4}
-.ag-cmp figcaption{display:flex;flex-direction:column;align-items:center;padding:8px 4px 0;font-size:14px}.ag-cmp figcaption span{font-size:12px;color:var(--c-sub)}
-.ag-cmp figure:last-child figcaption b{color:var(--c-main)}
-.ag-cmp section{border:0!important;border-radius:0!important;background:transparent!important;padding:0!important;margin:0!important;box-shadow:none!important}
-.ag-cmp-cap{margin:0;font-size:15px;line-height:1.5}
-.ag-cmp [class*="stage"]{height:auto!important;min-height:0!important;aspect-ratio:1/1}
 
 /* 예시 체험 머리말(휴대폰): 글자 크게·로그인도 보이게(작게) */
 @media(max-width:600px){.guest-utils{gap:4px}.guest-utils .btn-ghost{display:inline-flex!important;padding:0 8px;font-size:13px}.guest-utils .big-text-toggle .btt-t{display:none}}

@@ -12,7 +12,7 @@ import {LotEditor, MeasurementForm} from '@/components/lot-dialogs';
 import {latestObservation, lotPredictor, easyChange, EASY_LABEL, EASY_METRICS, weatherPending, type WeatherValues} from '@/lib/lot-predict';
 import {lotReadiness, baselineObservation, storageStart, quantityUnit, weatherInitial} from '@/lib/lot-readiness';
 import {fmtNum, metricMeta, todayKST, addDays, daysBetween, isDate} from '@/lib/tracker';
-import {AppleGraph, Apple3D} from '@/components/apple-graph';
+import {AppleGraph} from '@/components/apple-graph';
 import MiniCharts from '@/components/mini-charts';
 import {weatherLabels, WEATHER_STATIONS} from '@/lib/rda-weather';
 import {lotRegionLabel} from '@/lib/lot-region';
@@ -206,7 +206,6 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
     {obs === null ? <p className="dash-chart ma-loading" role="status">측정 기록 확인 중…</p> : <>
       <div className="dash-chart only-mobile"><AppleGraph p={p} p0={p0} obs={obs} sel={sel} maxDay={hongro ? 120 : 200} target={lot.details?.firmness_target ?? null} /></div>
       <section className="dash-chart only-pc" aria-label="저장 일수별 변화"><h2>저장 일수별 변화 <small>선: 계산값 · 동그라미: 내가 잰 값 · 세로선: 고른 날</small></h2><MiniCharts p={p} obs={obs} sel={sel} maxDay={hongro ? 120 : 200} target={lot.details?.firmness_target ?? null} /></section>
-      <div className="dash-3d"><Apple3D p={p} sel={sel} cultivar={lot.variety || ''} /></div>
     </>}
     <div className="dash-measurements">
       <section className="ma-records dash-rec" aria-label="최근 측정 기록"><h2>최근 측정</h2>
