@@ -20,10 +20,10 @@ test('matches all eight municipalities from the origin field, including old and 
   }
 });
 
-test('weights prices by lots and never merges sizes, grades, varieties, or markets', () => {
+test('weights prices by lots, never merges sizes, grades, varieties, or markets, and keeps only 후지·홍로', () => {
   const groups = groupAppleAuctions([
     sale, {...sale, quantity: 6, unitPrice: 20000}, {...sale, unitWeightKg: 10}, {...sale, grade: '상'},
-    {...sale, variety: '미시마'}, {...sale, size: '4'}, {...sale, packageName: '컨테이너'},
+    {...sale, variety: '홍로'}, {...sale, variety: '미시마'}, {...sale, size: '4'}, {...sale, packageName: '컨테이너'},
     {...sale, source: 'wholesale', marketName: '안동'}, {...sale, region: 'yeongju'},
   ], 'geochang');
   assert.equal(groups.length, 7);

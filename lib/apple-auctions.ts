@@ -24,6 +24,10 @@ export function auctionOriginRegion(origin: string): RegionKey | undefined {
   });
 }
 
+/** 애플트랙이 다루는 품종(후지·홍로)만 경매가에 보여 줍니다. 원자료 품종명이 정확히 이 이름일 때만 씁니다. */
+const TRACKED_VARIETIES = new Set(['후지', '부사', '후지(부사)', '홍로']);
+export const isTrackedVariety = (variety: string) => TRACKED_VARIETIES.has(normalize(variety));
+
 export type RegionalAuctionTrade = MarketAuctionTrade & {source: MarketAuctionSource; region: RegionKey};
 
 type GroupTotal = Omit<AppleAuctionGroup, 'days'> & {
@@ -44,7 +48,7 @@ export function groupAppleAuctions(trades: readonly RegionalAuctionTrade[], regi
   const groups = new Map<string, GroupTotal>();
 
   for (const trade of trades) {
-    if (trade.region !== region) continue;
+    if (trade.region !== region || !isTrackedVariety(trade.variety)) continue;
     const {date, source, marketName, variety, grade, packageName, size, unit, unitWeightKg, quantity, unitPrice} = trade;
     const id = JSON.stringify([source, marketName, variety, grade, packageName, size, unit, unitWeightKg]);
     let group = groups.get(id);

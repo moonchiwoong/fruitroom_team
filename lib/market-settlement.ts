@@ -1,7 +1,7 @@
 // aT 전국 공영도매시장 정산정보(공공데이터 15141809, katSale/trades)에서 사과 등급별 정산가를 읽습니다.
 // 실시간 경매정보에는 등급·크기가 없어서, 어제 이전 거래는 이 자료로 등급별 가격을 보여 줍니다.
 import type {GradedAuctionGroup} from './apple-auction-types';
-import {auctionOriginRegion} from './apple-auctions';
+import {auctionOriginRegion, isTrackedVariety} from './apple-auctions';
 import type {RegionKey} from './regions';
 import {isDate} from './tracker';
 import {SETTLEMENT_MARKETS} from './settlement-markets';
@@ -50,7 +50,7 @@ export function groupGraded(rows: readonly SettlementRow[], region: RegionKey): 
   type Acc = {boxes: number; amount: number; low: number; high: number};
   const groups = new Map<string, {g: Omit<GradedAuctionGroup, 'grades'>; grades: Map<string, {grade: string; size: string; days: Map<string, Acc>}>}>();
   for (const r of rows) {
-    if (auctionOriginRegion(r.origin) !== region) continue;
+    if (auctionOriginRegion(r.origin) !== region || !isTrackedVariety(r.variety)) continue;
     const id = JSON.stringify([r.marketCode, r.variety, r.packageName, r.unitWeightKg]);
     let e = groups.get(id);
     if (!e) { e = {g: {id, marketCode: r.marketCode, marketName: r.marketName, variety: r.variety, packageName: r.packageName, unitWeightKg: r.unitWeightKg}, grades: new Map()}; groups.set(id, e); }

@@ -36,3 +36,8 @@ test('시장 이름 → 정산정보 시장 코드', () => {
   assert.equal(settlementMarketCode('서울가락'), '110001');
   assert.equal(settlementMarketCode('없는시장'), undefined);
 });
+
+test('후지·홍로만: 미얀마·감홍 등 다른 품종 이름은 등급별 정산가에서 뺌', () => {
+  const rows = ['후지', '홍로', '미얀마', '감홍'].map(v => settlementRow(raw({gds_sclsf_nm: v, unit_tot_qty: '20', totprc: '30000', lwprc: '30000', hgprc: '30000'}), '2026-11-25')!);
+  assert.deepEqual(groupGraded(rows, 'cheongsong').map(g => g.variety).sort(), ['홍로', '후지'].sort());
+});
