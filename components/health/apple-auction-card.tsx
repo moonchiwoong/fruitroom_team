@@ -1,0 +1,165 @@
+'use client';
+
+import {useEffect, useId, useState} from 'react';
+import {requestJson} from '@/components/lot-forms';
+import type {AppleAuctionGroup, AppleAuctionsResponse} from '@/lib/apple-auction-types';
+import {isRegionKey, REGION_KEYS, REGIONS, type RegionKey} from '@/lib/regions';
+import './apple-auction-card.css';
+
+type Props = {region?: RegionKey | null; variety?: string | null};
+type RequestResult = {region: RegionKey; attempt: number; data: AppleAuctionsResponse | null};
+
+const priceFormat = new Intl.NumberFormat('ko-KR', {maximumFractionDigits: 0});
+const weightFormat = new Intl.NumberFormat('ko-KR', {maximumFractionDigits: 3});
+const sourceLabel = {'origin-hall': '산지공판장', wholesale: '공영도매시장'};
+const sourceLink = {
+  'origin-hall': 'https://www.data.go.kr/data/15156054/openapi.do',
+  wholesale: 'https://www.data.go.kr/data/15141808/openapi.do',
+};
+
+const marketKey = (group: AppleAuctionGroup) => JSON.stringify([group.source, group.marketName]);
+const weightLabel = (weightKg: number) => `${weightFormat.format(weightKg)}kg`;
+const gradeLabel = (grade: string) => grade === '없음' || !grade ? '등급 미기재' : grade;
+
+function specification(group: AppleAuctionGroup) {
+  return [...new Set([weightLabel(group.unitWeightKg), group.packageName, group.size, group.unit].filter(Boolean))].join(' · ');
+}
+
+function initialGroup(groups: AppleAuctionGroup[], preferred?: string | null) {
+  const variety = preferred?.trim();
+  // `후지`와 `후지(부사)`는 초기 선택에서만 연결하고 실제 경매 품종명과 집계는 그대로 표시합니다.
+  const fujiLabels = ['후지', '부사', '후지(부사)'];
+  const preferFuji = variety !== undefined && fujiLabels.includes(variety);
+  return groups.find(group => group.variety === variety || (preferFuji && fujiLabels.includes(group.variety))) ?? groups[0];
+}
+
+export default function AppleAuctionCard({region, variety}: Props) {
+  const defaultRegion = region ?? REGION_KEYS[0];
+  return <AuctionCard key={JSON.stringify([defaultRegion, variety])} defaultRegion={defaultRegion} variety={variety} />;
+}
+
+function AuctionCard({defaultRegion, variety}: {defaultRegion: RegionKey; variety?: string | null}) {
+  const title = useId();
+  const [region, setRegion] = useState(defaultRegion);
+  const [attempt, setAttempt] = useState(0);
+  const [result, setResult] = useState<RequestResult | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const params = new URLSearchParams({region});
+    requestJson<AppleAuctionsResponse>(`/api/market/apple-auctions?${params}`, {signal: controller.signal})
+      .then(data => {
+        if (!controller.signal.aborted) setResult({region, attempt, data});
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setResult({region, attempt, data: null});
+      });
+    return () => controller.abort();
+  }, [region, attempt]);
+
+  const current = result?.region === region && result.attempt === attempt ? result : null;
+  const data = current?.data;
+  const groups = data?.status === 'ready' ? data.groups.filter(group => group.days.length) : [];
+  const loading = current === null;
+  const error = current !== null && (!data || data.status === 'unavailable' || data.region !== region);
+
+  return <section className="hs-card apple-auction" aria-labelledby={title}>
+    <div className="apple-auction__heading">
+      <h2 id={title}>사과 경매가</h2>
+      <div className="apple-auction__filter">
+        <label htmlFor={`${title}-region`}>산지</label>
+        <select id={`${title}-region`} value={region} onChange={event => {
+          const nextRegion = event.currentTarget.value;
+          if (isRegionKey(nextRegion)) {
+            setResult(null);
+            setRegion(nextRegion);
+          }
+        }}>
+          {REGION_KEYS.map(key => <option key={key} value={key}>{REGIONS[key].label}</option>)}
+        </select>
+      </div>
+    </div>
+    {loading ? <p className="apple-auction__notice" role="status">경매 자료를 불러오는 중이에요…</p>
+      : error ? <div className="apple-auction__retry">
+        <p className="apple-auction__notice" role="status">조회 자료를 불러오지 못했어요.</p>
+        <button className="hs-link" type="button" onClick={() => setAttempt(value => value + 1)}>다시 불러오기</button>
+      </div>
+      : !groups.length ? <p className="apple-auction__notice" role="status">
+        {REGIONS[region].label}산 사과의 최근 경매 자료를 확인하지 못했어요.
+        {data?.checkedThrough && <> 조회 기준일 <time dateTime={data.checkedThrough}>{data.checkedThrough}</time></>}
+      </p>
+      : <AuctionResults key={JSON.stringify([region, attempt])} region={region} groups={groups} variety={variety} />}
+    {!error && data?.partial && <p className="apple-auction__note">일부 시장의 자료는 아직 확인되지 않았어요.</p>}
+  </section>;
+}
+
+function AuctionResults({region, groups, variety}: {region: RegionKey; groups: AppleAuctionGroup[]; variety?: string | null}) {
+  const filters = useId();
+  const [selectedId, setSelectedId] = useState(() => initialGroup(groups, variety).id);
+  const selected = groups.find(group => group.id === selectedId) ?? initialGroup(groups, variety);
+  const markets = [...new Map(groups.map(group => [marketKey(group), group])).values()];
+  const market = marketKey(selected);
+  const marketGroups = groups.filter(group => marketKey(group) === market);
+  const varieties = [...new Set(marketGroups.map(group => group.variety))];
+  const comparableGroups = marketGroups.filter(group => group.variety === selected.variety);
+  const days = selected.days.slice(0, 5);
+  const latest = days[0];
+  const priceBasis = [weightLabel(selected.unitWeightKg), selected.packageName || (selected.unit === 'kg' ? '' : selected.unit)].filter(Boolean).join(' ');
+
+  function changeMarket(key: string) {
+    const options = groups.filter(group => marketKey(group) === key);
+    if (options.length) setSelectedId(initialGroup(options, selected.variety).id);
+  }
+
+  function changeVariety(name: string) {
+    const first = marketGroups.find(group => group.variety === name);
+    if (first) setSelectedId(first.id);
+  }
+
+  return <>
+    {markets.length > 1 && <div className="apple-auction__filter apple-auction__market-filter">
+      <label htmlFor={`${filters}-market`}>거래 시장</label>
+      <select id={`${filters}-market`} value={market} onChange={event => changeMarket(event.currentTarget.value)}>
+        {markets.map(group => <option key={marketKey(group)} value={marketKey(group)}>{group.marketName} · {sourceLabel[group.source]}</option>)}
+      </select>
+    </div>}
+    <div className="apple-auction__filters">
+      <div className="apple-auction__filter">
+        <label htmlFor={`${filters}-variety`}>품종</label>
+        <select id={`${filters}-variety`} value={selected.variety} onChange={event => changeVariety(event.currentTarget.value)}>
+          {varieties.map(name => <option key={name} value={name}>{name}</option>)}
+        </select>
+      </div>
+      <div className="apple-auction__filter">
+        <label htmlFor={`${filters}-spec`}>등급·규격</label>
+        <select id={`${filters}-spec`} value={selected.id} onChange={event => setSelectedId(event.currentTarget.value)}>
+          {comparableGroups.map(group => <option key={group.id} value={group.id}>{gradeLabel(group.grade)} · {specification(group)}</option>)}
+        </select>
+      </div>
+    </div>
+    <p className="apple-auction__venue"><strong>{selected.marketName}</strong> · {sourceLabel[selected.source]}</p>
+    <p className="apple-auction__meta">{REGIONS[region].label}산 · 최근 거래일 <time dateTime={latest.date}>{latest.date}</time></p>
+    <dl className="apple-auction__metrics">
+      <div>
+        <dt>평균 낙찰가</dt>
+        <dd><strong>{priceFormat.format(latest.averagePrice)}원</strong><small>{priceBasis} 기준</small></dd>
+      </div>
+      <div>
+        <dt>거래량</dt>
+        <dd><strong>{weightLabel(latest.totalWeightKg)}</strong></dd>
+      </div>
+    </dl>
+    <details className="apple-auction__history" key={selected.id}>
+      <summary>최근 {days.length}거래일 추이</summary>
+      <table aria-label="거래일별 평균 낙찰가와 거래량">
+        <thead><tr><th scope="col">거래일</th><th scope="col">평균 낙찰가<small>원/{priceBasis}</small></th><th scope="col">거래량<small>kg</small></th></tr></thead>
+        <tbody>{days.map(day => <tr key={day.date}>
+          <td><time dateTime={day.date}>{day.date}</time></td>
+          <td>{priceFormat.format(day.averagePrice)}</td>
+          <td>{weightFormat.format(day.totalWeightKg)}</td>
+        </tr>)}</tbody>
+      </table>
+    </details>
+    <p className="apple-auction__note">수수료·운송비 차감 전 낙찰가 · <a href={sourceLink[selected.source]} target="_blank" rel="noreferrer">출처 aT</a></p>
+  </>;
+}
