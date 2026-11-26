@@ -38,12 +38,13 @@
 .lh{position:relative;min-height:100dvh;background:#fff;color:#191F28;letter-spacing:-.4px;overflow:hidden;overflow:clip}
 .lh-top{display:flex;align-items:center;gap:20px;padding:20px clamp(20px,5vw,56px)}
 .lh-top img{height:34px;width:auto}
-.lh-top a{margin-left:auto;color:#4E5968;font-size:15px;text-decoration:none;white-space:nowrap}
-@media (max-width:480px){.lh-top{gap:10px}.lh-top img{height:28px}.lh-top a{font-size:13px}}
+@media (max-width:480px){.lh-top{gap:10px}.lh-top img{height:28px}}
 .lh-wrap{display:grid;grid-template-columns:minmax(0,440px) minmax(0,1fr);gap:32px;padding:24px clamp(20px,5vw,56px) 40px;align-items:center;max-width:1280px;margin:0 auto}
 .lh-kicker{margin:0;font-size:17px;font-weight:700;color:#E5322D}
 .lh h1{margin:10px 0 14px;font-size:clamp(30px,4.2vw,52px);line-height:1.25;font-weight:800;letter-spacing:-1.4px}
-.lh-lead{margin:0 0 26px;font-size:clamp(16px,1.6vw,19px);line-height:1.6;color:#4E5968}
+.lh-lead{margin:0 0 18px;font-size:clamp(16px,1.6vw,19px);line-height:1.6;color:#4E5968}
+.lh-try-link{min-height:44px;margin:0 0 24px;background:var(--brand);color:#fff}
+.lh-try-link:hover{background:var(--brand-2)}
 .lh-stage{position:relative;height:560px}
 .lh-ring{position:absolute;left:8%;top:6%;width:min(480px,84%);aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 35% 35%,#FFE3E1,#FFF5F4 60%,transparent 70%)}
 .lh-apple{position:absolute;left:24%;top:22%;width:min(280px,52%);filter:drop-shadow(0 18px 30px rgba(180,40,30,.18))}
@@ -58,7 +59,7 @@
 .lh-float{animation:lhBob 5s ease-in-out 1.2s infinite}
 @keyframes lhUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
 @keyframes lhBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-@media (max-width:860px){.lh-wrap{grid-template-columns:1fr}.lh-stage{order:-1;height:300px;margin:0 -8px}.lh-ring{left:50%;transform:translateX(-50%);top:0;width:280px}.lh-apple{left:50%;top:40px;width:170px;margin-left:-85px}.lh-c2{display:none}.lh-c0{left:0;top:30px}.lh-c1{right:0;top:60px}.lh-c3{right:4%;bottom:6px}}
+@media (max-width:860px){.lh-wrap{grid-template-columns:1fr}.lh-stage{height:300px;margin:0 -8px}.lh-ring{left:50%;transform:translateX(-50%);top:0;width:280px}.lh-apple{left:50%;top:40px;width:170px;margin-left:-85px}.lh-c2{display:none}.lh-c0{left:0;top:30px}.lh-c1{right:0;top:60px}.lh-c3{right:4%;bottom:6px}}
 @media (prefers-reduced-motion:reduce){.lh-up{opacity:1;animation:none}.lh-float{animation:none}}
 /* ===== 헬스앱형 공통 테마: 로그인 후 모든 화면 ===== */
 :root{--hx-max:1080px;--hx-pad:24px;--hx-bg:#F2F2F7;--hx-acc:#E5322D;--hx-sub:#8A8A8E}
@@ -118,7 +119,7 @@ body:has(.app-header) .site-footer-bottom,body:has(.app-header) .site-footer-leg
 /* PC 사과 상세: 한 줄이 너무 길어지지 않게(왼쪽 정렬은 유지) */
 
 /* 로그인 화면의 ‘글자 크게’ 버튼이 선처럼 보이던 문제 */
-.lh-top .big-text-toggle{display:inline-flex;align-items:center;gap:4px;border:1px solid #D1D6DB;border-radius:999px;padding:5px 10px;background:#fff;font-size:13px;color:#4E5968;min-width:0;height:auto}
+.lh-top .big-text-toggle{display:inline-flex;align-items:center;gap:4px;margin-left:auto;flex-shrink:0;white-space:nowrap;border:1px solid #D1D6DB;border-radius:999px;padding:5px 10px;background:#fff;font-size:13px;color:#4E5968;min-width:0;min-height:44px;height:auto}
 /* 체험 화면도 같은 색·모양으로 */
 .site.guest .site-main{background:var(--hx-bg)}
 .try-tabs{background:#E3E3E8!important;border-radius:9px!important;padding:2px!important;border:0!important}
@@ -190,30 +191,40 @@ body:has(.app-header) .site-footer-bottom,body:has(.app-header) .site-footer-leg
 .dash-wx div{display:flex;justify-content:space-between;gap:8px;font-size:13px;border-bottom:1px solid #F2F2F7;padding:4px 0}
 .dash-wx dt{color:var(--hx-sub)}.dash-wx dd{margin:0;font-weight:700}
 .dash-bottom{display:grid;gap:12px}
+.ma-dash .dash-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px 16px;
+}
+.ma-dash .dash-title-row .ma-title {
+  flex: 1 1 400px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.dash-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ma-dash .dash-head .ma-hint { margin-top: 8px; }
+.dash-measurements { display: grid; gap: 12px; }
 @media (max-width:999.98px){.only-pc{display:none!important}}
 @media (min-width:1000px){
   .only-mobile{display:none!important}
-  .ma.ma-dash{display:grid!important;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:12px 16px;align-items:start;
-    grid-template-areas:"back back" "head head" "days days" "tiles tiles" "chart side" "bottom bottom" "foot foot" "manage manage"}
-  .ma-dash>*{grid-column:1/-1}
-  .ma-dash>.ma-back{grid-area:back}.ma-dash>.dash-head{grid-area:head}.ma-dash>.dash-days{grid-area:days}.ma-dash>.dash-tiles{grid-area:tiles}
-  .ma-dash>.dash-chart.only-pc{grid-area:chart}.ma-dash>.dash-side{grid-area:side;display:grid;gap:12px}
-  .ma-dash>.dash-bottom{grid-area:bottom;grid-template-columns:1fr 1fr}.ma-dash>.ma-foot{grid-area:foot}.ma-dash>.ma-manage{grid-area:manage}
-  .ma-dash .dash-act{margin:0}
-  .ma-dash .dash-act .ma-primary{width:100%}
+  .dash-measurements {
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    align-items: start;
+  }
+  .dash-measurements > :only-child { grid-column: 1 / -1; }
+  .ma-dash > .dash-bottom { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ma-dash .dash-tiles .ma-rows,.lp-dash .dash-tiles .ma-rows{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;background:none!important;padding:0!important}
   .ma-dash .dash-tiles .ma-row,.lp-dash .dash-tiles .ma-row{flex-direction:column;align-items:flex-start;background:#fff;border-radius:14px;padding:12px 14px;border:0!important;gap:6px;justify-content:flex-start}
   .ma-dash .dash-tiles .ma-row div,.lp-dash .dash-tiles .ma-row div{text-align:left}
   .ma-dash .dash-tiles .ma-row b,.lp-dash .dash-tiles .ma-row b{font-size:17px}
 }
 
-/* 모바일: 옆칸 묶음을 풀고 ‘측정 추가’를 그래프 위로 */
-@media (max-width:999.98px){
-  .ma-dash .dash-side{display:contents}
-  .ma-dash>.ma-back{order:1}.ma-dash>.dash-head{order:2}.ma-dash>.dash-days{order:3}.ma-dash>.dash-tiles{order:4}
-  .ma-dash .dash-act{order:5}.ma-dash>.dash-chart{order:6}.ma-dash .dash-3d{order:7}.ma-dash .dash-rec{order:8}
-  .ma-dash>.dash-bottom{order:9}.ma-dash>.ma-foot{order:10}.ma-dash>.ma-manage{order:11}
-}
 /* ===== 요약 대시보드 ===== */
 .hs-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
 .hs-kpi{background:#fff;border-radius:14px;padding:10px 14px;display:flex;flex-direction:column;gap:2px}
