@@ -47,9 +47,19 @@ const PAGE_SIZE = 1_000;
 const MAX_PAGES = 30;
 const PAGE_CONCURRENCY = 4;
 const TIMEOUT_MS = 15_000;
+const RESULT_CODES = new Set(['0', '00', '000', '01', '02', '03', '04', '05', '10', '11', '12', '20', '21', '22', '23', '29', '30', '31', '32', '33', '99']);
+
+type SourceFailure = {
+  stage: 'configuration' | 'network' | 'timeout' | 'http' | 'gateway' | 'shape' | 'pagination' | 'normalization';
+  page?: number;
+  httpStatus?: number;
+  resultCode?: string;
+  envelope?: 'response' | 'header-body' | 'gateway' | 'unknown';
+  fields?: string[];
+};
 
 export class MarketAuctionSourceError extends Error {
-  constructor() {
+  constructor(readonly failure: SourceFailure) {
     super('aT 경매 원자료를 확인하지 못했어요.');
     this.name = 'MarketAuctionSourceError';
   }
@@ -140,28 +150,40 @@ function trade(row: RecordFields, query: DayQuery): MarketAuctionTrade | null {
   };
 }
 
-function parsePage(content: unknown, page: number): AuctionPage {
+function resultCode(value: unknown): string | undefined {
+  const code = text(value);
+  return RESULT_CODES.has(code) ? code : undefined;
+}
+
+function fieldNames(row?: RecordFields | null): string[] | undefined {
+  return row ? Object.keys(row).filter(key => /^[a-z][a-z0-9_]{0,39}$/.test(key)).slice(0, 48) : undefined;
+}
+
+function parsePage(content: unknown, page: number, httpStatus: number): AuctionPage {
   const envelope = record(content);
-  const response = record(envelope?.response) ?? envelope;
-  const status = text(record(response?.header)?.resultCode);
+  const wrapped = record(envelope?.response);
+  const response = wrapped ?? envelope;
+  const gateway = record(record(envelope?.OpenAPI_ServiceResponse)?.cmmMsgHeader);
+  const status = resultCode(record(response?.header)?.resultCode ?? gateway?.returnReasonCode);
+  const shape = wrapped ? 'response' : gateway ? 'gateway' : response?.header ? 'header-body' : 'unknown';
+  const metadata = {page, httpStatus, resultCode: status, envelope: shape} as const;
+  if (httpStatus < 200 || httpStatus >= 300) throw new MarketAuctionSourceError({stage: 'http', ...metadata});
   // 공공데이터포털 공통 응답 코드 03은 NODATA_ERROR입니다.
   if (status === '03') return {rows: [], total: 0, pageSize: PAGE_SIZE};
+  if (status && !/^(?:0|00|000)$/.test(status)) throw new MarketAuctionSourceError({stage: 'gateway', ...metadata});
   const body = record(response?.body);
   const total = number(body?.totalCount);
-  if (!/^(?:0|00|000)$/.test(status) || !body || total === null || !Number.isSafeInteger(total) || total < 0) {
-    throw new MarketAuctionSourceError();
-  }
-
+  if (!status || !body || total === null || !Number.isSafeInteger(total) || total < 0) throw new MarketAuctionSourceError({stage: 'shape', ...metadata});
   const pageSize = number(body.numOfRows) ?? PAGE_SIZE;
   const returnedPage = number(body.pageNo);
-  if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > PAGE_SIZE || (returnedPage !== null && returnedPage !== page)) {
-    throw new MarketAuctionSourceError();
-  }
   const items = record(body.items)?.item ?? body.items;
   const rawRows = Array.isArray(items) ? items : record(items) ? [items] : [];
   const rows = rawRows.map(record);
+  const invalidPage = !Number.isInteger(pageSize) || pageSize < 1 || pageSize > PAGE_SIZE || (returnedPage !== null && returnedPage !== page);
   const expectedLength = Math.min(pageSize, Math.max(0, total - (page - 1) * pageSize));
-  if (rows.some(row => row === null) || rows.length !== expectedLength) throw new MarketAuctionSourceError();
+  if (invalidPage || rows.some(row => row === null) || rows.length !== expectedLength) {
+    throw new MarketAuctionSourceError({stage: 'pagination', ...metadata, fields: page === 1 ? fieldNames(rows[0]) : undefined});
+  }
   return {rows: rows as RecordFields[], total, pageSize};
 }
 
@@ -183,47 +205,56 @@ function endpoint(query: DayQuery): URL {
 async function fetchPage(base: URL, page: number, signal: AbortSignal): Promise<AuctionPage> {
   const url = new URL(base);
   url.searchParams.set('pageNo', String(page));
+  let httpStatus: number | undefined;
   try {
     const response = await fetch(url, {cache: 'no-store', redirect: 'error', signal});
-    if (!response.ok) throw new MarketAuctionSourceError();
-    return parsePage(await response.json(), page);
-  } catch {
+    httpStatus = response.status;
+    const raw = await response.text();
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      const code = resultCode(/<(?:returnReasonCode|resultCode|errCode)>\s*(\d{1,3})\s*</.exec(raw.slice(0, 4_096))?.[1]);
+      throw new MarketAuctionSourceError({stage: code ? 'gateway' : response.ok ? 'shape' : 'http', page, httpStatus, resultCode: code});
+    }
+    return parsePage(parsed, page, httpStatus);
+  } catch (error) {
+    if (error instanceof MarketAuctionSourceError) throw error;
     // 네트워크 오류에는 인증키가 포함된 URL이나 응답 원문이 있을 수 있습니다.
-    throw new MarketAuctionSourceError();
+    throw new MarketAuctionSourceError({stage: signal.aborted ? 'timeout' : 'network', page, httpStatus});
   }
 }
 
-/** 정산일로 자료를 조회하되 반환 날짜에는 확인된 낙찰일만 사용합니다. 서버 라우트에서 호출합니다. */
-export async function fetchMarketAuctionDay(query: DayQuery): Promise<MarketAuctionDay> {
+async function loadMarketAuctionDay(query: DayQuery): Promise<MarketAuctionDay> {
   if (!isDate(query.date) || !query.serviceKey.trim() || (query.source === 'origin-hall' && !query.marketCode)) {
-    throw new MarketAuctionSourceError();
+    throw new MarketAuctionSourceError({stage: 'configuration'});
   }
 
   let url: URL;
   try {
     url = endpoint(query);
   } catch {
-    throw new MarketAuctionSourceError();
+    throw new MarketAuctionSourceError({stage: 'configuration'});
   }
   const timeout = AbortSignal.timeout(TIMEOUT_MS);
   const signal = query.signal ? AbortSignal.any([query.signal, timeout]) : timeout;
   const first = await fetchPage(url, 1, signal);
   const pages = Math.ceil(first.total / first.pageSize);
-  if (pages > MAX_PAGES) throw new MarketAuctionSourceError();
+  if (pages > MAX_PAGES) throw new MarketAuctionSourceError({stage: 'pagination', page: 1, fields: fieldNames(first.rows[0])});
 
   const rows = first.rows;
   for (let start = 2; start <= pages; start += PAGE_CONCURRENCY) {
     const batch = Array.from({length: Math.min(PAGE_CONCURRENCY, pages - start + 1)}, (_, i) => fetchPage(url, start + i, signal));
-    for (const page of await Promise.all(batch)) {
-      if (page.total !== first.total || page.pageSize !== first.pageSize) throw new MarketAuctionSourceError();
+    for (const [index, page] of (await Promise.all(batch)).entries()) {
+      if (page.total !== first.total || page.pageSize !== first.pageSize) throw new MarketAuctionSourceError({stage: 'pagination', page: start + index});
       rows.push(...page.rows);
     }
   }
-  if (rows.length !== first.total) throw new MarketAuctionSourceError();
+  if (rows.length !== first.total) throw new MarketAuctionSourceError({stage: 'pagination'});
   if (rows.length === 0) return {trades: [], incompleteOrigins: []};
 
   const apples = rows.filter(isApple);
-  if (!apples.length || apples.every(row => !text(row.trd_se))) throw new MarketAuctionSourceError();
+  if (!apples.length || apples.every(row => !text(row.trd_se))) throw new MarketAuctionSourceError({stage: 'normalization', page: 1, fields: fieldNames(rows[0])});
   const trades: MarketAuctionTrade[] = [];
   const incompleteOrigins = new Set<string>();
   let auctionRows = 0;
@@ -236,6 +267,17 @@ export async function fetchMarketAuctionDay(query: DayQuery): Promise<MarketAuct
     if (normalized) trades.push(normalized);
     else incompleteOrigins.add(cleanLabel(row.plor_nm));
   }
-  if (auctionRows && !trades.length) throw new MarketAuctionSourceError();
+  if (auctionRows && !trades.length) throw new MarketAuctionSourceError({stage: 'normalization', page: 1, fields: fieldNames(rows[0])});
   return {trades, incompleteOrigins: [...incompleteOrigins].filter(Boolean)};
+}
+
+/** 정산일로 자료를 조회하되 반환 날짜에는 확인된 낙찰일만 사용합니다. 서버 라우트에서 호출합니다. */
+export async function fetchMarketAuctionDay(query: DayQuery): Promise<MarketAuctionDay> {
+  try {
+    return await loadMarketAuctionDay(query);
+  } catch (caught) {
+    const error = caught instanceof MarketAuctionSourceError ? caught : new MarketAuctionSourceError({stage: 'normalization'});
+    console.warn('aT apple auction day unavailable', {source: query.source, date: isDate(query.date) ? query.date : undefined, ...error.failure});
+    throw error;
+  }
 }
