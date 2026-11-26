@@ -45,7 +45,7 @@ try {
       assert.match(card, /55\.0/); assert.match(card, /오늘 실측/);
       show('요약 카드', card);
       ok(`${tag} 1 요약: 로딩 중 임시값 없음 → 55.0 N 오늘 실측`);
-      await page.locator('.hs-sec .hs-link').filter({hasText: '자세히'}).first().click();
+      await page.locator('.hs-sec .hs-more').first().click();
       await page.waitForURL(new RegExp(`#lot/${T0.id}`));
       await page.getByText('측정 기록 확인 중…').first().waitFor();
       assert.ok(!(await bodyHas(page, /60\.0\s*N|59\.6/)), '상세 로딩 중 임시 60.0/59.6');
@@ -133,7 +133,7 @@ try {
       show('체험 화면 출하 비교 흔적 수', await page.locator('#ship-compare').count()); assert.equal(await page.locator('#ship-compare').count(), 0);
       assert.equal(await page.getByText('내 사과로 해 보기').count(), 0, '체험은 예시 사과만');
       await page.locator('.hs-today .hs-hl').waitFor({timeout: 30000});
-      await page.locator('.hs-today').getByRole('button', {name: '자세히'}).click();
+      await page.locator('.hs-today .hs-more').click();
       await page.locator('section[aria-label="소비자 선호와 비교"]').waitFor();
       ok(`${tag} 4 체험: 예시 사과만 · ‘내 사과로 해 보기’ 없음`);
       await context.close();

@@ -2,6 +2,7 @@
 // 로그인 후 홈 ‘요약’: 보관 중인 사과 → 고른 사과의 오늘 계산값 4가지 → 한 줄 요약.
 // 값은 lotPredictor(기존 식)만 씁니다. 작은 선도 그 식으로 계산한 0일~마지막 날 값입니다(예시 모양 없음).
 import {useEffect, useMemo, useState} from 'react';
+import {ChevronRight} from 'lucide-react';
 import {josa} from '@/lib/josa';
 import type {Lot, Observation} from '@/lib/lot-types';
 import {lotPredictor, easyChange, latestObservation} from '@/lib/lot-predict';
@@ -106,7 +107,7 @@ function LotToday({lot, openLot, guest = false}: {lot: Lot; openLot: (id: string
   const hm = ORDER.reduce<MetricId | null>((best, m) => change(m) < 0 ? best : best === null || change(m) > change(best) ? m : best, null);
   const f = hm ? p.at(hm, today) : p.at('firmness', today);
   return <>
-    <div className="hs-sec"><h2>{lot.name || lot.variety} · {p.todayDay !== null && p.todayDay > maxDay ? `${maxDay}일째(계산 끝)` : '오늘'}</h2><button type="button" className="hs-link" onClick={() => openLot(lot.id)}>자세히</button></div>
+    <div className="hs-sec"><h2>{lot.name || lot.variety} · {p.todayDay !== null && p.todayDay > maxDay ? `${maxDay}일째(계산 끝)` : '오늘'}</h2><button type="button" className="hs-more" onClick={() => openLot(lot.id)}>자세히 보기<ChevronRight size={16} aria-hidden="true" /></button></div>
     {(() => {
       // 계산할 수 없는 항목은 빈 카드 여러 장 대신 한 장으로 모아 보여 줍니다.
       const ready = ORDER.filter(m => p.at(m, today).ok), missing = ORDER.filter(m => !p.at(m, today).ok);
@@ -130,6 +131,7 @@ function LotToday({lot, openLot, guest = false}: {lot: Lot; openLot: (id: string
           <Bar label={f.from === 'measured' && today === p.todayDay && latestObservation(obs, hm, todayKST()) ? '오늘 실측' : f.from === 'measured' ? '오늘(측정값부터 계산)' : '오늘(계산)'} v={f.value} max={Math.max(f.first, f.value)} color="#C7C7CC" digits={metricMeta[hm].digits} />
         </div>}
       </div></>}
+    <button type="button" className="hs-more-wide" onClick={() => openLot(lot.id)}><span><b>이 사과 자세히 보기</b><small>저장 일수별 그래프 · 소비자 선호 비교 · 목표 저장일 · 측정 기록</small></span><ChevronRight size={20} aria-hidden="true" /></button>
     {ORDER.some(m => p.at(m, today).ok) && <p className="hs-src">기존 팀 계산식 결과 · 정확도 검증 전 · 출하·안전 판정 아님</p>}
   </>;
 }
