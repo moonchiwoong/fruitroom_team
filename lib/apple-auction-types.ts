@@ -1,10 +1,13 @@
 import type {RegionKey} from './regions';
 
+export const APPLE_AUCTION_PARTS = 4;
+
 export type AppleAuctionDay = {
   date: string;
   averagePrice: number;
   quantity: number;
   totalWeightKg: number;
+  totalAmount: number;
 };
 
 export type AppleAuctionGroup = {
