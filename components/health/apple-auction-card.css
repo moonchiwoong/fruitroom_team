@@ -246,18 +246,16 @@
 .gk-chart{margin:0}.gk-chart figcaption{font-size:12px;font-weight:700;color:#636366;margin-bottom:2px}
 .gk-chart svg{width:100%;max-width:480px;max-height:210px;height:auto;display:block}
 @media (max-width:380px){.gk-tile dd b{font-size:17px}}
-.gk-why-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
-.gk-why-btns button{border:1px solid #F7C1C1;background:#fff;color:#A32D2D;border-radius:999px;min-height:36px;padding:0 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
-.gk-why-btns button.on{background:#FCEBEB}
-.gk-why{margin-top:8px;background:#FFF6E0;border-radius:10px;padding:10px 12px;display:grid;gap:4px}
-.gk-why b{font-size:13px;color:#7A4A00}.gk-why p{margin:0;font-size:14px;line-height:1.55;color:#1c1c1e}
-.gk-why a{font-size:12px;color:#636366;text-decoration:underline;text-underline-offset:2px}
+.gk-why{margin-top:10px;background:#FFF6E0;border-radius:14px;padding:16px 18px;display:grid;gap:8px;align-content:start}
+.gk-why b{font-size:15px;color:#7A4A00}.gk-why b span{margin-left:6px;font-size:13px}.gk-why p{margin:0;font-size:16px;line-height:1.6;color:#1c1c1e}
+.gk-why.empty{align-content:center}.gk-why.empty p{font-size:14px;color:#7A4A00}
+.gk-why a{font-size:13px;color:#636366;text-decoration:underline;text-underline-offset:2px}
 @media (min-width:861px){
   .gk-chart{display:grid;grid-template-columns:minmax(0,480px) minmax(0,1fr);column-gap:20px;align-items:start}
   .gk-chart figcaption{grid-column:1/-1}
-  .gk-chart svg{grid-column:1;grid-row:2/span 3}
-  .gk-why-btns,.gk-why{grid-column:2}
-  .gk-why-btns{margin-top:8px}
+  .gk-chart{align-items:stretch}
+  .gk-chart svg{grid-column:1;grid-row:2}
+  .gk-chart .gk-why{grid-column:2;grid-row:2;margin-top:0}
 }
 /* ⓘ 연도: 띠·틀 없이 고른 해의 점만 채움 */
 .gk-pt{outline:none;-webkit-tap-highlight-color:transparent}

@@ -80,7 +80,7 @@ function Chart({v, points}: {v: TrendVariety; points: WeekPoint[]}) {
   const sel = open !== null ? noted[open] : null;
   const anchor = (_i: number) => 'middle' as const;
   return <figure className="gk-chart">
-    <figcaption>연도별 이맘때 (같은 날짜까지 7일 평균, 원/10kg){noted.some(Boolean) ? ' · ⓘ나 아래 버튼을 누르면 이유가 나와요' : ''}</figcaption>
+    <figcaption>연도별 이맘때 (같은 날짜까지 7일 평균, 원/10kg){noted.some(Boolean) ? ' · ⓘ를 누르면 이유가 나와요' : ''}</figcaption>
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={points.map(p => `${p.year}년 ${won.format(p.per10kg)}원`).join(', ')}>
       <line x1={L} x2={W - R} y1={H - B + 4} y2={H - B + 4} stroke="#E5E8EB" />
       <polyline fill="none" stroke="#E5322D" strokeWidth="2.2" strokeLinejoin="round" points={points.map((p, i) => `${x(i)},${y(p.per10kg)}`).join(' ')} />
@@ -91,12 +91,10 @@ function Chart({v, points}: {v: TrendVariety; points: WeekPoint[]}) {
         <text x={x(i)} y={H - 4} textAnchor={anchor(i)} fontSize="10" fill="#8A8A8E">{p.year}</text>
       </g>)}
     </svg>
-    {noted.some(Boolean) && <div className="gk-why-btns">{noted.map((n, i) => n && <button key={points[i].year} type="button" aria-expanded={open === i} className={open === i ? 'on' : ''} onClick={() => setOpen(open === i ? null : i)}>
-      {points[i].year}년 {n.pct > 0 ? '▲' : '▼'} {Math.abs(n.pct).toFixed(0)}%</button>)}</div>}
-    {sel && open !== null && <div className="gk-why" role="note">
-      <b>{points[open].year}년 이맘때 값이 {sel.pct > 0 ? '높았던' : '낮았던'} 이유</b>
+    {noted.some(Boolean) && (sel && open !== null ? <div className="gk-why" role="note" aria-live="polite">
+      <b>{points[open].year}년 이맘때 값이 {sel.pct > 0 ? '높았던' : '낮았던'} 이유 <span>{sel.pct > 0 ? '▲' : '▼'} {Math.abs(sel.pct).toFixed(0)}%</span></b>
       <p>{sel.note.text}</p>
       <a href={sel.note.url} target="_blank" rel="noreferrer">출처: {sel.note.source}</a>
-    </div>}
+    </div> : <div className="gk-why empty" aria-live="polite"><p>그래프에서 <b>ⓘ</b>가 붙은 해를 누르면 그해 가격이 크게 바뀐 이유가 여기에 나와요.</p></div>)}
   </figure>;
 }
