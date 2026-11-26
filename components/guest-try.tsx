@@ -9,7 +9,8 @@ import type {Lot} from '@/lib/lot-types';
 import {exampleForm, payloadFromForm} from '@/lib/tracker-form';
 import type {Observation} from '@/lib/lot-types';
 
-import AppleAuctionCard from '@/components/health/apple-auction-card';
+const HomeSummary = dynamic(() => import('@/components/health/home-summary'), {ssr: false, loading: () => <div className="loading-strip">요약을 불러오는 중…</div>});
+import {ArrowLeft} from 'lucide-react';
 const LotPreview = dynamic(() => import('@/components/lot-preview'), {ssr: false, loading: () => <div className="loading-strip">예시를 불러오는 중…</div>});
 const ModelInfo = dynamic(() => import('@/components/model-info'), {ssr: false, loading: () => <div className="loading-strip">계산 근거를 불러오는 중…</div>});
 
@@ -84,12 +85,14 @@ function SimpleTry() {
     const obs: Observation[] = [];
     return {lot, obs};
   }, []);
+  // 로그인했을 때처럼 ‘요약’부터 보여 주고, 사과를 누르면 상세(예시)로 들어갑니다. 개인 기록 API는 부르지 않습니다.
+  const [detail, setDetail] = useState(false);
+  useEffect(() => { window.scrollTo({top: 0}); }, [detail]);
+  if (!detail) return <div className="try-summary"><HomeSummary guest lots={[example.lot]} loaded error="" retry={() => {}} openLot={() => setDetail(true)} newLot={() => {}} name="" openAccount={() => {}} /></div>;
   return <div className="ma try-simple">
-    <>
-      <div className="ma-title"><h1>예시 사과 · 후지</h1><p>후지 · 일반 저온 · 1-MCP 미처리 · <b>예시 데이터(실제 기록 아님)</b></p></div>
-      <LotPreview lot={example.lot} observations={example.obs} obsLabel="예시 측정" />
-      <p className="ma-foot">처음 값(예시)에서 예측식으로 0일부터 계산했어요 · 시연용 계산 · 출하·안전 판정 아님</p>
-      <div className="try-market"><AppleAuctionCard variety="후지" /></div>
-    </>
+    <button type="button" className="ma-back" onClick={() => setDetail(false)}><ArrowLeft size={18} aria-hidden="true" />요약</button>
+    <div className="ma-title"><h1>예시 사과 · 후지</h1><p>후지 · 일반 저온 · 1-MCP 미처리 · <b>예시 데이터(실제 기록 아님)</b></p></div>
+    <LotPreview lot={example.lot} observations={example.obs} obsLabel="예시 측정" />
+    <p className="ma-foot">처음 값(예시)에서 예측식으로 0일부터 계산했어요 · 시연용 계산 · 출하·안전 판정 아님</p>
   </div>;
 }

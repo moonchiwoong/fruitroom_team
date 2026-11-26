@@ -11,14 +11,17 @@ try {
     await context.route('https://review.supabase.co/**', r => { if (/\/rest\/v1\//.test(r.request().url())) dataCalls.push(r.request().url()); return r.fulfill({status: 401, contentType: 'application/json', body: '{}'}); });
     await context.route('**/api/market/**', r => r.fulfill({status: 503, contentType: 'application/json', body: '{"status":"unavailable"}'}));
     const page = await context.newPage(); await page.goto(`${base}/try`);
+    await page.locator('.hs-today .hs-hl').waitFor({timeout: 30000});
+    assert.equal(await page.getByRole('heading', {name: '요약', level: 1}).count(), 1, '체험은 요약부터');
+    assert.equal(await page.getByRole('heading', {name: '사과 경매가'}).count(), 1);
+    await page.locator('.hs-today').getByRole('button', {name: '자세히'}).click();
     const cc = page.locator('section[aria-label="소비자 선호와 비교"]'), ts = page.locator('section[aria-label="목표 저장일"]');
     await cc.waitFor({timeout: 30000}); await ts.waitFor();
     assert.match(await cc.innerText(), /오늘 단맛/); assert.equal(await cc.getByRole('button', {name: '오늘 잰 당도 기록하기'}).count(), 0);
     await ts.getByRole('radio').first().click(); assert.match(await ts.innerText(), /캘린더에 등록/);
-    assert.equal(await page.getByRole('heading', {name: '사과 경매가'}).count(), 1);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     assert.equal(dataCalls.length, 0, '개인 데이터 API 호출 없음');
-    console.log(`✓ ${w}px 체험 예시: 소비자 선호 비교 · 목표 저장일 · 경매가 카드 · 개인 데이터 호출 0건`);
+    console.log(`✓ ${w}px 체험: 요약(경매가 포함) → 예시 상세 소비자 선호 비교 · 목표 저장일 · 경매가 카드 · 개인 데이터 호출 0건`);
     await page.screenshot({path: `tests/browser/artifacts/guest-cards-${w}.png`, fullPage: true});
     await context.close();
   }

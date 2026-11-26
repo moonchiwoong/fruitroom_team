@@ -583,3 +583,13 @@ html .hs .s3d{margin-top:16px}
   .hs-today:not(:has(>.hs-hl))>.hs-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
   .hs-today:not(:has(>.hs-hl))>.hs-grid>.hs-none.in-grid.wide{grid-column:auto/span 4}
 }
+/* 요약 ‘오늘’ 칸 맞춤: 왼쪽 카드 묶음과 오른쪽 한 줄 요약 카드의 위·아래 끝을 일치 */
+.hs-hl-k{margin:0 0 6px;font-size:13px;font-weight:800;color:#1c1c1e}
+.hs-grid>.hs-none.in-grid{align-content:start}
+@media (min-width:1000px){
+  .hs-today{align-items:stretch}
+  .hs-today>.hs-grid{grid-column:1;grid-row:auto}
+  .hs-today>.hs-hl{grid-column:2;margin:0;align-self:stretch;display:flex;flex-direction:column;justify-content:flex-start;gap:8px}
+  .hs-today>.hs-src{grid-column:1/-1;align-self:start;margin:8px 0 0}
+  .hs-today>.hs-grid>*{height:100%}
+}

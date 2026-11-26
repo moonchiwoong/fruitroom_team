@@ -23,7 +23,7 @@ const UNIT = (m: MetricId) => m === 'firmness' ? 'N' : metricMeta[m].unit;
 const ORDER: MetricId[] = ['firmness', 'brix', 'acidity', 'loss'];
 const dateLabel = () => new Date().toLocaleDateString('ko-KR', {timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', weekday: 'long'});
 
-export default function HomeSummary({lots, loaded, error, retry, openLot, newLot, name, openAccount}: {lots: Lot[]; loaded: boolean; error: string; retry: () => void; openLot: (id: string) => void; newLot: () => void; name: string; openAccount?: () => void}) {
+export default function HomeSummary({lots, loaded, error, retry, openLot, newLot, name, openAccount, guest = false}: {guest?: boolean; lots: Lot[]; loaded: boolean; error: string; retry: () => void; openLot: (id: string) => void; newLot: () => void; name: string; openAccount?: () => void}) {
   // 계산되는 사과(예측식이 있는 품종)를 앞에, 그다음 최근에 저장을 시작한 순서로 보여 줍니다.
   const active = useMemo(() => {
     const ok = (l: Lot) => { try { return lotPredictor(l, []).at('firmness', 0).ok || lotPredictor(l, []).at('loss', 0).ok ? 1 : 0; } catch { return 0; } };
@@ -47,8 +47,8 @@ export default function HomeSummary({lots, loaded, error, retry, openLot, newLot
   }), [active]);
   const lot = active.find(l => l.id === selId) ?? active[0] ?? null;
   return <div className="hs">
-    <header className="hs-top"><div><p className="hs-date">{dateLabel()}</p><h1>요약</h1></div><button type="button" className="hs-avatar" aria-label="내 정보" onClick={openAccount}>{name.slice(0, 1) || '나'}</button></header>
-    <div className="hs-sec"><h2>보관 중인 사과</h2>{loaded && !error && active.length > 0 && <button type="button" className="hs-link" onClick={newLot}>+ 저장 시작</button>}</div>
+    <header className="hs-top"><div><p className="hs-date">{dateLabel()}</p><h1>요약</h1></div>{!guest && <button type="button" className="hs-avatar" aria-label="내 정보" onClick={openAccount}>{name.slice(0, 1) || '나'}</button>}</header>
+    <div className="hs-sec"><h2>보관 중인 사과</h2>{!guest && loaded && !error && active.length > 0 && <button type="button" className="hs-link" onClick={newLot}>+ 저장 시작</button>}</div>
     {!loaded ? <p className="hs-note" role="status">내 사과를 불러오는 중이에요…</p>
       : error ? <p className="hs-note" role="alert">{error} <button type="button" className="hs-link" onClick={retry}>다시 불러오기</button></p>
       : !active.length ? <div className="hs-card hs-start">
@@ -73,7 +73,7 @@ export default function HomeSummary({lots, loaded, error, retry, openLot, newLot
             <td><span className={'hs-tag ' + x.tone}>{x.status}</span></td></tr>)}</tbody></table></section>
         <div className="hs-pick only-mobile"><div className="hs-apples" role="list">{active.map(l => <button key={l.id} type="button" role="listitem" className={'hs-apple' + (lot?.id === l.id ? ' on' : '')} aria-pressed={lot?.id === l.id} onClick={() => setSelId(l.id)}>
           <img src={applePhoto(l.id)} alt="" loading="lazy" /><b>{l.name || l.variety}</b><small><DayCount lot={l} /></small></button>)}</div></div>
-        <div className="hs-today">{lot && <LotToday key={lot.id} lot={lot} openLot={openLot} />}</div>
+        <div className="hs-today">{lot && <LotToday key={lot.id} lot={lot} openLot={openLot} guest={guest} />}</div>
         </div>
       </>}
     {loaded && <AppleAuctionCard region={lot ? lotRegionId(lot) : null} variety={lot?.variety} />}
@@ -85,14 +85,16 @@ function DayCount({lot}: {lot: Lot}) {
   return <>{lot.variety}{d !== null && d >= 0 ? <> · <span className="hs-num">{d}</span>일째</> : ''}</>;
 }
 
-function LotToday({lot, openLot}: {lot: Lot; openLot: (id: string) => void}) {
+function LotToday({lot, openLot, guest = false}: {lot: Lot; openLot: (id: string) => void; guest?: boolean}) {
   const [obs, setObs] = useState<Observation[] | null>(null), [obsErr, setObsErr] = useState(false);
   useEffect(() => {
     // 사과가 바뀌면 이전 사과의 기록을 지우고, 늦게 도착한 이전 요청은 무시합니다.
     let live = true; setObs(null); setObsErr(false);
+    // 체험(비회원)은 개인 기록 API를 부르지 않고, 예시 처음 값만으로 계산합니다.
+    if (guest) { setObs([]); return () => { live = false; }; }
     requestJson<{observations: Observation[]}>(`/api/lots/${lot.id}/analysis?asOf=${todayKST()}`).then(r => { if (live) setObs(r.observations ?? []); }).catch(() => { if (live) { setObs([]); setObsErr(true); } });
     return () => { live = false; };
-  }, [lot.id, lot.latest_observation?.date, lot.latest_observation?.firmness]);
+  }, [lot.id, lot.latest_observation?.date, lot.latest_observation?.firmness, guest]);
   const p = useMemo(() => { if (obs === null) return null; try { return lotPredictor(lot, obs); } catch { return null; } }, [lot, obs]);
   
   const maxDay = isHongroVariety(lot.variety || '') ? 120 : 200;
@@ -120,8 +122,8 @@ function LotToday({lot, openLot}: {lot: Lot; openLot: (id: string) => void}) {
       </>;
     })()}
     {obsErr && <p className="hs-note warn" role="alert">측정 기록을 불러오지 못해 실측을 반영하지 않은 계산값이에요. 잠시 뒤 다시 열어 주세요.</p>}
-    {hm && f.ok && <><div className="hs-sec hs-sum-h"><h2>한 줄 요약</h2></div>
-      <div className="hs-card hs-hl"><span className="hs-lab" style={{color: METRIC_COLOR[hm]}}><MetricIcon m={hm} />{METRIC_LABEL[hm]}<small className="hs-why">처음보다 가장 많이 변한 항목</small></span>
+    {hm && f.ok && <>
+      <div className="hs-card hs-hl"><p className="hs-hl-k">한 줄 요약</p><span className="hs-lab" style={{color: METRIC_COLOR[hm]}}><MetricIcon m={hm} />{METRIC_LABEL[hm]}<small className="hs-why">처음보다 가장 많이 변한 항목</small></span>
         <p>{josa(lot.name || lot.variety, '은는')} 저장 {today}일째, {hm === 'loss' ? `무게가 약 ${fmtNum(f.value, 1)}% 줄었어요` : `${METRIC_LABEL[hm]} ${easyChange(hm, f.value, f.first, p.weather)}`}.</p>
         {hm !== 'loss' && f.first !== null && <div className="hs-bars">
           <Bar label={p.weather ? '수확 때(추정)' : '처음'} v={f.first} max={Math.max(f.first, f.value)} color={METRIC_COLOR[hm]} digits={metricMeta[hm].digits} />
