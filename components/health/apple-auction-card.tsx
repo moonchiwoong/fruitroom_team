@@ -132,6 +132,7 @@ function AuctionResults({region, groups, variety}: {region: RegionKey; groups: A
   const days = selected.days.slice(0, 5);
   const latest = days[0];
   const priceBasis = [weightLabel(selected.unitWeightKg), selected.packageName || (selected.unit === 'kg' ? '' : selected.unit)].filter(Boolean).join(' ');
+  const missingDimensions = [!selected.grade ? '등급' : '', !selected.size ? '크기' : ''].filter(Boolean).join('·');
 
   function changeMarket(key: string) {
     const options = groups.filter(group => marketKey(group) === key);
@@ -166,6 +167,7 @@ function AuctionResults({region, groups, variety}: {region: RegionKey; groups: A
     </div>
     <p className="apple-auction__venue"><strong>{selected.marketName}</strong> · {sourceLabel[selected.source]}</p>
     <p className="apple-auction__meta">{REGIONS[region].label}산 · 최근 거래일 <time dateTime={latest.date}>{latest.date}</time></p>
+    {missingDimensions && <p className="apple-auction__note">원자료에 {missingDimensions} 정보가 없어 이 조건은 구분하지 않았어요.</p>}
     <dl className="apple-auction__metrics">
       <div>
         <dt>평균 낙찰가</dt>
