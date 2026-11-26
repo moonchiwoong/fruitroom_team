@@ -1,12 +1,12 @@
 import {unstable_cache} from 'next/cache';
 import {auctionOriginRegion, groupAppleAuctions, type RegionalAuctionTrade} from '@/lib/apple-auctions';
-import type {AppleAuctionsResponse} from '@/lib/apple-auction-types';
+import {APPLE_AUCTION_PARTS, type AppleAuctionsResponse} from '@/lib/apple-auction-types';
 import {fetchMarketAuctionDay, type MarketAuctionSource} from '@/lib/market-auction-source';
 import {isRegionKey, type RegionKey} from '@/lib/regions';
 import {addDays, todayKST} from '@/lib/tracker';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 55;
+export const maxDuration = 22;
 
 // 농넷에서 공판장 이름과 코드를 대조했고, 응답의 시장명도 확인합니다.
 const ORIGIN_HALLS: Partial<Record<RegionKey, string>> = {
@@ -17,7 +17,7 @@ const HALL_NAMES: Record<string, RegExp> = {
   '6118204840': /거창사과원(?:예)?(?:농협|농업협동조합|협)/,
   '5128204505': /풍기농(?:협|업협동조합)/,
 };
-const SETTLEMENT_DAYS = 14;
+const SETTLEMENT_WINDOWS = [[0, 1, 2], [3, 4, 5, 6], [7, 8, 9, 10], [11, 12, 13]] as const;
 
 function sourceKey(source: MarketAuctionSource) {
   return (source === 'origin-hall'
@@ -28,7 +28,7 @@ function sourceKey(source: MarketAuctionSource) {
 async function loadDay(source: MarketAuctionSource, date: string, marketCode?: string) {
   const serviceKey = sourceKey(source);
   if (!serviceKey) throw new Error('Missing auction source configuration');
-  const {trades, incompleteOrigins} = await fetchMarketAuctionDay({source, date, serviceKey, marketCode, signal: AbortSignal.timeout(15000)});
+  const {trades, incompleteOrigins} = await fetchMarketAuctionDay({source, date, serviceKey, marketCode, signal: AbortSignal.timeout(12000)});
   const hallName = marketCode ? HALL_NAMES[marketCode] : undefined;
   if (hallName && trades.some(trade => !hallName.test(trade.marketName.replace(/\s+/g, '')))) {
     throw new Error('Unexpected origin auction hall');
@@ -45,10 +45,16 @@ const recentDay = unstable_cache(loadDay, ['apple-auction-recent-day-v2'], {reva
 const earlierDay = unstable_cache(loadDay, ['apple-auction-earlier-day-v2'], {revalidate: 86400});
 
 export async function GET(request: Request) {
-  const region = new URL(request.url).searchParams.get('region');
+  const params = new URL(request.url).searchParams;
+  const region = params.get('region');
   if (!isRegionKey(region)) return Response.json({error: '산지를 확인해 주세요.'}, {status: 400});
 
   const today = todayKST();
+  const baseDate = params.get('asOf') ?? today;
+  const part = Number(params.get('part') ?? '0');
+  if (!Number.isInteger(part) || part < 0 || part >= APPLE_AUCTION_PARTS || (baseDate !== today && baseDate !== addDays(today, -1))) {
+    return Response.json({error: '조회 범위를 확인해 주세요.'}, {status: 400});
+  }
   const marketCode = ORIGIN_HALLS[region];
   const sources: {source: MarketAuctionSource; marketCode?: string}[] = [];
   if (sourceKey('wholesale')) sources.push({source: 'wholesale'});
@@ -58,36 +64,22 @@ export async function GET(request: Request) {
   const trades: RegionalAuctionTrade[] = [];
   let successful = 0;
   let partial = sources.length < neededSources;
-  const deadline = Date.now() + 37000;
-
-  for (let offset = 0; sources.length && offset < SETTLEMENT_DAYS; offset += 3) {
-    if (Date.now() >= deadline) {
+  const results = await Promise.allSettled(SETTLEMENT_WINDOWS[part].flatMap(age => sources.map(({source, marketCode}) =>
+    (age < 3 ? recentDay : earlierDay)(source, addDays(baseDate, -age), marketCode))));
+  for (const result of results) {
+    if (result.status === 'rejected' || result.value.incompleteRegions.includes(region)) {
       partial = true;
-      break;
+      continue;
     }
-    const days = Array.from({length: Math.min(3, SETTLEMENT_DAYS - offset)}, (_, i) => offset + i);
-    const results = await Promise.allSettled(days.flatMap(age => sources.map(({source, marketCode}) =>
-      (age < 3 ? recentDay : earlierDay)(source, addDays(today, -age), marketCode))));
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        if (result.value.incompleteRegions.includes(region)) {
-          partial = true;
-          continue;
-        }
-        successful++;
-        for (const trade of result.value.trades) {
-          if (trade.region === region && trade.date <= today) trades.push(trade);
-        }
-      } else {
-        partial = true;
-      }
+    successful++;
+    for (const trade of result.value.trades) {
+      if (trade.region === region && trade.date <= baseDate) trades.push(trade);
     }
-    if (successful === 0) break;
   }
 
   const groups = groupAppleAuctions(trades, region);
   const status = groups.length ? 'ready' : successful && !partial ? 'empty' : 'unavailable';
-  const response: AppleAuctionsResponse = {status, region, groups, checkedThrough: today, partial};
+  const response: AppleAuctionsResponse = {status, region, groups, checkedThrough: baseDate, partial};
   return Response.json(response, {
     status: status === 'unavailable' ? 503 : 200,
     headers: {'cache-control': partial || status === 'unavailable' ? 'no-store' : 'public, max-age=120, s-maxage=600'},
