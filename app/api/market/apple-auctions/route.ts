@@ -6,7 +6,7 @@ import {isRegionKey, type RegionKey} from '@/lib/regions';
 import {addDays, todayKST} from '@/lib/tracker';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 22;
+export const maxDuration = 25;
 
 // 농넷에서 공판장 이름과 코드를 대조했고, 응답의 시장명도 확인합니다.
 const ORIGIN_HALLS: Partial<Record<RegionKey, string>> = {
@@ -28,7 +28,8 @@ function sourceKey(source: MarketAuctionSource) {
 async function loadDay(source: MarketAuctionSource, date: string, marketCode?: string) {
   const serviceKey = sourceKey(source);
   if (!serviceKey) throw new Error('Missing auction source configuration');
-  const {trades, incompleteOrigins} = await fetchMarketAuctionDay({source, date, serviceKey, marketCode, signal: AbortSignal.timeout(12000)});
+  const timeout = source === 'origin-hall' ? 7500 : 18000;
+  const {trades, incompleteOrigins} = await fetchMarketAuctionDay({source, date, serviceKey, marketCode, signal: AbortSignal.timeout(timeout)});
   const hallName = marketCode ? HALL_NAMES[marketCode] : undefined;
   if (hallName && trades.some(trade => !hallName.test(trade.marketName.replace(/\s+/g, '')))) {
     throw new Error('Unexpected origin auction hall');
@@ -52,18 +53,22 @@ export async function GET(request: Request) {
   const today = todayKST();
   const baseDate = params.get('asOf') ?? today;
   const part = Number(params.get('part') ?? '0');
+  const selectedSource = params.get('source');
   if (!Number.isInteger(part) || part < 0 || part >= APPLE_AUCTION_PARTS || (baseDate !== today && baseDate !== addDays(today, -1))) {
     return Response.json({error: '조회 범위를 확인해 주세요.'}, {status: 400});
   }
   const marketCode = ORIGIN_HALLS[region];
-  const sources: {source: MarketAuctionSource; marketCode?: string}[] = [];
-  if (sourceKey('wholesale')) sources.push({source: 'wholesale'});
-  if (marketCode && sourceKey('origin-hall')) sources.push({source: 'origin-hall', marketCode});
+  if (selectedSource !== null && selectedSource !== 'wholesale' && !(selectedSource === 'origin-hall' && marketCode)) {
+    return Response.json({error: '이 산지에서 조회할 수 있는 거래처를 확인해 주세요.'}, {status: 400});
+  }
+  const availableSources: {source: MarketAuctionSource; marketCode?: string}[] = [{source: 'wholesale'}];
+  if (marketCode) availableSources.push({source: 'origin-hall', marketCode});
+  const neededSources = selectedSource ? availableSources.filter(({source}) => source === selectedSource) : availableSources;
+  const sources = neededSources.filter(({source}) => sourceKey(source));
 
-  const neededSources = marketCode ? 2 : 1;
   const trades: RegionalAuctionTrade[] = [];
   let successful = 0;
-  let partial = sources.length < neededSources;
+  let partial = sources.length < neededSources.length;
   const results = await Promise.allSettled(SETTLEMENT_WINDOWS[part].flatMap(age => sources.map(({source, marketCode}) =>
     (age < 3 ? recentDay : earlierDay)(source, addDays(baseDate, -age), marketCode))));
   for (const result of results) {
