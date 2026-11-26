@@ -114,10 +114,10 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
   // 체험 안내는 지금 화면에 보이는 단계·입력란에 맞춥니다(산지를 고르기 전에는 품종별 저장 조건을 묻지 않음).
   const shownMissing = missing.map(x => x === '1-MCP 처리 여부' ? '보관 방식·1-MCP 처리' : x);
   const guestHint = path === null ? '' : path === 'region' && !mapRegion ? '지도에서 생산지를 먼저 골라 주세요. 고른 산지에 예측식이 있는 품종과 그 품종의 저장 조건을 이어서 물어봐요.'
-    : shownMissing.length ? `${josa(shownMissing.join(', '), '을를')} 고르면 아래에 바로 결과가 나와요. ${hongro ? '홍로는 저장고 온도(0℃·4℃)를' : '후지는 보관 방식(일반 저온·CA)과 1-MCP 처리를'} 물어봐요. 가입하지 않아도 돼요.` : '';
+    : shownMissing.length ? `${shownMissing.join(', ')} 항목을 고르면 아래에 바로 결과가 나와요. ${hongro ? '홍로는 저장고 온도(0℃·4℃)를' : '후지는 보관 방식(일반 저온·CA)과 1-MCP 처리를'} 물어봐요. 가입하지 않아도 돼요.` : '';
   async function save() {
     setErr('');
-    if (missing.length) { setErr(`${josa(missing.join(', '), '을를')} 골라 주세요.`); return; }
+    if (missing.length) { setErr(`아직 안 고른 항목이 있어요: ${missing.join(', ')}`); return; }
     if (harvestErr) { setErr(harvestErr); return; }
     const e = Object.values(validateForm(form, true)).filter(Boolean) as string[];
     if (e.length) { setErr(e[0]); return; }

@@ -141,7 +141,9 @@ export function MeasurementForm({open, lot, observation, prefill, isBaseline, ha
   async function save() {
     setError('');
     if (!isDate(f.date)) return setError('측정일을 입력해 주세요.');
-    const fn = firmN(); if (Number.isNaN(fn)) return setError('경도는 숫자로 입력해 주세요.');
+    if (f.date > today()) return setError('측정일은 오늘까지만 넣을 수 있어요.');
+    if (lot.intake_date && f.date < lot.intake_date) return setError(`측정일은 입고일(${lot.intake_date}) 이후여야 해요.`);
+    const fn = firmN(); if (Number.isNaN(fn)) return setError('단단함은 숫자로 입력해 주세요.');
     const n = (v: string) => v.trim() === '' ? null : v.trim();
     // 물리적으로 불가능한 값(음수 등)은 확인창 없이 바로 막습니다.
     const bad: string[] = [], neg = (v: string) => v.trim() !== '' && Number.isFinite(Number(v)) && Number(v) < 0;

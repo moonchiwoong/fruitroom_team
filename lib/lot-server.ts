@@ -6,6 +6,7 @@ import {restrictLegacyLoss} from './quality-policy';
 import {HONGRO_DEDICATED_REASON,isHongroVariety} from './cultivar';
 import {harvestMonthError} from './harvest-window';
 import {HONGRO_MODEL_VERSION,HONGRO_UNITS} from './hongro';
+import {josa} from './josa';
 async function clientUser(){const c=await serverClient();const {data,error}=await c.auth.getUser();if(error||!data.user)throw new InputError('로그인이 필요합니다.');return {c,user:data.user};}
 async function client(){const c=await serverClient();const {data,error}=await c.auth.getUser();if(error||!data.user)throw new InputError('로그인이 필요합니다.');return c;}
 function checked<T>(r:{data:T;error:unknown}):T{if(r.error)throw r.error;return r.data;}
@@ -18,7 +19,7 @@ export function sameSite(req:Request){const origin=req.headers.get('origin');if(
  const hosts=[req.headers.get('x-forwarded-host'),req.headers.get('host'),new URL(req.url).host].filter(Boolean).flatMap(h=>String(h).split(',').map(x=>x.trim()));return hosts.includes(o.host);}
 export async function getLot(id:string){const c=await client();const lot=checked(await c.from('lots').select('*').eq('id',id).maybeSingle()) as Lot|null;if(!lot)throw new InputError('물량을 찾을 수 없습니다.');return lot;}
 async function payload(req:Request){const text=await req.text();if(text.length>30000)throw new InputError('입력 내용이 너무 깁니다.');try{const parsed=JSON.parse(text);if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw new Error();return parsed;}catch{throw new InputError('입력 형식을 확인해 주세요.');}}
-function short(v:unknown,label:string,optional=false,max=120){if(typeof v!=='string'||(!optional&&!v.trim())||v.length>max)throw new InputError(`${label}를 확인해 주세요.`);return v.trim();}
+function short(v:unknown,label:string,optional=false,max=120){if(typeof v!=='string'||(!optional&&!v.trim())||v.length>max)throw new InputError(`${josa(label, '을를')} 확인해 주세요.`);return v.trim();}
 export async function listLots(){const c=await client();const lots=checked(await c.from('lots').select('*').order('created_at',{ascending:false}).limit(100))||[];const result=await Promise.all(lots.map(async(l:any)=>{const [e,o,f]=await Promise.all([c.from('environment').select('timestamp',{count:'exact'}).eq('lot_id',l.id).order('timestamp',{ascending:false}).limit(1),c.from('observations').select('defects,date,firmness,brix,acidity',{count:'exact'}).eq('lot_id',l.id).order('date',{ascending:false}).order('id',{ascending:false}).limit(1),c.from('files').select('id',{count:'exact',head:true}).eq('lot_id',l.id).eq('kind','photo')]);if(e.error||o.error||f.error)throw e.error||o.error||f.error;return {...l,environment_count:e.count||0,observation_count:o.count||0,photo_count:f.count||0,latest_defects:o.data?.[0]?.defects,latest_observation:o.data?.[0]?{date:o.data[0].date,firmness:o.data[0].firmness,brix:o.data[0].brix,acidity:o.data[0].acidity??null}:null,last_environment:e.data?.[0]?.timestamp};}));return json({lots:result});}
 // ── 물량 기록: 이름·품종·입고일만 필수, 나머지는 측정·확인한 항목만 저장 ──
 function lotFields(p:any,partial:boolean,variety:unknown=p.variety){

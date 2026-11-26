@@ -8,7 +8,6 @@ import {useTeamSession} from '@/components/team-auth';
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog';
 import {requestJson} from '@/components/lot-forms';
 import type {TrackerRequest} from '@/components/quality-tracker';
-import type {LotsFocus} from '@/components/lots-page';
 import type {ModelInfoContext} from '@/components/model-info';
 import {clearDraft, HANDOFF_KEY, loadDraft, saveDraft, type TrackerHandoff} from '@/lib/tracker-form';
 import AIAssistant, {type AssistantContext} from '@/components/ai-assistant';
@@ -29,6 +28,7 @@ const pages: {id: Page; label: string; icon: typeof Apple; kicker: string; title
   {id: 'account', label: '내 정보', icon: UserRound, kicker: 'MY ACCOUNT', title: '내 정보', desc: '이름·소속·주 산지를 관리합니다.'},
 ];
 // 예전 주소(#predict 등)로 들어와도 새 화면으로 연결합니다.
+type LotsFocus = {id: string | null; create?: boolean; n: number};
 const legacy: Record<string, Page> = {predict: 'model', overview: 'lots', environment: 'lots', photos: 'lots', simulator: 'track'};
 
 export default function Home() {

@@ -1,9 +1,10 @@
 import type {Lot,EnvRow,Stats,Observation,Prediction} from './lot-types';
 import {parseOptionalNumber, restrictLegacyLoss} from './quality-policy';
 import {HONGRO_DEDICATED_REASON,isHongroVariety} from './cultivar';
+import {josa} from './josa';
 export class InputError extends Error{rows?:string[];constructor(message:string,rows?:string[]){super(message);this.rows=rows;}}
 export function numberOrNull(v:unknown,min:number,max:number,label:string){const p=parseOptionalNumber(v);if(p.status==='missing')return null;if(p.status==='invalid')throw new InputError(`${label}: ${p.reason}`);if(p.value<min||p.value>max)throw new InputError(`${label}: 단위와 소수점을 확인해 주세요. 기존 시스템의 저장 허용 범위는 ${min}~${max}이며 정상 품질이나 모델 적용 범위를 뜻하지 않습니다.`);return p.value;}
-export function validDate(v:unknown,label='날짜'){if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v)||!Number.isFinite(Date.parse(v+'T00:00:00Z'))||new Date(v+'T00:00:00Z').toISOString().slice(0,10)!==v)throw new InputError(`${label}를 확인해 주세요.`);return v;}
+export function validDate(v:unknown,label='날짜'){if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v)||!Number.isFinite(Date.parse(v+'T00:00:00Z'))||new Date(v+'T00:00:00Z').toISOString().slice(0,10)!==v)throw new InputError(`${josa(label, '을를')} 확인해 주세요.`);return v;}
 export function endOfKoreanDay(day:string){validDate(day);return new Date(day+'T23:59:59.999+09:00').toISOString();}
 export function startOfKoreanDay(day:string){validDate(day);return new Date(day+'T00:00:00+09:00').toISOString();}
 export function parseCsv(text:string,sensorId:string){
