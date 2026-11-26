@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {auctionOriginRegion, groupAppleAuctions, type RegionalAuctionTrade} from '../lib/apple-auctions';
+import {auctionOriginRegion, groupAppleAuctions, mergeAppleAuctionGroups, type RegionalAuctionTrade} from '../lib/apple-auctions';
 
 const sale: RegionalAuctionTrade = {
   date: '2026-11-26', source: 'origin-hall', region: 'geochang',
@@ -28,7 +28,7 @@ test('weights prices by lots and never merges sizes, grades, varieties, or marke
   ], 'geochang');
   assert.equal(groups.length, 7);
   assert.deepEqual(groups.find(group => group.days[0].quantity === 8)?.days, [
-    {date: '2026-11-26', averagePrice: 18000, quantity: 8, totalWeightKg: 160},
+    {date: '2026-11-26', averagePrice: 18000, quantity: 8, totalWeightKg: 160, totalAmount: 144000},
   ]);
 });
 
@@ -36,4 +36,13 @@ test('takes five distinct actual trading dates without inserting missing days', 
   const dates = ['2026-11-26', '2026-11-25', '2026-11-24', '2026-11-23', '2026-11-20', '2026-11-19'];
   const [group] = groupAppleAuctions(dates.map(date => ({...sale, date})).reverse(), 'geochang');
   assert.deepEqual(group.days.map(day => day.date), dates.slice(0, 5));
+});
+
+test('combines raw sales amounts when two settlement periods include the same auction date', () => {
+  const first = groupAppleAuctions([sale, {...sale, unitPrice: 12001, quantity: 1}], 'geochang');
+  const next = groupAppleAuctions([{...sale, unitPrice: 12002, quantity: 1}], 'geochang');
+  const [group] = mergeAppleAuctionGroups(first, next);
+  assert.deepEqual(group.days, [
+    {date: '2026-11-26', averagePrice: 12001, quantity: 4, totalWeightKg: 80, totalAmount: 48003},
+  ]);
 });
