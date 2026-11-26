@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import {Loader2} from 'lucide-react';
 import {supabaseBrowser} from '@/lib/supabase-browser';
 import {displayLogin} from '@/lib/login-id';
-import type {Inputs, RegionId} from '@/lib/initial-quality';
+import type {Inputs} from '@/lib/initial-quality';
 
 const Landing = dynamic(() => import('@/components/landing'), {ssr: false, loading: () => <Splash />});
 

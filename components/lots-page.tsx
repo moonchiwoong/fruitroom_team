@@ -1,6 +1,6 @@
 'use client';
 import {useEffect, useMemo, useRef, useState} from 'react';
-import {AlertTriangle, ArrowLeft, ArrowRight, ArrowUpRight, Boxes, Camera, Check, ClipboardList, Download, Info, Loader2, MessageCircle, Pencil, Plus, Search, Upload, Warehouse, Archive} from 'lucide-react';
+import {AlertTriangle, ArrowLeft, ArrowRight, ArrowUpRight, Camera, Check, ClipboardList, Download, Info, Loader2, MessageCircle, Pencil, Plus, Search, Upload} from 'lucide-react';
 import {useTeamSession} from '@/components/team-auth';
 import {applePhoto} from '@/lib/photos';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
@@ -115,7 +115,6 @@ export default function LotsPage({lots, loadError, reload, openTracker, focus, o
   const baseObs = lot ? baselineObservation(lot, obs) : null;
   const ready = lot ? lotReadiness(lot) : null;
   const review = data ? reviewLot(data.lot, data.stats, data.observations) : null;
-  const totalText = [summary.totals['상자'] ? `${summary.totals['상자'].toLocaleString('ko-KR')}상자` : '', summary.totals.kg ? `${summary.totals.kg.toLocaleString('ko-KR')}kg` : ''].filter(Boolean);
 
   return <div className={'lm' + (mobileDetail && selected ? ' has-detail' : '')}>
     <div className="lm-overview">

@@ -367,31 +367,8 @@ html.big-text .lh-wrap>section{max-width:calc(100vw / 1.25 - 32px)}
 html.big-text .site-main,html.big-text .site-footer{--hx-max:830.77px;--hx-pad:18.46px}
 @media (max-width:720px){html.big-text .site-main,html.big-text .site-footer{--hx-pad:12.31px}}
 /* ===== 요약: 3D 저온저장고 ===== */
-.s3d{position:relative;margin:0 0 16px;border-radius:20px;overflow:hidden;background:#1E2329}
-.s3d-stage{height:clamp(300px,46vw,440px);cursor:grab;touch-action:pan-y}
-.s3d-stage canvas{display:block}
-.s3d-tags{position:absolute;inset:0;pointer-events:none}
-.s3d-tag{position:absolute;transform:translate(-50%,-100%);background:rgba(255,255,255,.95);border-radius:8px;padding:3px 9px;font-size:12px;font-weight:600;white-space:nowrap;color:#191F28;border:1px solid transparent}
-.s3d-tag.warn{border-color:#FF8A2A}
-.s3d-chip{position:absolute;left:12px;top:12px;margin:0;background:rgba(255,255,255,.93);border-radius:10px;padding:7px 11px;font-size:13px;color:#191F28;font-weight:600}
-.s3d-panel{position:absolute;right:12px;bottom:44px;width:min(240px,calc(100% - 24px));margin:0;background:rgba(255,255,255,.96);border-radius:14px;padding:12px 14px;font-size:13px;color:#4E5968;display:grid;gap:4px;box-sizing:border-box}
-.s3d-panel b{font-size:15px;color:#191F28}.s3d-panel em{font-style:normal;font-weight:600}.s3d-panel em.warn{color:#C2570C}.s3d-panel em.muted{color:#8A8A8E}.s3d-panel em.ok{color:#1F7A3A}
-.s3d-panel button{justify-self:start;margin-top:6px;border:0;background:none;padding:0;color:#E5322D;font:inherit;font-weight:700;cursor:pointer}
-.s3d-hint{width:auto;color:#4E5968}
-.s3d-legend{position:absolute;left:12px;bottom:10px;right:12px;margin:0;font-size:11px;color:#C9D1D9;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
-.s3d-legend span{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:-6px}
-.s3d-legend .b{background:#3E7CB1}.s3d-legend .y{background:#E3B53B}.s3d-legend .o{background:#FF8A2A;border-radius:50%}
-@media (max-width:720px){.s3d{border-radius:16px}.s3d-panel{bottom:52px}.s3d-legend{font-size:10.5px}}
 @media (max-width:720px){
-  .s3d{overflow:visible;background:none}
-  .s3d-stage{height:360px;border-radius:16px;overflow:hidden;background:#1E2329}
-  .s3d-tags{bottom:auto;height:360px}
-  .s3d-panel,.s3d-hint{position:static;width:auto;margin-top:8px;background:#fff;border:1px solid #E5E8EB}
-  .s3d-legend{position:static;margin-top:6px;color:#6B7684;padding:0 2px}
 }
-.s3d-open{display:grid;gap:2px;width:100%;margin:16px 0 0;padding:14px 16px;border:1px solid #E5E8EB;border-radius:16px;background:#fff;text-align:left;font:inherit;cursor:pointer;color:#191F28}
-.s3d-open b{font-size:16px}.s3d-open small{color:#6B7684;font-size:13px}
-html .hs .s3d{margin-top:16px}
 /* 선택지가 많을 때(산지 7곳 등) 좁은 화면·큰 글자에서 줄바꿈 */
 .qt3-seg.na-seg-wrap{display:grid!important;grid-auto-flow:row!important;grid-auto-columns:auto!important;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:6px;flex-wrap:wrap}
 .qt3-seg.na-seg-wrap>label{min-width:0}

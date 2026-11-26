@@ -1,11 +1,11 @@
 'use client';
 import {FUJI_REGION_KEYS, isFujiRegionKey} from '@/lib/regions';
 import {WEATHER_STATIONS} from '@/lib/rda-weather';
-import {Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
-import {AlertTriangle, ArrowLeft, ArrowRight, Info, Warehouse, ArrowUpRight, CalendarDays, Check, ChevronDown, Download, FlaskConical, Loader2, Pin, PinOff, Plus, RotateCcw, Save, Thermometer, Undo2} from 'lucide-react';
+import {useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
+import {AlertTriangle, ArrowLeft, ArrowRight, Info, CalendarDays, Check, ChevronDown, FlaskConical, Loader2, Plus, Save, Undo2} from 'lucide-react';
 import {useTeamSession} from '@/components/team-auth';
 import {ObservationForm, requestJson} from '@/components/lot-forms';
-import {ChartLegend, HardnessConvert, KindBadge, TrackerChart} from '@/components/tracker-parts';
+import {ChartLegend, TrackerChart} from '@/components/tracker-parts';
 import {demoAnalysis, demoLots} from '@/lib/demo-lots';
 import type {Lot, Observation, Stats} from '@/lib/lot-types';
 import {
@@ -20,8 +20,7 @@ import {measurementCompatibility, observationFingerprint} from '@/lib/ai/context
 import {isHongroVariety} from '@/lib/cultivar';
 import {calculateHongroForm, emptyHongroForm, exampleHongroForm} from '@/lib/hongro-tracker';
 import {EASY_LABEL, easyChange} from '@/lib/lot-predict';
-import {HONGRO_STORAGE_LABELS, HONGRO_UNITS, HONGRO_WEATHER_FIELDS, HONGRO_UNITS_CONFLICT} from '@/lib/hongro';
-import {buildQualityExportCsv, type QualityExportInput} from '@/lib/quality-export';
+import {HONGRO_UNITS, HONGRO_WEATHER_FIELDS, HONGRO_UNITS_CONFLICT} from '@/lib/hongro';
 import {predictQuality, getQualitySeries, selectQualityModel, HONGRO_LOSS_RATE} from '@/lib/quality-models';
 type ModelResult = ReturnType<typeof predictQuality>;
 type ModelInput = Parameters<typeof predictQuality>[0];
@@ -883,35 +882,7 @@ function F({id, label, unit, hint, err, extra, children}: {id: string; label: st
   </div>;
 }
 
-function ResultHero({metric, at, anchor, actualLoss, exampleMode, probeMm, onFocusInput, unit, sourceLabel}: {unit?: string; sourceLabel?: string; metric: MetricId; at: ValueAt; anchor: Anchor | null; actualLoss: boolean; exampleMode: boolean; probeMm: number | null; onFocusInput: () => void}) {
-  const meta = {...metricMeta[metric], unit: unit ?? metricMeta[metric].unit};
-  return <div className="qt-result-hero">
-    <div className="qt-result-kind"><b>{meta.label}</b>{sourceLabel && <span className="kind k-model">초기품질: {sourceLabel}</span>}{exampleMode && <KindBadge kind="예시" />}{at.status === 'ok' ? <KindBadge kind={actualLoss ? '실측' : '모델 계산'} verified={actualLoss ? undefined : false} /> : anchor && !actualLoss ? <span className="kind k-missing">계산 불가</span> : <KindBadge kind="미측정" />}</div>
-    {at.status === 'ok' ? <><div className="qt-result-number">{fmtNum(at.value, meta.digits)}<span>{meta.unit}</span>{metric === 'firmness' && <HardnessConvert valueN={at.value} probeMm={probeMm} />}</div>
-      {actualLoss ? <p className="qt-result-change">동일 추적 표본의 초기 중량 대비 변화 · 실제 측정 날짜</p> : anchor && <p className="qt-result-change">{anchor.source === 'latest' ? '계산 시작점' : '초기값'} {fmtNum(anchor.value, meta.digits)} {meta.unit} 대비 <strong>{describeChange(metric, at.value, anchor.value).short}</strong></p>}
-      <p className="qt-result-status">{actualLoss ? '실측 중량 기반 계산 · 품질 판정 아님' : `시연용 계산 · ${at.segment === 'past' ? '과거 구간' : '미래 가정'} · 검증 미확인`}</p>
-    </> : <div className="qt-result-unavailable"><strong>결과를 표시할 수 없습니다</strong><p>{at.reason}</p><button className="linkbtn" onClick={onFocusInput}>필요한 입력 확인</button></div>}
-  </div>;
-}
 
-function ObsCompare({metric, measured, series, exampleMode, initialMeasure, observations, initialDay}: {metric: MetricId; measured: MeasuredPoint[]; series: Series; exampleMode: boolean; initialMeasure: TrackerForm['measure']; observations: Observation[];initialDay:number}) {
-  const meta = metricMeta[metric];
-  if (!measured.length) return <div className="qt-obs"><p className="qt-help">분석 기준일까지 {meta.label} {exampleMode ? '예시 측정' : '실측'} 기록이 없습니다.</p></div>;
-  return <div className="qt-obs qt-table-wrap"><table className="qt-table">
-    <caption>측정값과 같은 날짜 계산값 비교 — {meta.label} ({meta.unit})</caption>
-    <thead><tr><th>측정일</th><th>경과일</th><th>{exampleMode ? '예시 측정' : '실측'}</th><th>시연용 계산</th><th>측정 − 계산</th></tr></thead>
-    <tbody>{measured.map(p => {
-      const conditions = measurementCompatibility(initialMeasure, observations.find(o => o.id === p.id)?.details?.measure);
-      const comparable=metric==='loss'?initialDay===0:conditions.comparable;
-      const v = comparable ? valueAt(series, p.day) : null;
-      return <Fragment key={p.id}><tr><td>{fmtDate(p.date)}</td><td>{p.day}일차</td><td>{fmtNum(p.value, meta.digits)}</td>
-        <td>{v?.status === 'ok' ? fmtNum(v.value, meta.digits) : !comparable ? '제공 안 함' : v?.status === 'before' ? '계산 시작 전' : '계산 불가'}</td><td>{v?.status === 'ok' ? describeChange(metric, p.value, v.value).short : '비교 불가'}</td></tr>
-        {metric==='loss' && initialDay>0 && <tr className="qt-obs-condition"><td colSpan={5}>실측 감모율은 저장 {initialDay}일차의 첫 중량 이후 변화이고 모델은 저장 시작일 대비 누적값이므로 차이를 비교하지 않습니다.</td></tr>}
-        {metric!=='loss' && conditions.reason && <tr className="qt-obs-condition"><td colSpan={5}><p className="qt-help qt-measure-compatibility"><strong>{conditions.status === 'mismatch' ? '측정 조건 불일치' : '측정 조건 확인 필요'}</strong> · {conditions.reason}</p></td></tr>}
-      </Fragment>;
-    })}</tbody>
-  </table><p className="qt-help">차이는 검증 지표가 아닙니다. 표본이 다르면(파괴 측정) 같은 과실의 변화가 아닙니다.</p></div>;
-}
 
 
 
@@ -1038,11 +1009,4 @@ function predictionSeries(input:ModelInput,asOfDay:number,maxDays:number):Series
   return {ok:true,startDay:from,endDay:maxDays,asOfDay,past:'cold',future:'cold',points:values.map(r=>({day:r.day,value:r.value!,segment:r.day<=asOfDay?'past':'future',result:r}))};
 }
 
-function SharedHongroComparison({input,day}:{input:(m:MetricId,day:number,temperature?:number|null)=>ModelInput;day:number}) {
-  return <><h3>홍로 0℃ / 4℃ 조건 비교</h3><p className="qt-help">같은 측정일·측정값과 원래 저장 시간축으로 비교합니다. 실제 저장 중 온도를 전환한 검증 모델이 아닙니다.</p><div className="qt-table-wrap"><table className="qt-table"><thead><tr><th>지표</th><th>0℃</th><th>4℃</th></tr></thead><tbody>{metricIds.map(m=><tr key={m}><td>{metricMeta[m].label}</td>{[0,4].map(temp=>{const r=predictQuality(input(m,day,temp));return <td key={temp}>{r.ok?`${fmtNum(r.value!,metricMeta[m].digits)} ${r.unit}`:r.reason}{r.kind==='참고 추정'&&<small> · 후지 기반 참고 추정</small>}</td>;})}</tr>)}</tbody></table></div></>;
-}
 
-function exportUnifiedCsv(o:QualityExportInput) {
-  const url=URL.createObjectURL(new Blob([buildQualityExportCsv(o)],{type:'text/csv;charset=utf-8'}));
-  const a=document.createElement('a');a.href=url;a.download=`애플트랙_${o.form.variety}_${o.selDate || '결과'}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-}

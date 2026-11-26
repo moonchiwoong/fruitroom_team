@@ -6,7 +6,7 @@ import {PROFILE_REGIONS} from '@/lib/profile-regions';
 import {authMessage, supabaseBrowser} from '@/lib/supabase-browser';
 import {ID_RULE, displayLogin, normalizeId, toAuthEmail, validId} from '@/lib/login-id';
 import {countPredictions} from '@/lib/my-predictions';
-import {inputInfo, inputKeys, regionIds, regions, type RegionId} from '@/lib/initial-quality';
+import {inputInfo, inputKeys, type RegionId} from '@/lib/initial-quality';
 
 export default function Account({onOpenPredict}: {onOpenPredict: () => void}) {
   const session = useTeamSession();

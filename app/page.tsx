@@ -3,8 +3,7 @@ import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react';
 import '@/components/health/health.css';
 import dynamic from 'next/dynamic';
 import BigTextToggle from '@/components/big-text-toggle';
-import {Apple, ArrowRight, ArrowUpRight, BookOpen, ClipboardList, Home as HomeIcon, Info, LineChart, LogOut, Menu, MessageCircle, ShieldCheck, UserRound, X} from 'lucide-react';
-import {applePhoto} from '@/lib/photos';
+import {Apple, BookOpen, ClipboardList, Home as HomeIcon, Info, LineChart, LogOut, Menu, ShieldCheck, UserRound, X} from 'lucide-react';
 import {useTeamSession} from '@/components/team-auth';
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog';
 import {requestJson} from '@/components/lot-forms';
@@ -14,15 +13,12 @@ import type {ModelInfoContext} from '@/components/model-info';
 import {clearDraft, HANDOFF_KEY, loadDraft, saveDraft, type TrackerHandoff} from '@/lib/tracker-form';
 import AIAssistant, {type AssistantContext} from '@/components/ai-assistant';
 import type {Lot} from '@/lib/lot-types';
-import {fmtNum, daysBetween, todayKST} from '@/lib/tracker';
-import {quantityUnit, storageStart} from '@/lib/lot-readiness';
 
 const QualityTracker = dynamic(() => import('@/components/quality-tracker'), {ssr: false, loading: () => <div className="loading-strip">화면을 준비하고 있어요…</div>});
 const MyApples = dynamic(() => import('@/components/my-apples'), {ssr: false, loading: () => <div className="loading-strip">사과 목록을 불러오는 중…</div>});
 const ModelInfo = dynamic(() => import('@/components/model-info'), {ssr: false, loading: () => <div className="loading-strip">모델 정보를 불러오는 중…</div>});
 const Account = dynamic(() => import('@/components/account'), {ssr: false});
 const HomeSummary = dynamic(() => import('@/components/health/home-summary'), {ssr: false, loading: () => <div className="loading-strip">요약을 불러오는 중…</div>});
-const ServicePreview = dynamic(() => import('@/components/landing').then(m => m.ServicePreview), {ssr: false});
 
 type Page = 'home' | 'track' | 'lots' | 'model' | 'account';
 const pages: {id: Page; label: string; icon: typeof Apple; kicker: string; title: string; desc: string; hidden?: boolean}[] = [
@@ -149,8 +145,6 @@ function PageHead({title, desc, action}: {title: ReactNode; desc?: ReactNode; ac
   </div></div>;
 }
 
-const storageDays = (l: Lot) => Math.max(0, daysBetween(storageStart(l), todayKST()));
-const shortDate = (d: string) => { const [, m, day] = d.split('-').map(Number); return `${m}월 ${day}일`; };
 
 function SiteFooter({setTab}: {setTab: (p: Page) => void}) {
   const signedIn = !!useTeamSession()?.userId;

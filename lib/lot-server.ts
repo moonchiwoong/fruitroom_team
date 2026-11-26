@@ -1,6 +1,6 @@
 import {isRegionKey, isFujiRegionKey, isHongroRegionKey} from './regions';
 import {serverClient} from './supabase-server';
-import {InputError,numberOrNull,validDate,parseCsv,summarizeEnvironment,demoPrediction,endOfKoreanDay,restrictPredictionForVariety} from './lot-analysis';
+import {InputError, numberOrNull, validDate, parseCsv, summarizeEnvironment, demoPrediction, restrictPredictionForVariety} from './lot-analysis';
 import {today,type Lot,type EnvRow,type Observation,type Photo} from './lot-types';
 import {restrictLegacyLoss} from './quality-policy';
 import {HONGRO_DEDICATED_REASON,isHongroVariety} from './cultivar';

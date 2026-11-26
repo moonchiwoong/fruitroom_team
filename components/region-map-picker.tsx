@@ -1,8 +1,7 @@
 'use client';
-// 새 사과 ‘지역으로 시작’: 남한 지도에서 산지를 고릅니다. 고르면 그 산지 쪽으로 살짝 확대됩니다.
+// 새 사과 ‘지역으로 시작’: 남한 지도에서 산지를 고릅니다. 고르더라도 확대하지 않고, 산지 점이 모두 보이는 범위를 그대로 둡니다.
 // 지도 도형: @svg-maps/south-korea (CC BY 4.0, https://github.com/VictorCazanave/svg-maps)
 // 점 위치는 시·군청 위경도를 이 지도 좌표에 맞춘 대략적인 위치입니다(관측지점 위치가 아님).
-import {useEffect, useRef, useState} from 'react';
 import southKoreaRaw from '@svg-maps/south-korea';
 import {WEATHER_STATIONS} from '@/lib/rda-weather';
 import {REGION_KEYS, REGIONS, regionCultivars, type RegionKey} from '@/lib/regions';
@@ -10,20 +9,14 @@ import {REGION_KEYS, REGIONS, regionCultivars, type RegionKey} from '@/lib/regio
 const southKorea = southKoreaRaw as unknown as {viewBox: string; locations: {id: string; name: string; path: string}[]};
 export type MapRegion = RegionKey;
 export const MAP_PINS = Object.fromEntries(REGION_KEYS.map(k => [k, {...REGIONS[k].map, cultivars: regionCultivars(k)}])) as Record<MapRegion, {x: number; y: number; cultivars: ('후지' | '홍로')[]; left?: boolean}>;
-const FULL = [0, 40, 524, 520];
+// 산지 점 8곳이 모두 들어가는 범위(이름 글자 여유 포함). 지도 전체보다 조금 당겨 점·글자가 잘 보이게 합니다.
+const PINS = Object.values(MAP_PINS), PAD = 60;
+const BOX = (() => { const x0 = Math.min(...PINS.map(p => p.x)) - PAD - 40, x1 = Math.max(...PINS.map(p => p.x)) + PAD + 40, y0 = Math.min(...PINS.map(p => p.y)) - PAD, y1 = Math.max(...PINS.map(p => p.y)) + PAD; return [x0, y0, x1 - x0, y1 - y0]; })();
 
 export const MAP_CREDIT = '지도: svg-maps (CC BY 4.0) · 점은 대략적인 위치';
 
 export default function RegionMapPicker({value, onPick, credit = true}: {value: MapRegion | ''; onPick: (r: MapRegion) => void; credit?: boolean}) {
-  const target = value ? [MAP_PINS[value].x - 150, MAP_PINS[value].y - 130, 300, 260] : FULL;
-  const [box, setBox] = useState<number[]>(target), cur = useRef<number[]>(target);
-  useEffect(() => {
-    const from = cur.current, to = target;
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { cur.current = to; setBox(to); return; }
-    let raf = 0; const t0 = performance.now();
-    const tick = (t: number) => { const k = Math.min(1, (t - t0) / 450), e = 1 - (1 - k) ** 3; const b = from.map((v, i) => v + (to[i] - v) * e); cur.current = b; setBox(b); if (k < 1) raf = requestAnimationFrame(tick); };
-    raf = requestAnimationFrame(tick); return () => cancelAnimationFrame(raf);
-  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+  const box = BOX;
   const s = box[2] / 524;
   return <div className="rmp">
     <svg viewBox={box.map(v => v.toFixed(1)).join(' ')} role="group" aria-label="산지 지도">

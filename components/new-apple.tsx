@@ -11,8 +11,8 @@ import type {Lot} from '@/lib/lot-types';
 import {requestJson} from '@/components/lot-forms';
 import {useTeamSession} from '@/components/team-auth';
 import {emptyForm, payloadFromForm, validateForm, suggestName, type TrackerForm, type FujiRegion} from '@/lib/tracker-form';
-import {lotPredictor, easyChange, EASY_METRICS} from '@/lib/lot-predict';
-import {fmtNum, metricMeta, todayKST, isDate} from '@/lib/tracker';
+import {lotPredictor, EASY_METRICS} from '@/lib/lot-predict';
+import {todayKST, isDate} from '@/lib/tracker';
 import LotPreview from '@/components/lot-preview';
 import {WEATHER_STATIONS} from '@/lib/rda-weather';
 import RegionMapPicker, {MAP_CREDIT, MAP_PINS, type MapRegion} from '@/components/region-map-picker';
@@ -23,7 +23,6 @@ import type {HongroRegion} from '@/lib/hongro';
 const FUJI_REGIONS: FujiRegion[] = [...FUJI_REGION_KEYS];
 const HONGRO_REGION_IDS: HongroRegion[] = [...HONGRO_REGION_KEYS];
 const label = (id: keyof typeof WEATHER_STATIONS) => WEATHER_STATIONS[id].label;
-const SHORT: Record<string, string> = {firmness: '단단함', loss: '무게', brix: '단맛', acidity: '신맛'};
 
 function Seg<T extends string>({name, legend, value, options, onChange}: {name: string; legend: ReactNode; value: T | ''; options: {value: T; label: string; disabled?: boolean; tag?: string}[]; onChange: (v: T) => void}) {
   return <fieldset className="qt3-q na-q"><legend className="qt3-q-head">{legend}</legend>
