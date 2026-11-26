@@ -485,3 +485,9 @@ html .hs .s3d{margin-top:16px}
 .hs-why{margin-left:8px;font-size:12px;font-weight:500;color:#8A8A8E}
 
 @media (max-width:599.98px){.mc-grid{grid-template-columns:minmax(0,1fr)}}
+/* 소비자 비교 근거: 접었다 펼치기 */
+.cc-src{margin-top:4px}
+.cc-src summary{cursor:pointer;font-size:13px;font-weight:600;color:#636366;list-style:none;display:inline-flex;align-items:center;gap:4px;min-height:32px}
+.cc-src summary::-webkit-details-marker{display:none}
+.cc-src summary::after{content:'▾';font-size:11px;transition:transform .15s}
+.cc-src[open] summary::after{transform:rotate(180deg)}

@@ -330,6 +330,6 @@ export function ConsumerCompare({lot, p, onMeasure}: {lot: Lot; p: ReturnType<ty
         </>}</li>;
     })}</ul>
     {onMeasure && <button type="button" className="ma-target-save cc-measure" onClick={onMeasure}>오늘 잰 당도 기록하기</button>}
-    <p className="ma-target-note">선호 범위: <a href={CONSUMER_BRIX.url} target="_blank" rel="noreferrer">{CONSUMER_BRIX.source}</a>{ref && <> · 품종 기준: <a href={ref.url} target="_blank" rel="noreferrer">{ref.source}</a></>}. 무게 감소는 저장 시작 무게 대비 누적 감소율이에요. 기존 팀 계산식 결과이며 정확도 검증 전이고, 출하·품질 판정이 아니에요.</p>
+    <details className="cc-src"><summary>근거·참고</summary><p className="ma-target-note">선호 범위: <a href={CONSUMER_BRIX.url} target="_blank" rel="noreferrer">{CONSUMER_BRIX.source}</a>{ref && <> · 품종 기준: <a href={ref.url} target="_blank" rel="noreferrer">{ref.source}</a></>}. 무게 감소는 저장 시작 무게 대비 누적 감소율이에요. 기존 팀 계산식 결과이며 정확도 검증 전이고, 출하·품질 판정이 아니에요.</p></details>
   </section>;
 }
