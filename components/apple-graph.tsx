@@ -1,6 +1,7 @@
 'use client';
 // ‘내 사과’ 상세의 그래프와 3D 사과 모양. 값은 lotPredictor(기존 예측식)가 낸 것만 그립니다. 계산 못 한 날은 선을 끊습니다.
-import {firmnessReach, reachText} from '@/lib/target-reach';
+import {firmnessReach, metricReach, prefReachText, reachText} from '@/lib/target-reach';
+import {CONSUMER_BRIX} from '@/lib/consumer-compare';
 import {useMemo, useState} from 'react';
 import {josa} from '@/lib/josa';
 import type {Observation} from '@/lib/lot-types';
@@ -21,11 +22,12 @@ export function AppleGraph({p, p0, obs, sel, maxDay, measLabel = '내가 잰 값
     const pts: {d: number; v: number | null; seg: string}[] = [], base: {d: number; v: number | null}[] = [];
     for (let d = 0; d <= maxDay; d += 2) { const r = p.at(m, d); pts.push({d, v: r.ok ? r.value : null, seg: r.ok ? r.from : ''}); if (p0) { const r0 = p0.at(m, d); base.push({d, v: r0.ok ? r0.value : null}); } }
     const meas = m === 'loss' || !p.start ? [] : obs.filter(o => o[m] != null && isDate(o.date)).map(o => ({d: daysBetween(p.start!, o.date), v: o[m] as number})).filter(x => x.d >= 0 && x.d <= maxDay);
-    const vals = [...pts.map(x => x.v).filter((v): v is number => v !== null), ...meas.map(x => x.v), ...(meas.length ? base.map(x => x.v).filter((v): v is number => v !== null) : []), ...(m === 'firmness' && target ? [target] : [])];
+    const vals = [...pts.map(x => x.v).filter((v): v is number => v !== null), ...meas.map(x => x.v), ...(meas.length ? base.map(x => x.v).filter((v): v is number => v !== null) : []), ...(m === 'firmness' && target ? [target] : []), ...(m === 'brix' ? [CONSUMER_BRIX.min] : [])];
     if (!vals.length) return null;
     let lo = Math.min(...vals), hi = Math.max(...vals); if (hi - lo < 1e-6) { lo -= 1; hi += 1; } const pad = (hi - lo) * .1; lo -= pad; hi += pad;
     return {pts, meas, lo, hi, base: meas.length ? base : []};
   }, [p, p0, m, obs, maxDay, target]);
+  const pref = m === 'brix' ? CONSUMER_BRIX.min : null, prefR = pref ? metricReach(p, 'brix', pref, maxDay) : null, prefT = prefR && pref ? prefReachText(prefR, pref) : null;
   const tg = m === 'firmness' && target ? target : null, reach = tg ? firmnessReach(p, tg, maxDay) : null, rt = reach && tg ? reachText(reach, tg) : null;
   const x = (d: number) => L + (W - L - R) * d / maxDay, y = (v: number) => data ? T + (H - T - B) * (1 - (v - data.lo) / (data.hi - data.lo)) : 0;
   // 계산 출발점(처음 값 → 최근 측정값)이 바뀌는 곳은 선을 잇지 않습니다(이어 그리면 없는 급변처럼 보임).
@@ -46,13 +48,14 @@ export function AppleGraph({p, p0, obs, sel, maxDay, measLabel = '내가 잰 값
         {ticks.map((d, i) => <text key={d} x={x(d)} y={H - 8} textAnchor={i === ticks.length - 1 ? 'end' : i === 0 ? 'start' : 'middle'} className="ag-tick">{d}일</text>)}
         {today !== null && today >= 0 && today <= maxDay && <g><line x1={x(today)} x2={x(today)} y1={T} y2={H - B} className="ag-today" /><text x={x(today) + 3} y={T + 9} className="ag-tick ag-today-t">오늘</text></g>}
         {tg && data && <g><line x1={L} x2={W - R} y1={y(tg)} y2={y(tg)} className="ag-target" /><text x={W - R} y={y(tg) - 5} textAnchor="end" className="ag-tick ag-target-t">내 기준 {tg} N</text>{reach?.kind === 'at' && <circle cx={x(reach.day)} cy={y(tg)} r={5} className="ag-target-dot" />}</g>}
+        {pref && <g><line x1={L} x2={W - R} y1={y(pref)} y2={y(pref)} className="ag-pref" /><text x={W - R} y={y(pref) - 5} textAnchor="end" className="ag-tick ag-pref-t">소비자 선호 하한 {pref} °Brix</text>{prefR?.kind === 'at' && <circle cx={x(prefR.day)} cy={y(pref)} r={5} className="ag-pref-dot" />}</g>}
         {basePath && <path d={basePath} className="ag-baseline" />}
         {measPath && <path d={measPath} className="ag-measline" />}
         <path d={path} className="ag-line" />
         {data.meas.map((pt, i) => <circle key={i} cx={x(pt.d)} cy={y(pt.v)} r={4} className="ag-meas"><title>{`${pt.d}일 실측 ${fmtNum(pt.v, metricMeta[m].digits)} ${UNIT(m)}`}</title></circle>)}
         {selR.ok && sel <= maxDay && (!hasMeasuredSeg || selR.from === 'measured') && <circle cx={x(sel)} cy={y(selR.value)} r={5} className="ag-sel" />}
       </svg>
-      <p className="ag-legend"><span className="ag-k line" />{basePath ? '잰 값부터 다시 계산' : '계산값'}{basePath && <><span className="ag-k base" />처음 값 기준 예측</>}{data.meas.length > 0 && <><span className="ag-k dot" />{measLabel}{measPath ? ' (점선: 잰 값 잇기)' : ''}</>}{tg && <><span className="ag-k target" />내 기준</>}<span className="ag-unit">단위 {UNIT(m)}</span></p>
+      <p className="ag-legend"><span className="ag-k line" />{basePath ? '잰 값부터 다시 계산' : '계산값'}{basePath && <><span className="ag-k base" />처음 값 기준 예측</>}{data.meas.length > 0 && <><span className="ag-k dot" />{measLabel}{measPath ? ' (점선: 잰 값 잇기)' : ''}</>}{tg && <><span className="ag-k target" />내 기준</>}{pref && <><span className="ag-k pref" />소비자 선호 하한{prefT && <b className="ag-pref-reach">{prefT}</b>}</>}<span className="ag-unit">단위 {UNIT(m)}</span></p>
       {rt && <p className={'ag-reach' + (reach?.kind === 'at' || reach?.kind === 'already' ? ' hit' : '')}>{rt}</p>}
     </>}
   </section>;

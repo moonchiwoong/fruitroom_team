@@ -472,3 +472,11 @@ html .hs .s3d{margin-top:16px}
 @media (min-width:1000px){
   .dash-measurements:not(:has(> .cc)) > .dash-side{grid-column:1/-1;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
 }
+/* 소비자 선호 당도 하한선(Kim 외 2023): 보라 점선 + 범례 옆 도달 안내 */
+.mc-pref,.ag-pref{stroke:#7A4FD1;stroke-width:1.6;stroke-dasharray:6 5}
+.mc-pref-t{font-size:10px;fill:#7A4FD1;font-weight:700}.ag-pref-t{fill:#7A4FD1!important;font-weight:700}
+.mc-pref-dot,.ag-pref-dot{fill:#7A4FD1;stroke:#fff;stroke-width:2}
+.ag-k.pref,.mc-k.pref{display:inline-block;width:16px;border-top:2px dashed #7A4FD1;margin:0 4px 3px 10px;vertical-align:middle}
+.mc-legend{margin:4px 0 0;font-size:12px;color:#4E5968;line-height:1.5}
+.mc-k.line{display:inline-block;width:14px;height:2px;margin:0 4px 3px 0;vertical-align:middle;border-radius:1px}
+.ag-pref-reach,.mc-pref-reach{margin-left:6px;color:#7A4FD1;font-weight:700}
