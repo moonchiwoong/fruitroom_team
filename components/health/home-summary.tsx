@@ -2,14 +2,13 @@
 // 로그인 후 홈 ‘요약’: 보관 중인 사과 → 고른 사과의 오늘 계산값 4가지 → 한 줄 요약.
 // 값은 lotPredictor(기존 식)만 씁니다. 작은 선도 그 식으로 계산한 0일~마지막 날 값입니다(예시 모양 없음).
 import {useEffect, useMemo, useState} from 'react';
-import dynamic from 'next/dynamic';
-import type {StorageItem} from '@/components/health/storage-3d';
+import Storage2D, {type StorageItem} from '@/components/health/storage-2d';
 import {josa} from '@/lib/josa';
 import type {Lot, Observation} from '@/lib/lot-types';
 import {lotPredictor, easyChange, latestObservation} from '@/lib/lot-predict';
 import {isHongroVariety} from '@/lib/cultivar';
 import {fmtNum, metricMeta, todayKST, type MetricId} from '@/lib/tracker';
-import {storageStart, lotReadiness, weatherInitial} from '@/lib/lot-readiness';
+import {storageStart, lotReadiness, weatherInitial, quantityUnit} from '@/lib/lot-readiness';
 import {daysBetween, isDate} from '@/lib/tracker';
 import {WEATHER_STATIONS} from '@/lib/rda-weather';
 import {applePhoto} from '@/lib/photos';
@@ -17,21 +16,6 @@ import {requestJson} from '@/components/lot-forms';
 import {MetricIcon, METRIC_COLOR, METRIC_LABEL} from '@/components/health/metric-icons';
 import AppleAuctionCard from '@/components/health/apple-auction-card';
 import {lotRegionId} from '@/lib/lot-region';
-
-// 3D 저장고는 요약 화면에서만 따로 불러옵니다(서버 렌더링 없음).
-const Storage3D = dynamic(() => import('@/components/health/storage-3d'), {ssr: false});
-/** WebGL이 되고, 움직임 줄이기를 켜지 않은 기기에서만 3D를 보여 줍니다. */
-function use3D() {
-  const [ok, setOk] = useState(false);
-  useEffect(() => { try { const c = document.createElement('canvas'); setOk(!!(c.getContext('webgl2') || c.getContext('webgl')) && !matchMedia('(prefers-reduced-motion: reduce)').matches); } catch { setOk(false); } }, []);
-  return ok;
-}
-
-function useWide() {
-  const [w, setW] = useState(false);
-  useEffect(() => { const m = matchMedia('(min-width: 1001px)'); const f = () => setW(m.matches); f(); m.addEventListener('change', f); return () => m.removeEventListener('change', f); }, []);
-  return w;
-}
 
 /** 숫자의 출처: 오늘 잰 값 / 최근 측정값에서 계산 / 날씨 추정에서 계산 / 처음 값에서 계산 */
 const srcLabel = (from: string, measuredToday: boolean) => measuredToday && from === 'measured' ? '오늘 실측' : from === 'measured' ? '측정값부터 계산' : from === 'weather' ? '날씨 추정에서 계산' : '계산';
@@ -63,10 +47,7 @@ export default function HomeSummary({lots, loaded, error, retry, openLot, newLot
     return {l, day, loss, since, measured, status, tone, region: WEATHER_STATIONS[rid]?.label ?? null};
   }), [active]);
   const lot = active.find(l => l.id === selId) ?? active[0] ?? null;
-  const can3d = use3D();
-  // PC(넓은 화면)는 맨 위에 바로, 휴대폰은 오늘 품질 카드 아래에서 버튼을 눌렀을 때만 3D를 불러옵니다.
-  const wide = useWide(), [open3d, setOpen3d] = useState(false);
-  const items3d = useMemo<StorageItem[]>(() => infos.map(x => ({id: x.l.id, name: x.l.name || x.l.variety, variety: x.l.variety, hongro: isHongroVariety(x.l.variety), day: x.day, tone: x.tone as StorageItem['tone'], status: x.status, temp: x.l.details?.storage_temperature ?? null, qty: x.l.quantity ?? null, unit: x.l.details?.quantity_unit ?? null})), [infos]);
+  const items3d = useMemo<StorageItem[]>(() => infos.map(x => ({id: x.l.id, name: x.l.name || x.l.variety, variety: x.l.variety, hongro: isHongroVariety(x.l.variety), day: x.day, tone: x.tone as StorageItem['tone'], status: x.status, temp: x.l.details?.storage_temperature ?? null, qty: x.l.quantity ?? null, unit: x.l.quantity ? quantityUnit(x.l) : null})), [infos]);
   return <div className="hs">
     <header className="hs-top"><div><p className="hs-date">{dateLabel()}</p><h1>요약</h1></div><button type="button" className="hs-avatar" aria-label="내 정보" onClick={openAccount}>{name.slice(0, 1) || '나'}</button></header>
     <div className="hs-sec"><h2>보관 중인 사과</h2>{loaded && !error && active.length > 0 && <button type="button" className="hs-link" onClick={newLot}>+ 저장 시작</button>}</div>
@@ -83,7 +64,7 @@ export default function HomeSummary({lots, loaded, error, retry, openLot, newLot
       </div>
       : <>
         <Kpis infos={infos} />
-        {can3d && wide && <Storage3D items={items3d} onOpen={openLot} />}
+        <Storage2D items={items3d} onOpen={openLot} />
         <div className="hs-dash">
         <section className="hs-table-wrap only-pc" aria-label="보관 중인 사과 한눈에"><table className="hs-table">
           <thead><tr><th>사과</th><th>저장</th><th>무게 감소 (오늘)</th><th>마지막 측정</th><th>상태</th></tr></thead>
@@ -99,7 +80,6 @@ export default function HomeSummary({lots, loaded, error, retry, openLot, newLot
         </div>
       </>}
     {loaded && <AppleAuctionCard region={lot ? lotRegionId(lot) : null} variety={lot?.variety} />}
-    {loaded && !error && active.length > 0 && can3d && !wide && (open3d ? <Storage3D items={items3d} onOpen={openLot} /> : <button type="button" className="s3d-open" onClick={() => setOpen3d(true)}><b>내 저장고 3D로 보기</b><small>보관 중인 사과를 저장고 모습으로 봐요</small></button>)}
   </div>;
 }
 
