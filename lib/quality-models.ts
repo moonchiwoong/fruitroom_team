@@ -16,6 +16,7 @@ export const QUALITY_MODEL_VERSION = 'appletrack-storage@2026-10-26.1';
 export const FUJI_MODEL_VERSION = 'fuji-xlsx-2026-10-26.1';
 export const HONGRO_STORAGE_MODEL_VERSION = 'hongro-xlsx-approximation-2026-10-27.1';
 export const QUALITY_METRICS:QualityMetric[] = ['firmness','brix','acidity','loss'];
+export const QUALITY_MODEL_DAYS = {fuji: 300, hongro: 120} as const;
 export const QUALITY_UNITS:Record<QualityMetric,string> = {firmness:'N',brix:'°Brix',acidity:'%',loss:'%'};
 export const FUJI_SOURCE = 'data/evidence/사과_품질예측_회귀식.xlsx';
 export const HONGRO_SOURCE = 'data/evidence/거창_품질예측식(1).xlsx';
@@ -75,7 +76,7 @@ export const MODEL_REGISTRY:ModelDefinition[] = [
     label:`후지 ${method==='cold'?'일반 저온 저장':method==='mcp'?'1-MCP + 저온 저장':'CA 저장'}`,
     storage:method==='ca'?'ca' as const:'cold' as const,temperature:null,mcp:method==='mcp'?'treated' as const:'untreated' as const,
     metric,unit:QUALITY_UNITS[metric],formula:FUJI_FORMULAS[metric][method],source:[FUJI_SOURCE],
-    range:{min:0,max:300,validatedDays:null},validation:`${UNVALIDATED} · 원자료 관측·검증 기간 미기재 · 0~300일은 기존 UI 표시 범위`,
+    range:{min:0,max:QUALITY_MODEL_DAYS.fuji,validatedDays:null},validation:`${UNVALIDATED} · 원자료 관측·검증 기간 미기재 · 0~300일은 기존 UI 표시 범위`,
     warnings:[FUJI_TEMPERATURE_NOTE,MODEL_RANGE_NOTICE,...(method==='mcp'&&metric==='firmness'?[FUJI_MCP_SOURCE_NOTE]:[])],
     connection:metric==='acidity'?'ratio' as const:'delta' as const,
   }))),
@@ -83,7 +84,7 @@ export const MODEL_REGISTRY:ModelDefinition[] = [
     id:`hongro-cold${temperature}-${metric}`,version:HONGRO_STORAGE_MODEL_VERSION,cultivar:'hongro' as const,
     label:`홍로 일반 저온 저장 ${temperature}℃`,storage:'cold' as const,temperature,mcp:'untreated' as const,
     metric,unit:QUALITY_UNITS[metric],formula:HONGRO_FORMULAS[temperature===0?'cold0':'cold4'][metric],
-    source:metric==='loss'?[HONGRO_LOSS_SOURCE]:[HONGRO_SOURCE,HONGRO_PAPER],range:{min:0,max:120,validatedDays:null},
+    source:metric==='loss'?[HONGRO_LOSS_SOURCE]:[HONGRO_SOURCE,HONGRO_PAPER],range:{min:0,max:QUALITY_MODEL_DAYS.hongro,validatedDays:null},
     validation:metric==='loss'?`엑셀 제공 식 · 모형 유형·비고·관측 근거 미기재 · ${UNVALIDATED}`:`엑셀 근사 모델 · 논문이 직접 제시한 회귀식으로 확인되지 않음 · ${UNVALIDATED}`,
     warnings:[MODEL_RANGE_NOTICE,...(metric==='brix'?['엑셀 명시 수식 S(t)=S0를 사용합니다. 비고의 감소 설명에서 계수를 만들지 않습니다.']:[]),...(metric==='loss'?['저장 시작일(0일) 0%에서 시작하는 시간식입니다. 실측 중량이 없어도 계산하며, 실측 감모율과 따로 표시합니다. 원자료에 모형 유형·관측 근거가 적혀 있지 않습니다.']:[])],
     connection:'delta' as const,

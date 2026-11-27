@@ -5,8 +5,7 @@ import {useEffect, useMemo, useState} from 'react';
 import {ChevronRight} from 'lucide-react';
 import {josa} from '@/lib/josa';
 import type {Lot, Observation} from '@/lib/lot-types';
-import {lotPredictor, easyChange, latestObservation} from '@/lib/lot-predict';
-import {isHongroVariety} from '@/lib/cultivar';
+import {lotPredictor, easyChange, latestObservation, lotPredictionRange} from '@/lib/lot-predict';
 import {fmtNum, metricMeta, todayKST, type MetricId} from '@/lib/tracker';
 import {storageStart, lotReadiness, weatherInitial} from '@/lib/lot-readiness';
 import {daysBetween, isDate} from '@/lib/tracker';
@@ -16,6 +15,7 @@ import {requestJson} from '@/components/lot-forms';
 import {MetricIcon, METRIC_COLOR, METRIC_LABEL} from '@/components/health/metric-icons';
 import AppleAuctionCard from '@/components/health/apple-auction-card';
 import {lotRegionId} from '@/lib/lot-region';
+import {useLotWeather} from '@/components/use-lot-weather';
 
 /** 숫자의 출처: 오늘 잰 값 / 최근 측정값에서 계산 / 날씨 추정에서 계산 / 처음 값에서 계산 */
 const srcLabel = (from: string, measuredToday: boolean) => measuredToday && from === 'measured' ? '오늘 실측' : from === 'measured' ? '측정값부터 계산' : from === 'weather' ? '날씨 추정에서 계산' : '계산';
@@ -88,6 +88,7 @@ function DayCount({lot}: {lot: Lot}) {
 
 function LotToday({lot, openLot, guest = false}: {lot: Lot; openLot: (id: string) => void; guest?: boolean}) {
   const [obs, setObs] = useState<Observation[] | null>(null), [obsErr, setObsErr] = useState(false);
+  const {values: weather} = useLotWeather(lot, !guest);
   useEffect(() => {
     // 사과가 바뀌면 이전 사과의 기록을 지우고, 늦게 도착한 이전 요청은 무시합니다.
     let live = true; setObs(null); setObsErr(false);
@@ -95,19 +96,22 @@ function LotToday({lot, openLot, guest = false}: {lot: Lot; openLot: (id: string
     if (guest) { setObs([]); return () => { live = false; }; }
     requestJson<{observations: Observation[]}>(`/api/lots/${lot.id}/analysis?asOf=${todayKST()}`).then(r => { if (live) setObs(r.observations ?? []); }).catch(() => { if (live) { setObs([]); setObsErr(true); } });
     return () => { live = false; };
-  }, [lot.id, lot.latest_observation?.date, lot.latest_observation?.firmness, guest]);
-  const p = useMemo(() => { if (obs === null) return null; try { return lotPredictor(lot, obs); } catch { return null; } }, [lot, obs]);
+  }, [lot.id, lot.latest_observation?.date, lot.latest_observation?.firmness, lot.latest_observation?.brix, lot.latest_observation?.acidity, lot.observation_count, guest]);
+  const p = useMemo(() => { if (obs === null) return null; try { return lotPredictor(lot, obs, weather); } catch { return null; } }, [lot, obs, weather]);
   
-  const maxDay = isHongroVariety(lot.variety || '') ? 120 : 200;
+  const {defaultDay, lastDay} = lotPredictionRange(lot);
   if (obs === null) return <p className="hs-note" role="status">측정 기록 확인 중…</p>;
   if (!p) return <p className="hs-note">이 사과는 계산할 수 없어요.</p>;
-  const today = p.todayDay !== null && p.todayDay >= 0 ? Math.min(p.todayDay, maxDay) : 0;
+  const today = p.todayDay !== null && p.todayDay >= 0 ? Math.min(p.todayDay, lastDay) : 0;
+  const maxDay = Math.max(defaultDay, today);
+  const over = p.todayDay !== null && p.todayDay > lastDay;
+  const dayLabel = over ? `${lastDay}일째` : '오늘';
   // 한 줄 요약: 처음보다 가장 많이 변한 항목(변화율 %, 무게 감소는 줄어든 % 그대로). 같으면 단단함→단맛→신맛→무게 순.
   const change = (m: MetricId) => { const r = p.at(m, today); if (!r.ok) return -1; if (m === 'loss') return Math.abs(r.value); return r.first ? Math.abs((r.value - r.first) / r.first * 100) : -1; };
   const hm = ORDER.reduce<MetricId | null>((best, m) => change(m) < 0 ? best : best === null || change(m) > change(best) ? m : best, null);
   const f = hm ? p.at(hm, today) : p.at('firmness', today);
   return <>
-    <div className="hs-sec"><h2>{lot.name || lot.variety} · {p.todayDay !== null && p.todayDay > maxDay ? `${maxDay}일째(계산 끝)` : '오늘'}</h2><button type="button" className="hs-more" onClick={() => openLot(lot.id)}>자세히 보기<ChevronRight size={16} aria-hidden="true" /></button></div>
+    <div className="hs-sec"><h2>{lot.name || lot.variety} · {over ? `${dayLabel}(계산 끝)` : dayLabel}</h2><button type="button" className="hs-more" onClick={() => openLot(lot.id)}>자세히 보기<ChevronRight size={16} aria-hidden="true" /></button></div>
     {(() => {
       // 계산할 수 없는 항목은 빈 카드 여러 장 대신 한 장으로 모아 보여 줍니다.
       const ready = ORDER.filter(m => p.at(m, today).ok), missing = ORDER.filter(m => !p.at(m, today).ok);
@@ -118,7 +122,7 @@ function LotToday({lot, openLot, guest = false}: {lot: Lot; openLot: (id: string
         {!ready.length && <button type="button" className="hs-btn" onClick={() => openLot(lot.id)}>측정 기록 넣으러 가기</button>}
       </div>;
       return <>
-        {ready.length > 0 && <div className="hs-grid">{ready.map(m => <MetricCard key={m} m={m} p={p} day={today} maxDay={maxDay} measuredToday={m !== 'loss' && today === p.todayDay && !obsErr && !!latestObservation(obs, m, todayKST())} onOpen={() => openLot(lot.id)} />)}{missing.length > 0 && none}</div>}
+        {ready.length > 0 && <div className="hs-grid">{ready.map(m => <MetricCard key={m} m={m} p={p} day={today} dayLabel={dayLabel} maxDay={maxDay} measuredToday={m !== 'loss' && today === p.todayDay && !obsErr && !!latestObservation(obs, m, todayKST())} onOpen={() => openLot(lot.id)} />)}{missing.length > 0 && none}</div>}
         {!ready.length && none}
       </>;
     })()}
@@ -128,7 +132,7 @@ function LotToday({lot, openLot, guest = false}: {lot: Lot; openLot: (id: string
         <p>{josa(lot.name || lot.variety, '은는')} 저장 {today}일째, {hm === 'loss' ? `무게가 약 ${fmtNum(f.value, 1)}% 줄었어요` : `${METRIC_LABEL[hm]} ${easyChange(hm, f.value, f.first, p.weather)}`}.</p>
         {hm !== 'loss' && f.first !== null && <div className="hs-bars">
           <Bar label={p.weather ? '수확 때(추정)' : '처음'} v={f.first} max={Math.max(f.first, f.value)} color={METRIC_COLOR[hm]} digits={metricMeta[hm].digits} />
-          <Bar label={f.from === 'measured' && today === p.todayDay && latestObservation(obs, hm, todayKST()) ? '오늘 실측' : f.from === 'measured' ? '오늘(측정값부터 계산)' : '오늘(계산)'} v={f.value} max={Math.max(f.first, f.value)} color="#C7C7CC" digits={metricMeta[hm].digits} />
+          <Bar label={f.from === 'measured' && today === p.todayDay && latestObservation(obs, hm, todayKST()) ? '오늘 실측' : f.from === 'measured' ? `${dayLabel}(측정값부터 계산)` : `${dayLabel}(계산)`} v={f.value} max={Math.max(f.first, f.value)} color="#C7C7CC" digits={metricMeta[hm].digits} />
         </div>}
       </div></>}
     {ORDER.some(m => p.at(m, today).ok) && <p className="hs-src">기존 팀 계산식 결과 · 정확도 검증 전 · 출하·안전 판정 아님</p>}
@@ -139,15 +143,22 @@ function Bar({label, v, max, color, digits = 1}: {label: string; v: number; max:
   return <div className="hs-bar"><span className="hs-num">{fmtNum(v, digits)}</span><div><i style={{width: `${Math.max(4, v / max * 100)}%`, background: color}} /><small>{label}</small></div></div>;
 }
 
-function MetricCard({m, p, day, maxDay, measuredToday, onOpen}: {m: MetricId; p: NonNullable<ReturnType<typeof lotPredictor>>; day: number; maxDay: number; measuredToday: boolean; onOpen: () => void}) {
+function MetricCard({m, p, day, dayLabel, maxDay, measuredToday, onOpen}: {m: MetricId; p: ReturnType<typeof lotPredictor>; day: number; dayLabel: string; maxDay: number; measuredToday: boolean; onOpen: () => void}) {
   const r = p.at(m, day);
-  const pts = useMemo(() => { const a: {d: number; v: number}[] = []; for (let d = 0; d <= maxDay; d += 5) { const x = p.at(m, d); if (x.ok) a.push({d, v: x.value}); } return a; }, [p, m, maxDay]);
+  const pts = useMemo(() => {
+    const points: {d: number; v: number}[] = [];
+    for (let d = 0; ; d = Math.min(d + 5, maxDay)) {
+      const value = p.at(m, d);
+      if (value.ok) points.push({d, v: value.value});
+      if (d === maxDay) return points;
+    }
+  }, [p, m, maxDay]);
   const W = 92, H = 40;
   const lo = Math.min(...pts.map(x => x.v)), hi = Math.max(...pts.map(x => x.v)), span = hi - lo || 1;
   const X = (d: number) => 3 + (W - 6) * d / maxDay, Y = (v: number) => 4 + (H - 8) * (1 - (v - lo) / span);
-  const path = pts.map((x, i) => `${i && pts[i - 1].d === x.d - 5 ? 'L' : 'M'}${X(x.d).toFixed(1)},${Y(x.v).toFixed(1)}`).join('');
+  const path = pts.map((x, i) => `${i && x.d - pts[i - 1].d <= 5 ? 'L' : 'M'}${X(x.d).toFixed(1)},${Y(x.v).toFixed(1)}`).join('');
   return <button type="button" className="hs-card hs-metric" onClick={onOpen}>
-    <span className="hs-lab" style={{color: METRIC_COLOR[m]}}><MetricIcon m={m} />{METRIC_LABEL[m]}<em>오늘 ›</em></span>
+    <span className="hs-lab" style={{color: METRIC_COLOR[m]}}><MetricIcon m={m} />{METRIC_LABEL[m]}<em>{dayLabel} ›</em></span>
     <span className={'hs-val' + (r.ok ? '' : ' na')}>{r.ok ? <><b className="hs-num">{fmtNum(r.value, metricMeta[m].digits)}</b><small>{UNIT(m)}</small><i className="hs-from">{srcLabel(r.from, measuredToday)}</i></> : <><b className="hs-na">계산 없음</b><small title={r.reason}>{r.reason}</small></>}</span>
     {pts.length > 1 && <svg className="hs-spark" width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-hidden="true"><path d={path} fill="none" stroke={METRIC_COLOR[m]} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />{r.ok && <circle cx={X(day)} cy={Y(r.value)} r="4" fill={METRIC_COLOR[m]} stroke="#fff" strokeWidth="2" />}</svg>}
   </button>;

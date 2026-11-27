@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {weatherPending, lotPredictor} from '../lib/lot-predict';
+import {weatherPending, weatherRefreshPeriod, lotPredictor} from '../lib/lot-predict';
 import {predictAll} from '../lib/initial-quality';
 
 const fujiLot = (inputs: any, estimate: any = null) => ({id: 'f', name: 'f', variety: '후지', intake_date: '2026-10-25', storage_start_date: '2026-10-25', initial_measured_on: '2026-10-25', harvest_date: '2026-10-25',
@@ -9,6 +9,13 @@ const fujiLot = (inputs: any, estimate: any = null) => ({id: 'f', name: 'f', var
 test('날씨 값이 비어 저장된 물량을 찾아낸다', () => {
   assert.deepEqual(weatherPending(fujiLot({rain9: null, lc56: 850, lc78: 1250, min4: 4.5})), {region: 'jangsu', year: 2026});
   assert.equal(weatherPending(fujiLot({rain9: 120, lc56: 850, lc78: 1250, min4: 4.5}, {firmness_nmm: 1, brix: 1, acidity: 1, weight: 1, diameter: 1})), null);
+});
+
+test('미집계 날씨 다시 조회하는 날은 산지별 강수량 집계 월을 따른다', () => {
+  const lot = fujiLot({rain9: null, lc56: 850, lc78: 1250, min4: 4.5});
+  assert.deepEqual(weatherRefreshPeriod(lot), {region: 'jangsu', year: 2026, rainMonth: 9, refreshDate: '2026-10-01'});
+  lot.details.fuji_weather.region = 'pocheon';
+  assert.deepEqual(weatherRefreshPeriod(lot), {region: 'pocheon', year: 2026, rainMonth: 8, refreshDate: '2026-09-01'});
 });
 
 test('9월이 끝난 뒤 받은 값으로 당도·산도 처음 값을 추정해 이어 계산한다', () => {

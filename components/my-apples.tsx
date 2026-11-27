@@ -9,7 +9,7 @@ import {ArrowLeft, Calendar, CalendarPlus, Pencil, Plus} from 'lucide-react';
 import type {Lot, Observation} from '@/lib/lot-types';
 import {requestJson} from '@/components/lot-forms';
 import {LotEditor, MeasurementForm} from '@/components/lot-dialogs';
-import {latestObservation, lotPredictor, easyChange, EASY_METRICS, weatherPending, type WeatherValues} from '@/lib/lot-predict';
+import {latestObservation, lotPredictor, easyChange, EASY_METRICS, lotPredictionRange, weatherRefreshPeriod} from '@/lib/lot-predict';
 import {lotReadiness, baselineObservation, storageStart, quantityUnit, weatherInitial} from '@/lib/lot-readiness';
 import {fmtNum, metricMeta, todayKST, addDays, daysBetween, isDate} from '@/lib/tracker';
 import MiniCharts from '@/components/mini-charts';
@@ -18,6 +18,7 @@ import {lotRegionLabel} from '@/lib/lot-region';
 import {TARGET_PRESETS, checkTargetDate, targetIcs} from '@/lib/target-calendar';
 import {CONSUMER_BRIX, compareRow, lossKg, sugarBadge, sugarRef, sugarRefShort, type CompareRow} from '@/lib/consumer-compare';
 import {HARVEST_MONTHS, harvestCultivar, harvestMonthError} from '@/lib/harvest-window';
+import {useLotWeather} from '@/components/use-lot-weather';
 
 const NewApple = dynamic(() => import('@/components/new-apple'), {ssr: false, loading: () => <div className="loading-strip">여는 중…</div>});
 
@@ -25,7 +26,7 @@ const SHORT: Record<string, string> = {firmness: '단단함', loss: '무게', br
 const md = (d: string) => { const [, m, day] = d.split('-').map(Number); return `${m}/${day}`; };
 const unit = (m: string, hongro: boolean) => m === 'firmness' ? (hongro ? 'N (Ø11 mm)' : 'N') : metricMeta[m as 'brix'].unit;
 
-export default function MyApples({lots, loadError, reload, openTracker, focus, openModel}: {lots: Lot[]; loadError: string; reload: () => Promise<Lot[]>; openTracker: (mode: 'real' | 'example', lotId?: string) => void; focus?: {id: string | null; n: number; create?: boolean} | null; openModel?: () => void}) {
+export default function MyApples({lots, loadError, lotsRevision, reload, openTracker, focus, openModel}: {lots: Lot[]; loadError: string; lotsRevision: number; reload: () => Promise<Lot[]>; openTracker: (mode: 'real' | 'example', lotId?: string) => void; focus?: {id: string | null; n: number; create?: boolean} | null; openModel?: () => void}) {
   const [openId, setOpenId] = useState<string | null>(null), [creating, setCreating] = useState(false), [created, setCreated] = useState('');
   // 다른 화면에서 특정 사과(또는 새 사과 등록)를 열도록 요청하면 그 화면을 엽니다.
   useEffect(() => { if (focus) { setOpenId(focus.id); setCreating(!!focus.create && !focus.id); } }, [focus?.n]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -38,7 +39,23 @@ export default function MyApples({lots, loadError, reload, openTracker, focus, o
   }, []);
   const all = useMemo(() => [...lots].sort((a, b) => (storageStart(a) || '').localeCompare(storageStart(b) || '')), [lots]);
   const done = all.filter(l => l.details?.archived_on), viewDone = showDone && done.length > 0, sorted = viewDone ? done : all.filter(l => !l.details?.archived_on);
-  const lot = lots.find(l => l.id === openId) ?? null;
+  const listed = lots.find(l => l.id === openId), inList = !!listed;
+  const [lookedUp, setLookedUp] = useState<{id: string; revision: number; lot?: Lot; error?: string} | null>(null);
+  // Load a direct link independently of the current page. The server applies the usual lot access policies.
+  useEffect(() => {
+    if (!openId || inList || creating) return;
+    const controller = new AbortController();
+    const {signal} = controller;
+    const url = `/api/lots?${new URLSearchParams({id: openId})}`;
+    requestJson<{lot: Lot}>(url, {signal}).then(result => {
+      if (!signal.aborted) setLookedUp({id: openId, revision: lotsRevision, lot: result.lot});
+    }).catch((error: Error) => {
+      if (!signal.aborted) setLookedUp({id: openId, revision: lotsRevision, error: error.message});
+    });
+    return () => controller.abort();
+  }, [openId, inList, creating, lotsRevision]);
+  const direct = lookedUp?.id === openId ? lookedUp : null;
+  const lot = listed ?? direct?.lot ?? null;
   // 상세를 열면 주소를 #lot/<id>로(뒤로 가기로 목록), 목록이면 #lots로 맞춥니다.
   useEffect(() => {
     const want = lot ? `#lot/${encodeURIComponent(lot.id)}` : '#lots';
@@ -46,12 +63,12 @@ export default function MyApples({lots, loadError, reload, openTracker, focus, o
     if (lot && window.location.hash !== want) history.pushState(null, '', '/' + want);
     else if (!lot && !openId && window.location.hash.startsWith('#lot/')) history.replaceState(null, '', '/#lots');
   }, [lot, openId, creating]);
-  // 주소의 기록이 내 목록에 없으면(없는 기록이거나 열 권한이 없음) 목록에서 알려 줍니다. 목록은 서버 권한 검사(본인 기록만)를 거친 결과입니다.
-  const missing = !!openId && !lot && !creating && !loadError;
+  const lookupError = direct?.revision === lotsRevision ? direct.error : null;
   if (creating) return <NewApple onBack={() => setCreating(false)} onSaved={async l => { await reload(); setCreating(false); setCreated(l.id); setOpenId(l.id); }} />;
   if (lot) return <AppleDetail key={lot.id} lot={lot} firstMsg={created === lot.id ? `‘${josa(lot.name, '을를').replace(lot.name, lot.name + '’')} 등록했어요.` : ''} onBack={() => { setOpenId(null); setCreated(''); history.replaceState(null, '', '/#lots'); }} reload={reload} openTracker={openTracker} openModel={openModel} />;
+  if (openId && !lookupError) return <div className="loading-strip" role="status">사과 기록을 불러오는 중이에요…</div>;
   return <div className="ma">
-    {missing && <p className="ma-hint warn" role="alert">주소의 사과 기록을 찾을 수 없어요. 지워졌거나 이 계정으로 열 수 없는 기록이에요.</p>}
+    {lookupError && <p className="ma-hint warn" role="alert">{lookupError === '물량을 찾을 수 없습니다.' ? '주소의 사과 기록을 찾을 수 없어요. 지워졌거나 이 계정으로 열 수 없는 기록이에요.' : lookupError}</p>}
     <div className="ma-head"><h1>내 사과</h1>{all.length > 0 && <button type="button" className="ma-primary" onClick={() => setCreating(true)}><Plus size={18} aria-hidden="true" />새 사과</button>}</div>
     {loadError && <p className="error-box" role="alert">목록을 불러오지 못했어요. {loadError} <button type="button" className="linkbtn" onClick={() => void reload()}>다시 불러오기</button></p>}
     {viewDone && <p className="ma-hint muted">출하 완료로 옮긴 사과예요. 눌러서 다시 목록으로 옮길 수 있어요.</p>}
@@ -68,12 +85,12 @@ function AppleCard({lot, onOpen}: {lot: Lot; onOpen: () => void}) {
   const firm = d !== null ? p.at('firmness', d) : null, loss = d !== null ? p.at('loss', d) : null;
   // 목록에서는 측정 기록을 불러오지 않으므로, 측정값에 따라 달라지는 단단함은 상세 화면에서만 보여 줍니다.
   const parts = [loss?.ok ? `무게 ${easyChange('loss', loss.value, 0)}` : null].filter(Boolean);
-  const pend = weatherPending(lot), waitSept = !!pend && todayKST() < `${pend.year}-10-01`;
+  const period = weatherRefreshPeriod(lot), waiting = !!period && todayKST() < period.refreshDate;
   // 측정을 3주 넘게 안 했으면 알려 줍니다(마지막 측정, 없으면 처음 측정일·저장 시작일 기준).
   const lastDate = lot.latest_observation?.date ?? lot.initial_measured_on ?? storageStart(lot) ?? null;
   const since = lastDate && isDate(lastDate) ? daysBetween(lastDate, todayKST()) : null;
   const hint = ready.status === 'unsupported' || ready.status === 'conditions' ? {tone: 'muted', text: '기록만 · 예측은 준비 중이에요'}
-    : waitSept ? {tone: 'warn', text: '10월부터 날씨로 자동 추정 · 당도나 단단함을 재면 바로 예측돼요'}
+    : waiting ? {tone: 'warn', text: `${period.rainMonth + 1}월부터 날씨로 자동 추정 · 당도나 단단함을 재면 바로 예측돼요`}
     : !firm?.ok && loss?.ok ? {tone: 'warn', text: '당도나 단단함을 한 번 재 주세요'}
     : since !== null && since >= 21 && !lot.details?.archived_on ? {tone: 'warn', text: lot.latest_observation || (lot.initial_measured_on && !weatherInitial(lot)) ? `마지막 측정 ${since}일 전 · 한 번 재 주세요` : `아직 직접 측정한 기록이 없어요 · 저장 ${since}일째`} : null;
   return <button type="button" className="ma-card" onClick={onOpen}>
@@ -93,27 +110,16 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
     requestJson<{observations: Observation[]}>(`/api/lots/${lot.id}/analysis?asOf=${todayKST()}`).then(r => { if (live) setObs(r.observations ?? []); }).catch(e => { if (live) { setObs([]); setErr((e as Error).message || '측정 기록을 불러오지 못했어요.'); } });
     return () => { live = false; };
   }, [lot.id, n]);
-  // 날씨 값이 비어 있던 물량(9월 수확 직후 저장 등): 9월이 끝났으면 그 해 자료를 받아 화면에서 추정합니다. 끝나기 전에는 측정을 안내합니다.
-  const pend = useMemo(() => weatherPending(lot), [lot]);
-  const waitSept = !!pend && todayKST() < `${pend.year}-10-01`;
-  const [override, setOverride] = useState<WeatherValues | null>(null);
-  useEffect(() => {
-    if (!pend || waitSept) return;
-    let live = true;
-    fetch(`/api/weather/hongro?year=${pend.year}&region=${pend.region}`).then(r => r.ok ? r.json() : null).then(j => {
-      if (!live || !j || !Array.isArray(j.variables)) return;
-      const v = Object.fromEntries((j.variables as {key: string; value: number | null}[]).map(x => [x.key, x.value])) as WeatherValues;
-      if (Object.values(v).every(x => x !== null)) setOverride(v);
-    }).catch(() => {});
-    return () => { live = false; };
-  }, [pend?.region, pend?.year, waitSept]); // eslint-disable-line react-hooks/exhaustive-deps
+  const {period, waiting, values: override} = useLotWeather(lot);
   const p = useMemo(() => lotPredictor(lot, obs ?? [], override), [lot, obs, override]);
-  const hongro = /홍로/.test(lot.variety || '');
+  const {defaultDay, lastDay: limit} = lotPredictionRange(lot);
+  const hongro = defaultDay === limit;
   // 홍로 식은 120일까지, 후지는 장기 저장이 많아 150·200일도 보여 줍니다(식 표시 범위 안).
   const days = [...new Set([...(p.todayDay !== null && p.todayDay >= 0 ? [p.todayDay] : []), 30, 60, 90, 120, ...(hongro ? [] : [150, 200])])].sort((a, b) => a - b);
   const [day, setDay] = useState<number | null>(null);
-  const limit = hongro ? 120 : 300, over = p.todayDay !== null && p.todayDay > limit;
-  const sel = day ?? (over ? Math.max(...days.filter(d => d <= limit)) : p.todayDay !== null && p.todayDay >= 0 ? p.todayDay : 60);
+  const over = p.todayDay !== null && p.todayDay > limit;
+  const todaySelection = p.todayDay !== null && p.todayDay >= 0 ? Math.min(p.todayDay, limit) : 60;
+  const sel = day ?? todaySelection;
   const ready = lotReadiness(lot);
   const [allRec, setAllRec] = useState(false), [editObs, setEditObs] = useState<Observation | null>(null), [busy, setBusy] = useState(false);
   const sortedObs = [...(obs ?? [])].sort((a, b) => b.date.localeCompare(a.date)), recent = allRec ? sortedObs : sortedObs.slice(0, 3);
@@ -133,7 +139,7 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
   useEffect(() => { try { setKgUser(window.localStorage.getItem('appletrack:firmunit') === 'kgf'); } catch { /* 무시 */ } }, []);
   const asKg = (n: number) => `약 ${fmtNum(n / 9.80665, 1)} kg`;
   const [target, setTarget] = useState(lot.details?.firmness_target != null ? String(lot.details.firmness_target) : '');
-  const maxDay = hongro ? 120 : 300;
+  const maxDay = limit;
   const reach = (() => {
     const t = Number(target); if (!target.trim() || !Number.isFinite(t) || t <= 0 || p.todayDay === null) return null;
     const from = Math.max(0, p.todayDay), now = p.at('firmness', from);
@@ -188,11 +194,15 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
       {(ready.status === 'unsupported' || ready.status === 'conditions') && <p className="ma-hint muted">{ready.title} · {ready.detail}</p>}
       {harvestMonthError(lot.variety, lot.harvest_date) && (() => { const c = harvestCultivar(lot.variety)!, [a, b] = HARVEST_MONTHS[c], h = lot.harvest_date!;
         return <p className="ma-hint warn" role="alert">수확일 {+h.slice(5, 7)}월 {+h.slice(8, 10)}일이 {c === 'hongro' ? '홍로' : '후지'} 수확 달({a}~{b}월) 밖이라 계산값을 보여 주지 않아요. 기록은 그대로 두었으니 ‘사과 정보 수정’에서 수확일을 확인해 주세요.</p>; })()}
-      {waitSept && <p className="ma-hint warn">9월 강수량은 9월이 끝나야 집계돼서, 10월 1일부터 날씨로 자동 추정해요. 지금 당도나 단단함을 재서 ‘측정 추가’로 넣으면 바로 예측돼요.</p>}
-      {override && <p className="ma-hint">{pend?.year}년 농업기상 자료로 처음 품질을 자동 추정했어요(실측 아님).</p>}
+      {period && waiting && <p className="ma-hint warn">{period.rainMonth}월 강수량은 {period.rainMonth}월이 끝나야 집계돼서, {period.rainMonth + 1}월 1일부터 날씨로 자동 추정해요. 지금 당도나 단단함을 재서 ‘측정 추가’로 넣으면 바로 예측돼요.</p>}
+      {override && <p className="ma-hint">{period?.year}년 농업기상 자료로 처음 품질을 자동 추정했어요(실측 아님).</p>}
       {over && <p className="ma-hint warn">오늘은 저장 {p.todayDay}일째라 계산 범위({limit}일)를 넘었어요. 아래 날짜 버튼은 범위 안 날짜의 계산값이에요. 지금 상태는 직접 측정해 확인해 주세요.</p>}
     </div>
-    <div className="dash-days"><div className="ma-days" role="group" aria-label="저장 일수">{days.map(d => <button key={d} type="button" aria-pressed={sel === d} className={sel === d ? 'active' : ''} onClick={() => setDay(d)}>{d === p.todayDay ? '오늘' : `${d}일`}</button>)}</div>
+    <div className="dash-days"><div className="ma-days" role="group" aria-label="저장 일수">{days.map(d => {
+      const isToday = d === p.todayDay;
+      const selected = isToday ? day === null : (day ?? (over ? null : todaySelection)) === d;
+      return <button key={d} type="button" aria-pressed={selected} className={selected ? 'active' : ''} onClick={() => setDay(isToday ? null : d)}>{isToday ? '오늘' : `${d}일`}</button>;
+    })}</div>
     <p className="ma-date">{p.start ? `${md(addDays(p.start, sel))} 기준 (저장 ${sel}일째)` : ''}</p>{p.start && <p className="ma-sub ma-daybasis">버튼의 일수는 저장 시작일({md(p.start)})부터 센 날이에요.</p>}</div>
     <div className="dash-tiles">
     {obs === null ? <div className="ma-rows" aria-label="측정 기록을 불러와 계산하는 중" role="status"><p className="ma-sub">측정 기록 확인 중…</p><span className="ma-sk" style={{height: 18}} /><span className="ma-sk" style={{height: 18, width: '80%'}} /><span className="ma-sk" style={{height: 18, width: '60%'}} /></div> : <div className="ma-rows">{EASY_METRICS.map(m => { const r = p.at(m, sel);
@@ -202,7 +212,7 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
     {obs !== null && p.start && <SameDay lot={lot} obs={obs} p={p} sel={sel} hongro={hongro} />}
     </div>
     {obs === null ? <p className="dash-chart ma-loading" role="status">측정 기록 확인 중…</p> : <>
-      <section className="dash-chart" aria-label="저장 일수별 변화"><h2>저장 일수별 변화 <small>선: 계산값 · 동그라미: 내가 잰 값 · 세로선: 고른 날</small></h2><MiniCharts p={p} obs={obs} sel={sel} maxDay={hongro ? 120 : 200} target={lot.details?.firmness_target ?? null} /></section>
+      <section className="dash-chart" aria-label="저장 일수별 변화"><h2>저장 일수별 변화 <small>선: 계산값 · 동그라미: 내가 잰 값 · 세로선: 고른 날</small></h2><MiniCharts p={p} obs={obs} sel={sel} maxDay={Math.max(defaultDay, Math.min(sel, limit))} target={lot.details?.firmness_target ?? null} /></section>
     </>}
     <div className="dash-measurements">
       <section className="ma-records dash-rec" aria-label="최근 측정 기록"><h2>최근 측정</h2>
@@ -215,7 +225,7 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
       </section>
       {!lot.details?.archived_on && obs !== null && <ConsumerCompare lot={lot} p={p} onMeasure={() => setMeasure(true)} />}
       <div className="dash-side">
-      {!lot.details?.archived_on && obs !== null && <TargetStorage lot={lot} p={p} maxDay={hongro ? 120 : 300} />}
+      {!lot.details?.archived_on && obs !== null && <TargetStorage lot={lot} p={p} maxDay={limit} />}
       <section className="ma-target dash-card" aria-label="내 단단함 기준"><h2>내 기준</h2>
       <div className="ma-target-row"><label htmlFor="ma-target">단단함</label><input id="ma-target" type="number" inputMode="decimal" min={1} max={300} step="any" placeholder="예: 50" value={target} onChange={e => setTarget(e.target.value)} /><span>N</span>
         <button type="button" className="ma-ghost" disabled={busy || target === (lot.details?.firmness_target != null ? String(lot.details.firmness_target) : '')} onClick={() => void saveTarget()}>저장</button></div>

@@ -4,12 +4,13 @@
 import type {Lot, Observation} from './lot-types';
 import {harvestMonthError} from './harvest-window';
 import {formFromLot, firmnessToN, effectiveInitialMeasuredOn} from './tracker-form';
-import {predictQuality} from './quality-models';
+import {predictQuality, QUALITY_MODEL_DAYS} from './quality-models';
 import {calculateHongroForm} from './hongro-tracker';
 import {isHongroVariety} from './cultivar';
 import {daysBetween, isDate, fmtNum, metricMeta, todayKST, type MetricId} from './tracker';
 import {storageStart} from './lot-readiness';
 import {predictAll} from './initial-quality';
+import {isRegionKey, REGIONS} from './regions';
 
 export const EASY_LABEL: Record<MetricId, string> = {firmness: '단단함', brix: '단맛(당도)', acidity: '신맛(산도)', loss: '무게 감소'};
 export const EASY_METRICS: MetricId[] = ['firmness', 'loss', 'brix', 'acidity'];
@@ -42,13 +43,26 @@ export function weatherPending(lot: Lot): {region: string; year: number} | null 
   return null;
 }
 
+export function weatherRefreshPeriod(lot: Lot) {
+  const pending = weatherPending(lot);
+  if (!pending || !isRegionKey(pending.region)) return null;
+  const rainMonth = REGIONS[pending.region].rainMonth;
+  return {...pending, rainMonth, refreshDate: `${pending.year}-${String(rainMonth + 1).padStart(2, '0')}-01`};
+}
+
+export function lotPredictionRange(lot: Lot) {
+  return isHongroVariety(lot.variety)
+    ? {defaultDay: QUALITY_MODEL_DAYS.hongro, lastDay: QUALITY_MODEL_DAYS.hongro}
+    : {defaultDay: 200, lastDay: QUALITY_MODEL_DAYS.fuji};
+}
+
 /** 지표 m을 잰 가장 최근 측정. 같은 날 기록이 여럿이면 목록·API와 같은 규칙(날짜, 그다음 id 순서의 마지막)으로 하나를 고릅니다. */
 export function latestObservation(observations: Observation[], m: 'firmness' | 'brix' | 'acidity', onDate?: string): Observation | null {
   return [...observations].filter(o => typeof o[m] === 'number' && isDate(o.date) && (!onDate || o.date === onDate))
     .sort((a, b) => a.date.localeCompare(b.date) || String(a.id).localeCompare(String(b.id))).pop() ?? null;
 }
 
-/** 9월이 끝난 뒤 받은 날씨 값(override)이 있으면, 저장된 빈 값 대신 그 값으로 처음 품질을 추정합니다(기존 식 그대로). */
+/** 산지별 집계가 끝난 뒤 받은 날씨 값은 저장된 빈 값 대신 사용합니다. */
 export function lotPredictor(lot: Lot, observations: Observation[] = [], override?: WeatherValues | null) {
   const form = formFromLot(lot);
   const hongro = isHongroVariety(form.variety);

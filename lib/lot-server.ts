@@ -1,7 +1,7 @@
 import {isRegionKey, isFujiRegionKey, isHongroRegionKey} from './regions';
 import {serverClient} from './supabase-server';
 import {InputError, numberOrNull, validDate, parseCsv, summarizeEnvironment, demoPrediction, restrictPredictionForVariety} from './lot-analysis';
-import {today,type Lot,type EnvRow,type Observation,type Photo} from './lot-types';
+import {today,type Lot,type LotPage,type EnvRow,type Observation,type Photo} from './lot-types';
 import {restrictLegacyLoss} from './quality-policy';
 import {HONGRO_DEDICATED_REASON,isHongroVariety} from './cultivar';
 import {harvestMonthError} from './harvest-window';
@@ -20,7 +20,64 @@ export function sameSite(req:Request){const origin=req.headers.get('origin');if(
 export async function getLot(id:string){const c=await client();const lot=checked(await c.from('lots').select('*').eq('id',id).maybeSingle()) as Lot|null;if(!lot)throw new InputError('물량을 찾을 수 없습니다.');return lot;}
 async function payload(req:Request){const text=await req.text();if(text.length>30000)throw new InputError('입력 내용이 너무 깁니다.');try{const parsed=JSON.parse(text);if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw new Error();return parsed;}catch{throw new InputError('입력 형식을 확인해 주세요.');}}
 function short(v:unknown,label:string,optional=false,max=120){if(typeof v!=='string'||(!optional&&!v.trim())||v.length>max)throw new InputError(`${josa(label, '을를')} 확인해 주세요.`);return v.trim();}
-export async function listLots(){const c=await client();const lots=checked(await c.from('lots').select('*').order('created_at',{ascending:false}).limit(100))||[];const result=await Promise.all(lots.map(async(l:any)=>{const [e,o,f]=await Promise.all([c.from('environment').select('timestamp',{count:'exact'}).eq('lot_id',l.id).order('timestamp',{ascending:false}).limit(1),c.from('observations').select('defects,date,firmness,brix,acidity',{count:'exact'}).eq('lot_id',l.id).order('date',{ascending:false}).order('id',{ascending:false}).limit(1),c.from('files').select('id',{count:'exact',head:true}).eq('lot_id',l.id).eq('kind','photo')]);if(e.error||o.error||f.error)throw e.error||o.error||f.error;return {...l,environment_count:e.count||0,observation_count:o.count||0,photo_count:f.count||0,latest_defects:o.data?.[0]?.defects,latest_observation:o.data?.[0]?{date:o.data[0].date,firmness:o.data[0].firmness,brix:o.data[0].brix,acidity:o.data[0].acidity??null}:null,last_environment:e.data?.[0]?.timestamp};}));return json({lots:result});}
+const LOT_PAGE_SIZE = 30;
+
+function readLotCursor(raw: string): {createdAt: string; id: string} {
+  try {
+    if (raw.length > 1024 || !/^[A-Za-z0-9_-]+$/.test(raw)) throw new Error();
+    const decoded: unknown = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
+    if (!Array.isArray(decoded) || decoded.length !== 2) throw new Error();
+    const [createdAt, id] = decoded;
+    if (typeof createdAt === 'string' && createdAt.length <= 128 && typeof id === 'string' && id.length > 0 && id.length <= 256) return {createdAt, id};
+  } catch { /* Reject invalid cursors before filtering. */ }
+  throw new InputError('사과 목록 조회 위치를 확인해 주세요.');
+}
+
+async function withLotSummary(c: Awaited<ReturnType<typeof client>>, lot: Lot) {
+  const [environment, observations, photos] = await Promise.all([
+    c.from('environment').select('timestamp',{count:'exact'}).eq('lot_id',lot.id).order('timestamp',{ascending:false}).limit(1),
+    c.from('observations').select('defects,date,firmness,brix,acidity',{count:'exact'}).eq('lot_id',lot.id).order('date',{ascending:false}).order('id',{ascending:false}).limit(1),
+    c.from('files').select('id',{count:'exact',head:true}).eq('lot_id',lot.id).eq('kind','photo'),
+  ]);
+  if (environment.error || observations.error || photos.error) throw environment.error || observations.error || photos.error;
+  const latest = observations.data?.[0];
+  return {...lot, environment_count: environment.count || 0, observation_count: observations.count || 0,
+    photo_count: photos.count || 0, latest_defects: latest?.defects, last_environment: environment.data?.[0]?.timestamp,
+    latest_observation: latest ? {date: latest.date, firmness: latest.firmness, brix: latest.brix, acidity: latest.acidity ?? null} : null};
+}
+
+export async function listLots(req?: Request, readClient = client) {
+  const params = req ? new URL(req.url).searchParams : null;
+  const id = params?.get('id');
+  const rawCursor = params?.get('cursor');
+  const cursor = rawCursor === null || rawCursor === undefined ? null : readLotCursor(rawCursor);
+  const c = await readClient();
+  if (id !== null && id !== undefined) {
+    if (!id || id.length > 256) return json({error:'물량을 찾을 수 없습니다.'},404);
+    const lot = checked(await c.from('lots').select('*').eq('id', id).maybeSingle()) as Lot | null;
+    return lot ? json({lot: await withLotSummary(c, lot)}) : json({error:'물량을 찾을 수 없습니다.'},404);
+  }
+
+  const requested = req ? LOT_PAGE_SIZE + 1 : 100; // Keep the existing bounded AI tool response.
+  const ordered = () => c.from('lots').select('*').order('created_at',{ascending:false}).order('id',{ascending:false});
+  let rows: Lot[];
+  if (cursor) {
+    // Split the two disjoint ranges so legacy text IDs/dates go through the normal filter encoding.
+    rows = checked(await ordered().eq('created_at', cursor.createdAt).lt('id', cursor.id).limit(requested)) || [];
+    if (rows.length < requested) {
+      const older = checked(await ordered().lt('created_at', cursor.createdAt).limit(requested - rows.length)) || [];
+      rows = rows.concat(older);
+    }
+  } else {
+    rows = checked(await ordered().limit(requested)) || [];
+  }
+
+  const pageLots = req ? rows.slice(0, LOT_PAGE_SIZE) : rows;
+  const last = pageLots.at(-1);
+  const page: LotPage = {lots: await Promise.all(pageLots.map(lot => withLotSummary(c, lot)))};
+  if (req) page.nextCursor = last && rows.length > LOT_PAGE_SIZE ? Buffer.from(JSON.stringify([last.created_at, last.id])).toString('base64url') : null;
+  return json(page);
+}
 // ── 물량 기록: 이름·품종·입고일만 필수, 나머지는 측정·확인한 항목만 저장 ──
 function lotFields(p:any,partial:boolean,variety:unknown=p.variety){
  const out:Record<string,unknown>={};const has=(k:string)=>Object.prototype.hasOwnProperty.call(p,k);
@@ -113,10 +170,10 @@ function checkLotModel(l:Record<string,unknown>){
 /** 품종별 수확 달 밖의 수확일은 저장하지 않습니다(이미 저장된 기록은 수확일·품종을 바꿀 때만 다시 확인). */
 function checkHarvestMonth(l:Record<string,unknown>){const e=harvestMonthError(l.variety,l.harvest_date);if(e)throw new InputError(e);}
 function checkLotDates(l:Record<string,unknown>){const start=l.storage_start_date||l.intake_date;if(typeof start==='string'&&typeof l.initial_measured_on==='string'&&l.initial_measured_on<start)throw new InputError('초기 측정일이 저장 시작일보다 빠릅니다.');if(typeof l.harvest_date==='string'&&typeof l.intake_date==='string'&&l.harvest_date>l.intake_date)throw new InputError('수확일은 입고일보다 늦을 수 없습니다.');}
-export async function createLot(req:Request){checkOrigin(req);const p=await payload(req);
+export async function createLot(req:Request, readClient = client){checkOrigin(req);const p=await payload(req);
  const f=lotFields(p,false);checkLotDates(f);checkHarvestMonth(f);checkLotModel(f);const id=crypto.randomUUID();
  const lot={id,...f,created_at:new Date().toISOString(),team_shared:p.team_shared===true||p.team_shared==='on'||p.team_shared==='true'};
- const c=await client();const count=await c.from('lots').select('id',{count:'exact',head:true});if(count.error)throw count.error;if((count.count||0)>=100)throw new InputError('최대 100개 물량까지 등록할 수 있습니다.');
+ const c=await readClient();
  checked(await c.from('lots').insert(lot));return json({lot:checked(await c.from('lots').select('*').eq('id',id).single())},201);}
 export async function updateLot(id:string,req:Request){checkOrigin(req);const existing=await getLot(id);const p=await payload(req);
  const f=lotFields(p,true,p.variety??existing.variety);

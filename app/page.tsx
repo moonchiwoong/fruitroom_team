@@ -11,7 +11,7 @@ import type {TrackerRequest} from '@/components/quality-tracker';
 import type {ModelInfoContext} from '@/components/model-info';
 import {clearDraft, HANDOFF_KEY, loadDraft, saveDraft, type TrackerHandoff} from '@/lib/tracker-form';
 import AIAssistant, {type AssistantContext} from '@/components/ai-assistant';
-import type {Lot} from '@/lib/lot-types';
+import type {Lot, LotPage} from '@/lib/lot-types';
 
 const QualityTracker = dynamic(() => import('@/components/quality-tracker'), {ssr: false, loading: () => <div className="loading-strip">화면을 준비하고 있어요…</div>});
 const MyApples = dynamic(() => import('@/components/my-apples'), {ssr: false, loading: () => <div className="loading-strip">사과 목록을 불러오는 중…</div>});
@@ -39,14 +39,50 @@ export default function Home() {
   const [trackerVisited, setTrackerVisited] = useState(false), [lotsVisited, setLotsVisited] = useState(false);
   const scrollMemo = useRef<Partial<Record<Page, number>>>({}), tabRef = useRef<Page>('home');
   const [lots, setLots] = useState<Lot[]>([]), [lotsError, setLotsError] = useState(''), [lotsLoaded, setLotsLoaded] = useState(false);
+  const [lotsRevision, setLotsRevision] = useState(0);
+  const lotsRequest = useRef<AbortController | null>(null);
   const [trackReq, setTrackReq] = useState<TrackerRequest | null>(null), [lotFocus, setLotFocusState] = useState<LotsFocus | null>(null);
   const setLotFocus = useCallback((id: string | null, create = false) => setLotFocusState(f => ({id, create, n: (f?.n ?? 0) + 1})), []);
   const reload = useCallback(async () => {
-    try { const d = await requestJson<{lots: Lot[]}>('/api/lots'); setLots(d.lots); setLotsError(''); return d.lots; }
-    catch (e) { setLotsError((e as Error).message); return [] as Lot[]; }
-    finally { setLotsLoaded(true); }
+    lotsRequest.current?.abort();
+    const controller = new AbortController();
+    lotsRequest.current = controller;
+    const {signal} = controller;
+    const received = new Map<string, Lot>();
+    const seenCursors = new Set<string>();
+    function showPage(page: LotPage) {
+      for (const lot of page.lots) received.set(lot.id, lot);
+      const snapshot = [...received.values()];
+      const ids = new Set(received.keys());
+      // Keep previously loaded records visible during refresh until the new pages replace them.
+      setLots(previous => page.nextCursor ? [...snapshot, ...previous.filter(lot => !ids.has(lot.id))] : snapshot);
+    }
+    async function loadMore(cursor: string | null | undefined) {
+      while (cursor && !signal.aborted) {
+        if (seenCursors.has(cursor)) throw new Error('이어서 불러올 사과 기록을 확인할 수 없어요.');
+        seenCursors.add(cursor);
+        const page = await requestJson<LotPage>(`/api/lots?${new URLSearchParams({cursor})}`, {signal});
+        if (signal.aborted) return;
+        showPage(page);
+        cursor = page.nextCursor;
+      }
+    }
+    try {
+      const first = await requestJson<LotPage>('/api/lots', {signal});
+      if (signal.aborted) return [];
+      showPage(first);
+      setLotsError('');
+      setLotsRevision(n => n + 1);
+      void loadMore(first.nextCursor).catch(e => { if (!signal.aborted) setLotsError((e as Error).message); });
+      return first.lots;
+    } catch (e) {
+      if (!signal.aborted) setLotsError((e as Error).message);
+      return [];
+    } finally {
+      if (!signal.aborted) setLotsLoaded(true);
+    }
   }, []);
-  useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => { void reload(); return () => lotsRequest.current?.abort(); }, [reload]);
   const setTab = useCallback((p: Page, keepResultContext = false) => {
     if (p === 'model' && !keepResultContext) setModelContext(undefined);
     if (p === 'track') setTrackerVisited(true);
@@ -94,7 +130,7 @@ export default function Home() {
       {tab === 'model' && <PageHead title="계산 근거" />}
       <div className="page-body">
         {trackerVisited && <div hidden={tab !== 'track'}><QualityTracker lots={lots} onLotsChanged={reload} request={trackReq} onAskAI={setAIContext} openModelInfo={context => {setModelContext(context); setTab('model', true);}} openLot={id => { setLotFocus(id); setTab('lots'); }} /></div>}
-        {lotsVisited && <div hidden={tab !== 'lots'}>{lotsLoaded ? <MyApples lots={lots} loadError={lotsError} reload={reload} openTracker={openTracker} focus={lotFocus} openModel={() => setTab('model')} /> : <div className="loading-strip">사과 목록을 불러오는 중…</div>}</div>}
+        {lotsVisited && <div hidden={tab !== 'lots'}>{lotsLoaded ? <MyApples lots={lots} loadError={lotsError} lotsRevision={lotsRevision} reload={reload} openTracker={openTracker} focus={lotFocus} openModel={() => setTab('model')} /> : <div className="loading-strip">사과 목록을 불러오는 중…</div>}</div>}
         {tab === 'model' && <ModelInfo context={modelContext} />}
         {tab === 'account' && <Account onOpenPredict={() => { setTab('model'); }} />}
       </div>
