@@ -39,10 +39,15 @@ function Mini({m, p, obs, sel, maxDay, target, variety}: {m: MetricId; p: P; obs
   const vals = [...data.filter(x => x.v !== null).map(x => x.v as number), ...meas.map(x => x.v), ...(target ? [target] : []), ...(ref ? [ref.lo, ref.hi] : [])];
   const now = p.at(m, sel);
   if (!vals.length) return <figure className="mc"><figcaption><span style={{color: METRIC_COLOR[m]}}><MetricIcon m={m} />{METRIC_LABEL[m]}</span></figcaption><p className="mc-na">{now.ok ? '' : now.reason}</p></figure>;
-  let lo = Math.min(...vals), hi = Math.max(...vals); if (hi - lo < 1e-9) { lo -= 1; hi += 1; } const pad = (hi - lo) * 0.12; lo -= pad; hi += pad;
+  // 단맛·신맛은 눈금을 고정합니다(작은 차이가 크게 부풀려 보이지 않게, 사과끼리 비교 쉽게). 값이 범위를 벗어나면 그만큼만 넓힙니다.
+  const FIXED: Partial<Record<MetricId, [number, number]>> = {brix: [10, 18], acidity: [0.1, 0.6]};
+  const fx = FIXED[m];
+  let lo = Math.min(...vals), hi = Math.max(...vals), pad = 0;
+  if (fx) { lo = Math.min(fx[0], lo); hi = Math.max(fx[1], hi); }
+  else { if (hi - lo < 1e-9) { lo -= 1; hi += 1; } pad = (hi - lo) * 0.12; lo -= pad; hi += pad; }
   const X = (d: number) => L + (W - L - R) * d / maxDay, Y = (v: number) => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
   let path = '', open = false; for (const x of data) { if (x.v === null) { open = false; continue; } path += `${open ? 'L' : 'M'}${X(x.d).toFixed(1)},${Y(x.v).toFixed(1)}`; open = true; }
-  const dg = metricMeta[m].digits, tickDg = hi - lo - 2 * pad < 3 * 10 ** -dg ? dg + 1 : dg; // 범위가 좁으면 눈금 자리를 하나 더
+  const dg = metricMeta[m].digits, tickDg = fx ? (m === 'acidity' ? 2 : 0) : hi - lo - 2 * pad < 3 * 10 ** -dg ? dg + 1 : dg; // 범위가 좁으면 눈금 자리를 하나 더
   return <figure className="mc">
     <figcaption><span style={{color: METRIC_COLOR[m]}}><MetricIcon m={m} />{METRIC_LABEL[m]}</span><b>{now.ok ? <>{fmtNum(now.value, dg)}<small> {UNIT(m)}</small></> : <small>계산 없음</small>}</b></figcaption>
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${METRIC_LABEL[m]} 저장 일수별 계산값`}>
