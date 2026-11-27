@@ -20,7 +20,7 @@ try {
   }
   if(!ready)throw new Error(`Next did not become ready\n${logs}`);
   exitCode=0;
-  for(const script of (process.env.UI_TEST_SCRIPT||'run-six-fixes.mjs,run-summary-layout.mjs,run-guest-cards.mjs,run-consumer-line.mjs,run-target-calendar.mjs,run-garak.mjs,run-harvest-month.mjs,run-lot-regressions.mjs').split(',')) {
+  for(const script of (process.env.UI_TEST_SCRIPT||'run-six-fixes.mjs,run-summary-layout.mjs,run-guest-cards.mjs,run-target-calendar.mjs,run-garak.mjs,run-harvest-month.mjs,run-lot-regressions.mjs').split(',')) {
     const code=await new Promise((finish,reject)=>{
       const child=spawn(process.execPath,[resolve(here,script)],{cwd:root,env,stdio:'inherit'});
       child.once('error',reject);child.once('exit',code=>finish(code??1));

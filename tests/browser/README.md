@@ -22,7 +22,7 @@ NODE_PATH="$UI_TEST_DEPS/node_modules" npm run test:ui
 
 Alternatively, set `NODE_PATH` to an existing Playwright installation and `CHROMIUM_EXECUTABLE_PATH` to its Chromium executable. On a minimal Linux host, Playwright's documented browser system dependencies must also be installed.
 
-`run-local.mjs` starts Next with non-secret fake Supabase settings and runs the current suites: six fixes, summary layout, guest trial cards, consumer sugar line, target calendar, Seoul Garak price card and harvest month. Run with `LANG=C.UTF-8 LC_ALL=C.UTF-8` so Korean download file names are kept.
+`run-local.mjs` starts Next with non-secret fake Supabase settings and runs the current suites: six fixes, summary layout, guest trial cards, target calendar, Seoul Garak price card and harvest month. Run with `LANG=C.UTF-8 LC_ALL=C.UTF-8` so Korean download file names are kept.
 
 If external fonts are blocked, `PRETENDARD_FONT=/path/to/PretendardVariable.woff2` serves a local copy through the request fixture without changing production code. Screenshots and JSON results are written under `tests/browser/artifacts/`.
 

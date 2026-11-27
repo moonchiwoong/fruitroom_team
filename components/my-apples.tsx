@@ -296,8 +296,8 @@ export function TargetStorage({lot, p, maxDay, link}: {lot: Lot; p: ReturnType<t
     {chk?.ok && <>
       <div className="ts-res">
         <p className="ts-day"><b>{md2(date)}</b><span>저장 {chk.day}일째 · {daysBetween(today, date)}일 뒤</span></p>
-        {q.length ? <div className="ts-stats">{(['firmness', 'brix'] as const).map(m => { const r = val(m); if (!r?.ok) return null; const bd = m === 'brix' ? sugarBadge(r.value) : null;
-          return <div key={m}><span className="ts-lab">{SHORT[m]}{bd && <em className={'cc-pill ' + bd.kind}>{bd.kind === 'in' ? '선호 안' : bd.text}</em>}</span><b>{fmtNum(r.value, metricMeta[m].digits)}</b><small>{metricMeta[m].unit}</small></div>; })}</div>
+        {q.length ? <div className="ts-stats">{(['firmness', 'brix'] as const).map(m => { const r = val(m); if (!r?.ok) return null; 
+          return <div key={m}><span className="ts-lab">{SHORT[m]}</span><b>{fmtNum(r.value, metricMeta[m].digits)}</b><small>{metricMeta[m].unit}</small></div>; })}</div>
           : <p className="ts-none">이날은 계산 범위 밖이라 품질 값은 표시하지 않아요.</p>}
       </div>
       <div className="ts-cta"><button type="button" className="ma-target-save" onClick={save}><CalendarPlus size={16} aria-hidden="true" />캘린더에 등록</button><small>그날 오전 9시 알림</small></div>
