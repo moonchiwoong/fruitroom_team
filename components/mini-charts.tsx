@@ -3,6 +3,7 @@
 // 선은 lotPredictor(기존 예측식) 계산값만, 동그라미는 내가 잰 값. 계산 못 한 날은 선을 끊습니다.
 import {firmnessReach, reachText} from '@/lib/target-reach';
 import {useMemo} from 'react';
+import {refFor} from '@/lib/variety-reference';
 import type {Observation} from '@/lib/lot-types';
 import type {lotPredictor} from '@/lib/lot-predict';
 import {fmtNum, metricMeta, daysBetween, isDate, type MetricId} from '@/lib/tracker';
@@ -14,11 +15,17 @@ import {EASY_METRICS} from '@/lib/lot-predict';
 const ORDER = EASY_METRICS as readonly MetricId[]; // 위 타일과 같은 순서
 const W = 300, H = 120, L = 34, R = 8, T = 10, B = 20;
 
-export default function MiniCharts({p, obs, sel, maxDay, target = null}: {p: P; obs: Observation[]; sel: number; maxDay: number; target?: number | null}) {
-  return <div className="mc-grid">{ORDER.map(m => <Mini key={m} m={m} p={p} obs={obs} sel={sel} maxDay={maxDay} target={m === 'firmness' ? target : null} />)}</div>;
+export default function MiniCharts({p, obs, sel, maxDay, target = null, variety = null}: {p: P; obs: Observation[]; sel: number; maxDay: number; target?: number | null; variety?: string | null}) {
+  const refs = (['brix', 'acidity'] as const).map(m => refFor(variety, m)).filter(Boolean) as NonNullable<ReturnType<typeof refFor>>[];
+  const srcs = [...new Map(refs.map(r => [r.url, r])).values()];
+  return <>
+    <div className="mc-grid">{ORDER.map(m => <Mini key={m} m={m} p={p} obs={obs} sel={sel} maxDay={maxDay} target={m === 'firmness' ? target : null} variety={variety} />)}</div>
+    {srcs.length > 0 && <p className="mc-refsrc">회색 점선: {refs[0].label} 품종 평균(품종 특성 자료, 선호·판정 기준 아님) · 출처: {srcs.map((r, i) => <span key={r.url}>{i ? ' · ' : ''}<a href={r.url} target="_blank" rel="noreferrer">{r.source}</a></span>)}</p>}
+  </>;
 }
 
-function Mini({m, p, obs, sel, maxDay, target}: {m: MetricId; p: P; obs: Observation[]; sel: number; maxDay: number; target: number | null}) {
+function Mini({m, p, obs, sel, maxDay, target, variety}: {m: MetricId; p: P; obs: Observation[]; sel: number; maxDay: number; target: number | null; variety: string | null}) {
+  const ref = refFor(variety, m);
   const data = useMemo(() => {
     const points: {d: number; v: number | null}[] = [];
     for (let d = 0; ; d = Math.min(d + 2, maxDay)) {
@@ -29,7 +36,7 @@ function Mini({m, p, obs, sel, maxDay, target}: {m: MetricId; p: P; obs: Observa
   }, [p, m, maxDay]);
   const meas = m === 'loss' || !p.start ? [] : obs.filter(o => o[m] != null && isDate(o.date)).map(o => ({d: daysBetween(p.start!, o.date), v: o[m] as number})).filter(x => x.d >= 0 && x.d <= maxDay);
   const reach = target ? firmnessReach(p, target, maxDay) : null, rt = reach && target ? reachText(reach, target) : null;
-  const vals = [...data.filter(x => x.v !== null).map(x => x.v as number), ...meas.map(x => x.v), ...(target ? [target] : [])];
+  const vals = [...data.filter(x => x.v !== null).map(x => x.v as number), ...meas.map(x => x.v), ...(target ? [target] : []), ...(ref ? [ref.lo, ref.hi] : [])];
   const now = p.at(m, sel);
   if (!vals.length) return <figure className="mc"><figcaption><span style={{color: METRIC_COLOR[m]}}><MetricIcon m={m} />{METRIC_LABEL[m]}</span></figcaption><p className="mc-na">{now.ok ? '' : now.reason}</p></figure>;
   let lo = Math.min(...vals), hi = Math.max(...vals); if (hi - lo < 1e-9) { lo -= 1; hi += 1; } const pad = (hi - lo) * 0.12; lo -= pad; hi += pad;
@@ -41,6 +48,7 @@ function Mini({m, p, obs, sel, maxDay, target}: {m: MetricId; p: P; obs: Observa
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${METRIC_LABEL[m]} 저장 일수별 계산값`}>
       {[lo + pad, (lo + hi) / 2, hi - pad].map((v, i) => <g key={i}><line x1={L} x2={W - R} y1={Y(v)} y2={Y(v)} className="mc-grid-line" /><text x={L - 4} y={Y(v) + 3} textAnchor="end" className="mc-ax">{fmtNum(v, tickDg)}</text></g>)}
       <path d={path} fill="none" stroke={METRIC_COLOR[m]} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" className="mc-line" />
+      {ref && <g>{ref.hi > ref.lo && <rect x={L} width={W - L - R} y={Y(ref.hi)} height={Y(ref.lo) - Y(ref.hi)} className="mc-ref-band" />}{[...new Set([ref.lo, ref.hi])].map(v => <line key={v} x1={L} x2={W - R} y1={Y(v)} y2={Y(v)} className="mc-ref" />)}<text x={W - R} y={Y(ref.hi) - 4} textAnchor="end" className="mc-ref-t">{ref.label} 평균 {ref.hi > ref.lo ? `${fmtNum(ref.lo, m === 'acidity' ? 2 : 1)}~${fmtNum(ref.hi, m === 'acidity' ? 2 : 1)}` : fmtNum(ref.lo, m === 'acidity' ? 2 : 1)}{UNIT(m) === '%' ? '%' : ' °Brix'}</text></g>}
       {target && <g><line x1={L} x2={W - R} y1={Y(target)} y2={Y(target)} className="mc-target" /><text x={W - R} y={Y(target) - 4} textAnchor="end" className="mc-target-t">내 기준 {target} N</text>{reach?.kind === 'at' && <circle cx={X(reach.day)} cy={Y(target)} r="4" className="mc-target-dot" />}</g>}
       <line x1={X(sel)} x2={X(sel)} y1={T} y2={H - B} className="mc-today" />
       {now.ok && <circle cx={X(sel)} cy={Y(now.value)} r="4" fill={METRIC_COLOR[m]} stroke="#fff" strokeWidth="2" />}
