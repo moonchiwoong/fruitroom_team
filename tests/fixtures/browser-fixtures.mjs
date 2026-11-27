@@ -51,7 +51,7 @@ export function analysis(lot, asOf=today) {
   }};
 }
 
-export async function installFixtures(context, {baseURL='http://127.0.0.1:3000', initialLots=lots, delayAnalysisMs=0, analysisTransform=value=>value, aiFixture=null}={}) {
+export async function installFixtures(context, {baseURL='http://127.0.0.1:3000', initialLots=lots, delayAnalysisMs=0, analysisTransform=value=>value, aiFixture=null, lotPageSize=0, delayLotPagesMs=0}={}) {
   const requests=[];
   let activeUser=user,activeSession=session,activeLots=initialLots;
   const setSession=async(nextUser,nextLots)=>{
@@ -82,8 +82,17 @@ export async function installFixtures(context, {baseURL='http://127.0.0.1:3000',
     if(['127.0.0.1','localhost'].includes(url.hostname)) {
       if(url.pathname==='/__ui-fixture-font.woff2' && process.env.PRETENDARD_FONT)return route.fulfill({status:200,contentType:'font/woff2',body:await readFile(process.env.PRETENDARD_FONT),headers:{'access-control-allow-origin':'*'}});
       if(url.pathname==='/api/lots') {
-        requests.push({path:url.pathname,method:request.method(),mock:true});
-        return request.method()==='GET'?json({lots:activeLots}):json({error:'Local UI review never writes records'},405);
+        const id = url.searchParams.get('id'), cursor = url.searchParams.get('cursor');
+        requests.push({path:url.pathname,method:request.method(),mock:true,id,cursor});
+        if(request.method() !== 'GET')return json({error:'Local UI review never writes records'},405);
+        if(id !== null) {
+          const lot = activeLots.find(record => record.id === id);
+          return lot ? json({lot}) : json({error:'물량을 찾을 수 없습니다.'},404);
+        }
+        if(!lotPageSize)return json({lots:activeLots});
+        if(cursor && delayLotPagesMs)await new Promise(resolve=>setTimeout(resolve,delayLotPagesMs));
+        const offset = Number(cursor ?? 0), next = offset + lotPageSize;
+        return json({lots: activeLots.slice(offset,next),nextCursor:next < activeLots.length ? String(next) : null});
       }
       if(/^\/api\/lots\/[^/]+\/analysis$/.test(url.pathname)) {
         requests.push({path:url.pathname,method:request.method(),mock:true});

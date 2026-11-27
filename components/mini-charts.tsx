@@ -20,7 +20,14 @@ export default function MiniCharts({p, obs, sel, maxDay, target = null}: {p: P; 
 }
 
 function Mini({m, p, obs, sel, maxDay, target}: {m: MetricId; p: P; obs: Observation[]; sel: number; maxDay: number; target: number | null}) {
-  const data = useMemo(() => { const a: {d: number; v: number | null}[] = []; for (let d = 0; d <= maxDay; d += 2) { const r = p.at(m, d); a.push({d, v: r.ok ? r.value : null}); } return a; }, [p, m, maxDay]);
+  const data = useMemo(() => {
+    const points: {d: number; v: number | null}[] = [];
+    for (let d = 0; ; d = Math.min(d + 2, maxDay)) {
+      const value = p.at(m, d);
+      points.push({d, v: value.ok ? value.value : null});
+      if (d === maxDay) return points;
+    }
+  }, [p, m, maxDay]);
   const meas = m === 'loss' || !p.start ? [] : obs.filter(o => o[m] != null && isDate(o.date)).map(o => ({d: daysBetween(p.start!, o.date), v: o[m] as number})).filter(x => x.d >= 0 && x.d <= maxDay);
   const reach = target ? firmnessReach(p, target, maxDay) : null, rt = reach && target ? reachText(reach, target) : null;
   const pref = m === 'brix' ? CONSUMER_BRIX.min : null, prefR = pref ? metricReach(p, 'brix', pref, maxDay) : null, prefT = prefR && pref ? prefReachText(prefR, pref) : null;
