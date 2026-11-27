@@ -17,14 +17,12 @@ try {
     const btn = await page.locator('.hs-today .hs-more').boundingBox();
     assert.ok(btn.height >= 40, `자세히 버튼 크기 ${btn.height}`); assert.equal(await page.locator('.hs-more-wide').count(), 0);
     await page.locator('.hs-today .hs-more').click();
-    const cc = page.locator('section[aria-label="소비자 선호와 비교"]'), ts = page.locator('section[aria-label="목표 저장일"]');
-    await cc.waitFor({timeout: 30000}); await ts.waitFor();
-    assert.match(await cc.innerText(), /오늘 단맛/); assert.equal(await cc.getByRole('button', {name: '오늘 잰 당도 기록하기'}).count(), 0);
+    const ts = page.locator('section[aria-label="목표 저장일"]');
+    await ts.waitFor({timeout: 30000}); assert.equal(await page.locator('section[aria-label="소비자 선호와 비교"]').count(), 0, '소비자 비교 카드 없음');
     await ts.getByRole('radio').first().click(); assert.match(await ts.innerText(), /캘린더에 등록/);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
-    if (w >= 1000) { const a = await cc.boundingBox(), b = await ts.boundingBox(); assert.ok(Math.abs(a.y - b.y) < 2 && Math.abs(a.height - b.height) < 2, `두 카드 위치·높이 ${JSON.stringify([a.y, a.height, b.y, b.height])}`); }
     assert.equal(dataCalls.length, 0, '개인 데이터 API 호출 없음');
-    console.log(`✓ ${w}px 체험: 요약(경매가 포함) → 예시 상세 소비자 선호 비교 · 목표 저장일 · 경매가 카드 · 개인 데이터 호출 0건`);
+    console.log(`✓ ${w}px 체험: 요약(경매가 포함) → 예시 상세 목표 저장일(소비자 비교 카드 없음) · 경매가 카드 · 개인 데이터 호출 0건`);
     await page.screenshot({path: `tests/browser/artifacts/guest-cards-${w}.png`, fullPage: true});
     await context.close();
   }

@@ -606,3 +606,10 @@ html.big-text .site-main,html.big-text .site-footer{--hx-max:830.77px;--hx-pad:1
 /* 한 줄 요약 카드가 위 카드에 붙지 않게(폰) */
 .hs-today>.hs-hl{margin-top:12px}
 @media (min-width:1000px){.hs-today>.hs-hl{margin-top:0}}
+@media (min-width:1000px){.lp-extra>.ts{grid-column:1/-1}}
+/* 소비자 비교 카드가 없을 때(PC): 목표 저장일 왼쪽, 내 기준·저장 조건 오른쪽 */
+@media (min-width:1000px){
+  .dash-measurements:not(:has(>.cc))>.dash-side{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:12px;align-items:stretch}
+  .dash-measurements:not(:has(>.cc))>.dash-side>.ts{grid-row:span 2}
+  .dash-measurements:not(:has(>.cc))>.dash-side>:not(.ts){grid-column:2}
+}

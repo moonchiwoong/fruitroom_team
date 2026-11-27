@@ -6,7 +6,7 @@ import type {Lot, Observation} from '@/lib/lot-types';
 import {lotPredictor, easyChange, EASY_METRICS} from '@/lib/lot-predict';
 import {fmtNum, metricMeta, addDays} from '@/lib/tracker';
 import MiniCharts from '@/components/mini-charts';
-import {ConsumerCompare, TargetStorage} from '@/components/my-apples';
+import {TargetStorage} from '@/components/my-apples';
 
 const SHORT: Record<string, string> = {firmness: '단단함', loss: '무게', brix: '단맛', acidity: '신맛'};
 const md = (d: string) => { const [, m, day] = d.split('-').map(Number); return `${m}/${day}`; };
@@ -29,7 +29,6 @@ export default function LotPreview({lot, observations = [], obsLabel = '측정'}
     <div className="dash-side">{obs.length > 0 && <section className="ma-records" aria-label={`${obsLabel} 기록`}><h2>{obsLabel} 기록</h2><ul>{obs.slice(0, 5).map(o => <li key={o.id} className="ma-rec"><span><b>{md(o.date)}</b> {[o.brix != null ? `단맛 ${o.brix}` : null, o.firmness != null ? `단단함 ${o.firmness} N` : null, o.acidity != null ? `신맛 ${o.acidity}%` : null].filter(Boolean).join(' · ')}</span></li>)}</ul></section>}
     </div>
     <div className="dash-measurements lp-extra">
-      <ConsumerCompare lot={lot} p={p} />
       <TargetStorage lot={lot} p={p} maxDay={hongro ? 120 : 300} link={typeof location !== 'undefined' ? location.origin : undefined} />
     </div>
   </div>;

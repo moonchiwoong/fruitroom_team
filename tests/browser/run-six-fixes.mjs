@@ -134,7 +134,7 @@ try {
       assert.equal(await page.getByText('내 사과로 해 보기').count(), 0, '체험은 예시 사과만');
       await page.locator('.hs-today .hs-hl').waitFor({timeout: 30000});
       await page.locator('.hs-today .hs-more').click();
-      await page.locator('section[aria-label="소비자 선호와 비교"]').waitFor();
+      await page.locator('section[aria-label="목표 저장일"]').waitFor();
       ok(`${tag} 4 체험: 예시 사과만 · ‘내 사과로 해 보기’ 없음`);
       await context.close();
     }

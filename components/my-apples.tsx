@@ -223,7 +223,6 @@ function AppleDetail({lot, firstMsg = '', onBack, reload, openTracker, openModel
             {sortedObs.length > 3 && <button type="button" className="linkbtn" onClick={() => setAllRec(v => !v)}>{allRec ? '최근 3개만 보기' : `전체 ${sortedObs.length}개 보기`}</button>}</>
           : <p>아직 측정 기록이 없어요.</p>}
       </section>
-      {!lot.details?.archived_on && obs !== null && <ConsumerCompare lot={lot} p={p} onMeasure={() => setMeasure(true)} />}
       <div className="dash-side">
       {!lot.details?.archived_on && obs !== null && <TargetStorage lot={lot} p={p} maxDay={limit} />}
       <section className="ma-target dash-card" aria-label="내 단단함 기준"><h2>내 기준</h2>
