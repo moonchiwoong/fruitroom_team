@@ -613,9 +613,3 @@ html.big-text .site-main,html.big-text .site-footer{--hx-max:830.77px;--hx-pad:1
   .dash-measurements:not(:has(>.cc))>.dash-side>.ts{grid-row:span 2}
   .dash-measurements:not(:has(>.cc))>.dash-side>:not(.ts){grid-column:2}
 }
-/* 품종 평균 참고선(회색 점선, 범위면 옅은 띠) */
-.mc-ref{stroke:#8E8E93;stroke-width:1.4;stroke-dasharray:5 4}
-.mc-ref-band{fill:#8E8E93;opacity:.12}
-.mc-ref-t{font-size:10px;fill:#636366;font-weight:700}
-.mc-refsrc{margin:8px 2px 0;font-size:12px;color:#8A8A8E;line-height:1.5}
-.mc-refsrc a{color:#636366;text-decoration:underline}

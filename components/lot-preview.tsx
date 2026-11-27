@@ -25,7 +25,7 @@ export default function LotPreview({lot, observations = [], obsLabel = '측정'}
     <p className="ma-date">{p.start ? `${md(addDays(p.start, sel))} 기준 (저장 ${sel}일째)` : ''}</p></div>
     <div className="dash-tiles"><div className="ma-rows">{EASY_METRICS.map(m => { const r = p.at(m, sel);
       return <div key={m + ':' + sel} className="ma-row"><span className="ma-row-lab" style={{color: METRIC_COLOR[m]}}><MetricIcon m={m} />{SHORT[m]}</span><div>{r.ok ? <><b>{easyChange(m, r.value, r.first, p.weather)}</b><small>{fmtNum(r.value, metricMeta[m].digits)} {m === 'firmness' ? 'N' : metricMeta[m].unit}</small></> : <><b className="na">계산 없음</b><small>{r.reason}</small></>}</div></div>; })}</div></div>
-    <section className="dash-chart" aria-label="저장 일수별 변화"><h2>저장 일수별 변화 <small>선: 계산값 · 세로선: 고른 날</small></h2><MiniCharts variety={lot.variety} p={p} obs={observations} sel={sel} maxDay={hongro ? 120 : 200} /></section>
+    <section className="dash-chart" aria-label="저장 일수별 변화"><h2>저장 일수별 변화 <small>선: 계산값 · 세로선: 고른 날</small></h2><MiniCharts p={p} obs={observations} sel={sel} maxDay={hongro ? 120 : 200} /></section>
     <div className="dash-side">{obs.length > 0 && <section className="ma-records" aria-label={`${obsLabel} 기록`}><h2>{obsLabel} 기록</h2><ul>{obs.slice(0, 5).map(o => <li key={o.id} className="ma-rec"><span><b>{md(o.date)}</b> {[o.brix != null ? `단맛 ${o.brix}` : null, o.firmness != null ? `단단함 ${o.firmness} N` : null, o.acidity != null ? `신맛 ${o.acidity}%` : null].filter(Boolean).join(' · ')}</span></li>)}</ul></section>}
     </div>
     <div className="dash-measurements lp-extra">
