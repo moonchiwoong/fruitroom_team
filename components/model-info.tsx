@@ -6,6 +6,7 @@ import {KindBadge} from '@/components/tracker-parts';
 import {inputInfo, inputKeys, metricInfo, metricKeys, regionIds, sampleRegionIds, regions, regionSummary, samples} from '@/lib/initial-quality';
 import {HONGRO_REGIONS, HONGRO_REGRESSIONS} from '@/lib/hongro';
 import {WEATHER_STATIONS, weatherLabels} from '@/lib/rda-weather';
+import {REGION_KEYS, REGIONS, FUJI_REGION_KEYS, HONGRO_REGION_KEYS} from '@/lib/regions';
 import {MODEL_RANGE, modelLabel, metricMeta, type MetricId} from '@/lib/tracker';
 import {MODEL_REGISTRY, predictQuality, type PredictionResult} from '@/lib/quality-models';
 import type {StorageId} from '@/lib/initial-quality';
@@ -64,7 +65,7 @@ export default function ModelInfo({modelId, metric, context}: {modelId?: Storage
     <section className="mi-card mi-simple" aria-label="한눈에 보기">
       <h3>한눈에 보기</h3>
       <ul>
-        <li><b>처음 품질</b>: 직접 잰 값, 또는 수확한 해 농업기상(거창·청송·장수·영주 관측소) 자료로 산지별 회귀식이 추정한 값이에요.</li>
+        <li><b>처음 품질</b>: 직접 잰 값이나 수확한 해 농업기상으로 추정한 값이에요. 기상 추정은 {REGION_KEYS.map(id => REGIONS[id].label).join('·')} 총 {REGION_KEYS.length}곳에서 지원해요. 품종마다 지원 산지가 달라요(후지 {FUJI_REGION_KEYS.length}곳, 홍로 {HONGRO_REGION_KEYS.length}곳).</li>
         <li><b>저장 중 변화</b>: 품종·보관 방식·1-MCP·온도별 저장식으로 저장 일수에 따라 계산해요. 직접 잰 값이 있으면 그 값에서 이어 계산해요.</li>
         <li><b>정확도</b>: 아직 검증되지 않은 시연용 계산이에요. 출하·안전 여부는 판정하지 않아요. 색 변화·저장 병은 예측하지 않아요.</li>
       </ul>
@@ -186,7 +187,7 @@ export default function ModelInfo({modelId, metric, context}: {modelId?: Storage
 
     <section className="mi-card" id="mi-regression">
       <h2>연구 중인 모델·참고 자료</h2>
-      <p><b>후지(청송·장수·영주)에서 ‘날씨로 추정’을 고르면 이 산지별 기상 회귀식으로 처음 품질을 추정합니다.</b> 아래 참고 계산 화면에서 바꾼 값은 저장된 사과 기록에 반영되지 않습니다. 홍로(거창)는 이 식이 아닌 별도의 거창 회귀식을 사용합니다. 두 식 모두 별도 평가 자료로 정확도를 검증하지 않았습니다.</p>
+      <p><b>‘날씨로 추정’을 고르면 해당 품종과 산지의 회귀식으로 처음 품질을 추정합니다.</b> 아래 참고 계산 화면에서 바꾼 값은 저장된 사과 기록에 반영되지 않습니다. 회귀식의 정확도는 별도 평가 자료로 검증하지 않았습니다.</p>
       <details className="mi-disclosure">
       <summary>산지별 기상 회귀식과 참고 계산 펼치기</summary>
       <p className="qt-help">이 영역의 학습 적합도는 학습 자료에 대한 값이며 별도 평가 자료의 예측 성능이나 서비스 전체의 정확도가 아닙니다.</p>
