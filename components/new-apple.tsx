@@ -2,7 +2,7 @@
 // ‘새 사과’: 농가용 간단 등록 화면. 품종 → 생산지 → 수확일 → 보관 → 처음 품질(자동/직접) 다섯 가지만 묻습니다.
 // 저장 형식과 검사는 기존 품질 예측 화면과 같은 lib/tracker-form(payloadFromForm·validateForm)을 그대로 씁니다.
 // 계산은 lib/lot-predict(기존 예측식)만 쓰고, 날씨 값이 다 없으면 계산하지 않습니다(값을 채우거나 추정하지 않음).
-import {FUJI_REGION_KEYS, HONGRO_REGION_KEYS} from '@/lib/regions';
+import {FUJI_REGION_KEYS, HONGRO_REGION_KEYS, isFujiRegionKey, isHongroRegionKey} from '@/lib/regions';
 import {harvestMonthError} from '@/lib/harvest-window';
 import {useEffect, useMemo, useState, type ReactNode} from 'react';
 import {josa} from '@/lib/josa';
@@ -32,7 +32,7 @@ function Seg<T extends string>({name, legend, value, options, onChange}: {name: 
   </fieldset>;
 }
 
-type Weather = {state: 'idle' | 'loading' | 'ok' | 'pending' | 'error'; msg?: string; key?: string};
+type Weather = {state: 'idle' | 'loading' | 'ok' | 'pending' | 'error'; msg?: string; key?: string; values?: Record<string, number | null>};
 
 /** guest: 비회원 체험. 저장하지 않고 결과를 바로 보여 주며, 저장 버튼은 가입·로그인으로 보냅니다. */
 export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onBack?: () => void; onSaved?: (lot: Lot) => void | Promise<void>; guest?: boolean; onLogin?: () => void}) {
@@ -44,7 +44,7 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
   // 시작 방법: 'region' = 지도에서 산지를 골라 날씨로 추정, 'measured' = 직접 잰 값. 고르기 전에는 두 갈래만 보여 줍니다.
   const [path, setPath] = useState<'region' | 'measured' | null>(null), [mapRegion, setMapRegion] = useState<MapRegion | ''>('');
   function pickMap(r: MapRegion) {
-    setMapRegion(r); setWx({state: 'idle'}); setVals(null);
+    setMapRegion(r);
     const cv = MAP_PINS[r].cultivars, next = cv.includes(cultivar) ? cultivar : cv[0];
     setCultivar(next);
     if (MAP_PINS[r].cultivars.includes('후지')) setRegion(r as FujiRegion);
@@ -60,29 +60,30 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
   const [source, setSource] = useState<'weather' | 'measured'>('weather');
   const [m, setM] = useState({brix: '', firmness: '', acidity: ''}), [unit, setUnit] = useState<'N' | 'kgf'>(() => { try { return window.localStorage.getItem('appletrack:firmunit') === 'kgf' ? 'kgf' : 'N'; } catch { return 'N'; } });
   const [name, setName] = useState(''), [place, setPlace] = useState(''), [boxes, setBoxes] = useState('');
-  const [wx, setWx] = useState<Weather>({state: 'idle'}), [vals, setVals] = useState<Record<string, number | null> | null>(null);
+  const [wx, setWx] = useState<Weather>({state: 'idle'}), [retryWeather, setRetryWeather] = useState(0);
   const [saving, setSaving] = useState(false), [err, setErr] = useState('');
   const startDate = same ? harvest : start, year = isDate(harvest) ? +harvest.slice(0, 4) : null;
-  const wRegion = hongro ? hRegion : region;
+  const wRegion = path === 'region' ? mapRegion : hongro ? hRegion : region;
   const rainMonth = wRegion ? WEATHER_STATIONS[wRegion].rainMonth : 9;
 
   // 날씨로 추정: 수확한 해 4~9월 농업기상 일자료(서버 경로)로 네 값을 받습니다. 빠진 값은 비워 둡니다.
-  const wKey = source === 'weather' && year && wRegion ? `${wRegion}:${year}` : '';
+  const wKey = path === 'region' && year && wRegion ? `${wRegion}:${year}` : '';
+  const vals = wKey && wx.key === wKey ? wx.values : undefined;
   useEffect(() => {
-    if (!wKey || wx.key === wKey) return;
-    let live = true; setWx({state: 'loading', key: wKey}); setVals(null);
-    fetch(`/api/weather/hongro?year=${year}&region=${wRegion}`).then(async r => {
+    if (!wKey) { setWx({state: 'idle'}); return; }
+    const request = new AbortController();
+    setWx({state: 'loading', key: wKey});
+    fetch(`/api/weather/hongro?year=${year}&region=${wRegion}`, {signal: request.signal}).then(async r => {
       const j = await r.json().catch(() => ({}));
-      if (!live) return;
+      if (request.signal.aborted) return;
       if (!r.ok) { setWx({state: 'error', key: wKey, msg: j.error || '날씨 자료를 불러오지 못했어요.'}); return; }
       if (!Array.isArray(j.variables)) { setWx({state: 'error', key: wKey, msg: '날씨 자료를 불러오지 못했어요.'}); return; }
       const v = Object.fromEntries((j.variables as {key: string; value: number | null}[]).map(x => [x.key, x.value]));
-      setVals(v);
       const missing = Object.values(v).some(x => x === null);
-      setWx({state: missing ? 'pending' : 'ok', key: wKey, msg: missing ? (year && today < `${year}-${String(rainMonth + 1).padStart(2, '0')}-01` ? `${rainMonth}월 강수량은 ${rainMonth}월이 끝나야 집계돼서, ${rainMonth + 1}월 1일부터 자동으로 추정해요. 지금 저장해 두면 돼요. 당도나 단단함을 재면 바로 예측돼요.` : ((j.variables as {reason: string | null}[]).map(x => x.reason).find(Boolean) ?? '날씨 값이 빠져 있어 지금은 계산하지 않아요.')) : undefined});
-    }).catch(() => { if (live) setWx({state: 'error', key: wKey, msg: '날씨 자료를 불러오지 못했어요.'}); });
-    return () => { live = false; };
-  }, [wKey]); // eslint-disable-line react-hooks/exhaustive-deps
+      setWx({state: missing ? 'pending' : 'ok', key: wKey, values: v, msg: missing ? (year && today < `${year}-${String(rainMonth + 1).padStart(2, '0')}-01` ? `${rainMonth}월 강수량은 ${rainMonth}월이 끝나야 집계돼서, ${rainMonth + 1}월 1일부터 자동으로 추정해요. 지금 저장해 두면 돼요. 당도나 단단함을 재면 바로 예측돼요.` : ((j.variables as {reason: string | null}[]).map(x => x.reason).find(Boolean) ?? '날씨 값이 빠져 있어 지금은 계산하지 않아요.')) : undefined});
+    }).catch(() => { if (!request.signal.aborted) setWx({state: 'error', key: wKey, msg: '날씨 자료를 불러오지 못했어요.'}); });
+    return () => request.abort();
+  }, [wKey, year, wRegion, rainMonth, today, retryWeather]);
 
   const form: TrackerForm = useMemo(() => {
     const f = emptyForm(), s = (v: number | null | undefined) => v === null || v === undefined ? '' : String(v);
@@ -90,16 +91,16 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
     f.initialSameStart = true; f.mcpSelected = true; f.firmness_unit = unit; f.name = name; f.name_auto = !name.trim();
     if (hongro) {
       f.storage = '일반 저온'; f.mcp = '미처리'; f.temperature = temp;
-      f.hongro = {...f.hongro, source, storage: temp === '4' ? 'cold4' : 'cold0', region: hRegion || 'geochang'};
+      f.hongro = {...f.hongro, source, storage: temp === '4' ? 'cold4' : 'cold0', region: isHongroRegionKey(wRegion) ? wRegion : 'geochang'};
       if (source === 'weather') f.hongro.weather = {chang_min4: s(vals?.chang_min4), chang_LC56: s(vals?.chang_LC56), chang_LC78: s(vals?.chang_LC78), chang_9rain: s(vals?.chang_9rain)};
       else f.hongro.initial = {...f.hongro.initial, ...m};
     } else {
       f.storage = storage; f.mcp = mcp || '미확인'; f.mcpSelected = !!mcp;
-      if (source === 'weather') f.fuji = {source: 'weather', region, year: year ? String(year) : '', weather: {rain9: s(vals?.chang_9rain), lc56: s(vals?.chang_LC56), lc78: s(vals?.chang_LC78), min4: s(vals?.chang_min4)}};
+      if (source === 'weather') f.fuji = {source: 'weather', region: isFujiRegionKey(wRegion) ? wRegion : '', year: year ? String(year) : '', weather: {rain9: s(vals?.chang_9rain), lc56: s(vals?.chang_LC56), lc78: s(vals?.chang_LC78), min4: s(vals?.chang_min4)}};
       else { f.firmness = m.firmness; f.brix = m.brix; f.acidity = m.acidity; if (region) f.fuji = {...f.fuji, region}; }
     }
     return f;
-  }, [cultivar, hongro, harvest, startDate, unit, name, temp, source, vals, m, storage, mcp, region, hRegion, year]);
+  }, [cultivar, hongro, harvest, startDate, unit, name, temp, source, vals, m, storage, mcp, region, wRegion, year]);
 
   // 저장 전 미리보기: 저장될 내용 그대로 기존 예측식으로 계산합니다.
   const preview = useMemo(() => {
@@ -123,7 +124,12 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
     if (e.length) { setErr(e[0]); return; }
     setSaving(true);
     try {
-      const r = await requestJson<{lot: Lot}>('/api/lots', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify((() => { const pl = payloadFromForm(form), q = Number(boxes); return {...pl, location: place.trim() || null, ...(boxes.trim() && Number.isFinite(q) && q > 0 ? {quantity: q} : {}), details: {...pl.details, region: hongro ? 'geochang' : region || null, quantity_unit: '상자'}}; })())});
+      const pl = payloadFromForm(form), q = Number(boxes);
+      const selectedRegion = wRegion || null;
+      const r = await requestJson<{lot: Lot}>('/api/lots', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
+        ...pl, location: place.trim() || null, ...(boxes.trim() && Number.isFinite(q) && q > 0 ? {quantity: q} : {}),
+        details: {...pl.details, region: selectedRegion, ...(hongro && source === 'measured' && selectedRegion ? {region_confirmed: true} : {}), quantity_unit: '상자'},
+      })});
       await onSaved?.(r.lot);
     } catch (x) { setErr((x as Error).message); } finally { setSaving(false); }
   }
@@ -135,13 +141,13 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
     <div className="ma-title"><h1>{guest ? '내 사과로 해 보기' : '새 사과'}</h1><p>다섯 가지만 고르면 저장 중 변화를 계산해요.{guest ? ' 가입하지 않아도 결과를 볼 수 있어요.' : ''}</p></div>
 
     {path === null ? <div className="na-start" role="group" aria-label="시작 방법">
-      <button type="button" onClick={() => { setPath('region'); setSource('weather'); setWx({state: 'idle'}); }}>
+      <button type="button" onClick={() => { setPath('region'); setSource('weather'); }}>
         <b>지역으로 시작</b><p>지도에서 산지를 고르면 그 해 농업기상 자료로 처음 품질을 추정해요. 잰 값이 없을 때 좋아요.</p><em>산지 8곳 · 날씨로 추정 →</em></button>
-      <button type="button" onClick={() => { setPath('measured'); setSource('measured'); setWx({state: 'idle'}); }}>
+      <button type="button" onClick={() => { setPath('measured'); setSource('measured'); }}>
         <b>직접 잰 값으로 시작</b><p>수확하거나 입고할 때 잰 당도·단단함·신맛을 넣어요. 하나만 있어도 돼요.</p><em>더 정확해요 →</em></button>
     </div> : <>
     <div className="na-sheet">
-    <div className="na-sheet-h"><b>{path === 'region' ? '주산지로 시작' : '직접 잰 값으로 시작'}</b><button type="button" className="na-switch" onClick={() => { setPath(null); setWx({state: 'idle'}); setVals(null); }}>시작 방법 바꾸기</button></div>
+    <div className="na-sheet-h"><b>{path === 'region' ? '주산지로 시작' : '직접 잰 값으로 시작'}</b><button type="button" className="na-switch" onClick={() => setPath(null)}>시작 방법 바꾸기</button></div>
 
     {path === 'region' && <section className="na-card na-full na-maprow"><h2><span>1</span>주산지</h2>
       <RegionMapPicker value={mapRegion} onPick={pickMap} credit={false} />
@@ -149,15 +155,15 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
       <p className="rmp-credit">{MAP_CREDIT}</p></section>}
 
     {(path === 'measured' || mapRegion) && <section className="na-card"><h2><span>{path === 'region' ? 2 : 1}</span>품종</h2>
-      <Seg name="na-cultivar" legend="품종" value={cultivar} options={(['후지', '홍로'] as const).filter(c => path !== 'region' || !mapRegion || MAP_PINS[mapRegion].cultivars.includes(c)).map(c => ({value: c, label: c}))} onChange={v => { setCultivar(v); setWx({state: 'idle'}); setVals(null); }} /></section>}
+      <Seg name="na-cultivar" legend="품종" value={cultivar} options={(['후지', '홍로'] as const).filter(c => path !== 'region' || !mapRegion || MAP_PINS[mapRegion].cultivars.includes(c)).map(c => ({value: c, label: c}))} onChange={setCultivar} /></section>}
 
     {path === 'measured' && <section className="na-card"><h2><span>2</span>생산지 <small className="ma-sub">기록용 · 선택</small></h2>
-      {hongro ? <Seg name="na-region-h" legend="생산지" value={hRegion} options={HONGRO_REGION_IDS.map(id => ({value: id, label: label(id)}))} onChange={v => { setHRegion(v); setWx({state: 'idle'}); setVals(null); }} />
-        : <Seg name="na-region" legend="생산지" value={region} options={FUJI_REGIONS.map(id => ({value: id, label: label(id)}))} onChange={v => { setRegion(v); setWx({state: 'idle'}); setVals(null); }} />}</section>}
+      {hongro ? <Seg name="na-region-h" legend="생산지" value={hRegion} options={HONGRO_REGION_IDS.map(id => ({value: id, label: label(id)}))} onChange={setHRegion} />
+        : <Seg name="na-region" legend="생산지" value={region} options={FUJI_REGIONS.map(id => ({value: id, label: label(id)}))} onChange={setRegion} />}</section>}
 
     {(path === 'measured' || mapRegion) && <>
     <section className="na-card"><h2><span>3</span>수확일</h2>
-      <label className="na-field"><span>수확일</span><input id="na-harvest" type="date" max={today} value={harvest} aria-invalid={!!harvestErr} aria-describedby={harvestErr ? 'na-harvest-err' : undefined} onChange={e => { setHarvest(e.target.value); setWx({state: 'idle'}); }} /></label>
+      <label className="na-field"><span>수확일</span><input id="na-harvest" type="date" max={today} value={harvest} aria-invalid={!!harvestErr} aria-describedby={harvestErr ? 'na-harvest-err' : undefined} onChange={e => setHarvest(e.target.value)} /></label>
       {harvestErr && <p id="na-harvest-err" className="na-err" role="alert">{harvestErr}</p>}
       <label className="new-date-check"><input type="checkbox" checked={same} onChange={e => setSame(e.target.checked)} /><span>수확 당일 바로 저장고에 넣었어요</span></label>
       {!same && <label className="na-field"><span>저장 시작일</span><input id="na-start" type="date" min={harvest || undefined} max={today} value={start} onChange={e => setStart(e.target.value)} /></label>}</section>
@@ -171,10 +177,10 @@ export default function NewApple({onBack, onSaved, guest = false, onLogin}: {onB
     <section className={'na-card' + (source === 'weather' ? '' : ' na-full')}><h2><span>5</span>{source === 'weather' ? '처음 품질' : '잰 값'}</h2>
       {source === 'weather' ? <div className="na-wx" role="status" aria-live="polite">
         {!wKey ? <p className="ma-sub">{!wRegion ? '생산지를 고르면' : '수확일을 넣으면'} 그 해 농업기상 자료로 처음 품질을 추정해요.</p>
-          : wx.state === 'loading' ? <p><Loader2 className="spin" size={15} aria-hidden="true" />{year}년 4~9월 {station} 날씨를 모으는 중이에요…</p>
+          : wx.key !== wKey || wx.state === 'loading' ? <p><Loader2 className="spin" size={15} aria-hidden="true" />{year}년 4~9월 {station} 날씨를 모으는 중이에요…</p>
           : wx.state === 'ok' ? <p><b>{year}년 농업기상 {station} 관측</b>으로 추정해요(실측 아님).</p>
           : wx.state === 'pending' ? <p className="warn">{wx.msg}</p>
-          : wx.state === 'error' ? <><p className="warn">{wx.msg} 그대로 저장하면 나중에 다시 받아 와요. 직접 잰 값이 있으면 넣어 주세요.</p><button type="button" className="linkbtn" onClick={() => setWx({state: 'idle'})}>다시 불러오기</button></> : null}
+          : wx.state === 'error' ? <><p className="warn">{wx.msg} 그대로 저장하면 나중에 다시 받아 와요. 직접 잰 값이 있으면 넣어 주세요.</p><button type="button" className="linkbtn" onClick={() => setRetryWeather(n => n + 1)}>다시 불러오기</button></> : null}
       </div> : <div className="na-measure">
         <label className="na-field"><span>단맛(당도)</span><input type="number" inputMode="decimal" step="any" placeholder="예: 14.2" value={m.brix} onChange={e => setM(x => ({...x, brix: e.target.value}))} /><em>°Brix</em></label>
         <label className="na-field"><span>단단함</span><input type="number" inputMode="decimal" step="any" placeholder={unit === 'N' ? '예: 60' : '예: 6.1'} value={m.firmness} onChange={e => setM(x => ({...x, firmness: e.target.value}))} />
